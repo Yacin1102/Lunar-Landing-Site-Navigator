@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/sites.schema.json",
+  "type": "object",
+  "title": "SiteList",
+  "description": "sites.json, the curated site list (Contract 2). The only place site coordinates exist.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "sites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "Site",
+        "description": "One curated south polar site.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "description": "Unique, stable identifier. Used in file names: skylines/{id}.json, terrain/{id}.bin, shade/{id}.json."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude, degrees, -90 to 90."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude, degrees, east positive, -180 to 180."
+          },
+          "category": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "description": "Short lowercase group name for the menu. Group by whatever values appear; do not hard-code the set."
+          },
+          "mission": {
+            "type": "string",
+            "description": "Info-card text: mission name."
+          },
+          "date_utc": {
+            "type": "string",
+            "description": "Info-card text: a date in ISO 8601.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})?)?$"
+          },
+          "country": {
+            "type": "string",
+            "description": "Info-card text: country or agency."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Info-card text: free notes."
+          },
+          "has_terrain": {
+            "type": "boolean",
+            "description": "True only if terrain/{id}.bin and terrain/{id}.json exist."
+          },
+          "has_shade_grid": {
+            "type": "boolean",
+            "description": "True only if the three shade/{id}* files exist."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "lat",
+          "lon",
+          "category",
+          "has_terrain",
+          "has_shade_grid"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The 10 curated sites.",
+      "minItems": 10,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "version",
+    "sites"
+  ],
+  "additionalProperties": false
+}

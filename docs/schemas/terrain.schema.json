@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/terrain.schema.json",
+  "type": "object",
+  "title": "TerrainLabel",
+  "description": "Label of terrain/{id}.bin, the terrain patch for the 3D view (Contract 4). The .bin holds n * n little-endian Float32 heights, rows north to south, columns west to east. Sample (row i, column j) is at east = (j - (n-1)/2) * spacing_m, north = ((n-1)/2 - i) * spacing_m in the level plane of the site; its value is the ground height above that plane, metres, measured along the vertical of the site. Centre value is 0. Display only.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Latitude, degrees, -90 to 90."
+    },
+    "lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Longitude, degrees, east positive, -180 to 180."
+    },
+    "elev_m": {
+      "type": "number",
+      "description": "Ground height at the site (the patch centre), metres above the 1737.4 km sphere."
+    },
+    "size_m": {
+      "type": "number",
+      "description": "Side length of the patch, metres: (n - 1) * spacing_m.",
+      "exclusiveMinimum": 0
+    },
+    "n": {
+      "type": "integer",
+      "description": "Samples per side. Odd, so that the site is the centre sample.",
+      "minimum": 3
+    },
+    "spacing_m": {
+      "type": "number",
+      "description": "Distance between neighbouring samples, metres.",
+      "exclusiveMinimum": 0
+    },
+    "dem": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Names of the elevation map(s) used. Show this with every result."
+    },
+    "resolution_m": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Pixel size of the finest elevation map used near the point, metres. Show this with every result."
+    }
+  },
+  "required": [
+    "version",
+    "lat",
+    "lon",
+    "elev_m",
+    "size_m",
+    "n",
+    "spacing_m",
+    "dem",
+    "resolution_m"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/ephem.schema.json",
+  "type": "object",
+  "title": "EphemLabel",
+  "description": "Label of ephem.bin, the Sun/Earth timetable (Contract 1). ephem.bin holds `count` rows of six little-endian Float32 values in the order of `columns`. Row i is at time t0_ms + i * step_s * 1000.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "t0_ms": {
+      "type": "integer",
+      "const": 1794787200000,
+      "description": "UTC time of row 0, milliseconds since 1970-01-01: 16 Nov 2026 00:00 UTC."
+    },
+    "step_s": {
+      "type": "number",
+      "description": "Time between rows, seconds. Read it from here; do not assume a value.",
+      "exclusiveMinimum": 0
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of rows in ephem.bin.",
+      "minimum": 2
+    },
+    "columns": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "const": "sun_x"
+        },
+        {
+          "const": "sun_y"
+        },
+        {
+          "const": "sun_z"
+        },
+        {
+          "const": "earth_x"
+        },
+        {
+          "const": "earth_y"
+        },
+        {
+          "const": "earth_z"
+        }
+      ],
+      "items": false,
+      "minItems": 6,
+      "description": "The six values of each row, in order: the vector from the centre of the Moon to the Sun, then to the Earth."
+    },
+    "units": {
+      "type": "string",
+      "const": "km",
+      "description": "Unit of every value."
+    },
+    "frame": {
+      "type": "string",
+      "const": "MOON_ME",
+      "description": "Moon-fixed frame of the vectors."
+    },
+    "origin": {
+      "type": "string",
+      "const": "MOON",
+      "description": "The vectors start at the centre of the Moon."
+    },
+    "aberration": {
+      "type": "string",
+      "description": "SPICE correction used; positions are apparent (light time and stellar aberration corrected)."
+    }
+  },
+  "required": [
+    "version",
+    "t0_ms",
+    "step_s",
+    "count",
+    "columns",
+    "units",
+    "frame",
+    "origin",
+    "aberration"
+  ],
+  "additionalProperties": false
+}
