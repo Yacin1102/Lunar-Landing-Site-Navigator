@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/events.schema.json",
+  "type": "object",
+  "title": "EventsFixture",
+  "description": "events.json, known-correct rise and set times for the TypeScript tests (Contract 6), for a smooth Moon with no terrain and the eye at ground level. Rise and set are when the upper edge of the disc crosses the level horizon. Pass mark: 60 seconds.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "EventsCase",
+        "description": "One test case: every event between start_ms and end_ms.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What the case is meant to expose."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude, degrees, -90 to 90."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude, degrees, east positive, -180 to 180."
+          },
+          "start_ms": {
+            "type": "integer",
+            "description": "Start of the window, UTC milliseconds since 1970-01-01."
+          },
+          "end_ms": {
+            "type": "integer",
+            "description": "End of the window, UTC milliseconds since 1970-01-01."
+          },
+          "sunrise_ms": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Sunrises. UTC milliseconds since 1970-01-01, in time order."
+          },
+          "sunset_ms": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Sunsets. UTC milliseconds since 1970-01-01, in time order."
+          },
+          "earthrise_ms": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Earthrises. UTC milliseconds since 1970-01-01, in time order."
+          },
+          "earthset_ms": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Earthsets. UTC milliseconds since 1970-01-01, in time order."
+          }
+        },
+        "required": [
+          "lat",
+          "lon",
+          "start_ms",
+          "end_ms",
+          "sunrise_ms",
+          "sunset_ms",
+          "earthrise_ms",
+          "earthset_ms"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The test cases.",
+      "minItems": 1
+    }
+  },
+  "required": [
+    "version",
+    "cases"
+  ],
+  "additionalProperties": false
+}

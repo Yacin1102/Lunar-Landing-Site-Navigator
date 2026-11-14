@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/api_error.schema.json",
+  "type": "object",
+  "title": "ApiError",
+  "description": "Body of every refused request (HTTP status 400 for a bad or missing value, 422 for a point outside the service region).",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "ok": {
+      "type": "boolean",
+      "const": false,
+      "description": "Always false."
+    },
+    "error": {
+      "type": "object",
+      "title": "ApiErrorDetail",
+      "description": "What was wrong.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "missing_parameter",
+            "invalid_value",
+            "out_of_region",
+            "not_found",
+            "internal"
+          ],
+          "description": "Machine-readable reason."
+        },
+        "param": {
+          "type": "string",
+          "description": "The request parameter at fault, if one is."
+        },
+        "message": {
+          "type": "string",
+          "description": "Explanation for a person."
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version",
+    "ok",
+    "error"
+  ],
+  "additionalProperties": false
+}
