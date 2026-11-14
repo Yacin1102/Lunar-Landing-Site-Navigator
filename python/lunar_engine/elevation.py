@@ -96,11 +96,17 @@ def xy_to_unit(x_m, y_m) -> np.ndarray:
 def scale_factor(lat_deg) -> np.ndarray:
     """How much the projection stretches distances at a latitude.
 
-    A short distance ``d`` on the Moon is drawn ``scale_factor * d`` long on
-    the sheet. It is exactly 1 at the south pole and grows away from it
-    (1.0038 at 83 S, 1.072 at 60 S), never below 1. So two points are never
-    farther apart on the Moon than they are on the sheet: a fact the skyline
-    search relies on for its guarantees.
+    A short distance ``d`` on the reference sphere is drawn
+    ``scale_factor * d`` long on the sheet. It is exactly 1 at the south pole
+    and grows away from it (1.0038 at 83 S, 1.072 at 60 S), never below 1. So
+    two points **on the reference sphere** are never farther apart than they
+    are on the sheet.
+
+    Caution for anyone relying on this: it holds on the 1737.4 km sphere
+    only. Points standing at a height ``h`` are ``(1 + h / R)`` farther apart
+    than their feet on the sphere (0.3 % at 5 km), which near the pole is
+    more than the projection's stretch. A search that needs a guaranteed
+    lower limit on distance must allow for that factor.
     """
     lat = np.radians(np.asarray(lat_deg, dtype=float))
     return 2.0 / (1.0 - np.sin(lat))
@@ -126,6 +132,13 @@ class GridSpec:
     y_top: float
     n_rows: int
     n_cols: int
+
+    def __post_init__(self):
+        # Interpolation needs a 2 x 2 block of pixel centres.
+        if not self.pixel_m > 0:
+            raise ValueError(f"pixel size must be positive, got {self.pixel_m}")
+        if self.n_rows < 2 or self.n_cols < 2:
+            raise ValueError(f"a grid needs at least 2 x 2 pixels, got {self.n_rows} x {self.n_cols}")
 
     def x_of_col(self, col):
         """``x`` of the centre of a column (fractional columns allowed), metres."""
@@ -255,7 +268,15 @@ def max_pyramid(cells: np.ndarray, missing_as: float) -> list[np.ndarray]:
     Returns:
         List of arrays, finest first. ``levels[k][i, j]`` is an upper limit
         for every cell ``levels[0][i*2**k : (i+1)*2**k, j*2**k : (j+1)*2**k]``.
+
+    Note: this bounds the surface of the one grid the cells came from. It
+    says nothing about a finer map nested over the same area.
+
+    Raises:
+        ValueError: if ``cells`` is empty.
     """
+    if np.size(cells) == 0:
+        raise ValueError("cannot build a pyramid from an empty array")
     level = np.where(np.isnan(cells), missing_as, cells).astype(float)
     levels = [level]
     while level.shape != (1, 1):
@@ -341,12 +362,24 @@ class ElevationSource:
     def service_lat_max(self) -> float:
         """Northernmost latitude at which every longitude is inside the data.
 
-        The maps are squares on the projected sheet; the largest circle
-        around the pole that fits inside the widest map gives the latitude
-        up to which all longitudes are covered. Returns degrees.
+        The maps are squares on the projected sheet. For each map, the
+        largest circle around the pole that fits inside its pixel centres is
+        found; the largest of those circles gives the latitude up to which
+        all longitudes are covered. Returns degrees.
+
+        Raises:
+            CoverageError: if no map contains the pole, so that there is no
+                circle around the pole at all.
         """
-        spec = self.grids[-1].spec
-        half = spec.pixel_m / 2
-        reach = min(-(spec.x_left + half), spec.x_left + spec.n_cols * spec.pixel_m - half,
-                    spec.y_top - half, -(spec.y_top - spec.n_rows * spec.pixel_m + half))
+        reach = -np.inf
+        for grid in self.grids:
+            spec = grid.spec
+            half = spec.pixel_m / 2
+            reach = max(reach, min(-(spec.x_left + half),
+                                   spec.x_left + spec.n_cols * spec.pixel_m - half,
+                                   spec.y_top - half,
+                                   -(spec.y_top - spec.n_rows * spec.pixel_m + half)))
+        if reach <= 0:
+            raise CoverageError("no elevation map contains the south pole, so no latitude "
+                                "is covered at every longitude")
         return float(to_lat_lon(reach, 0.0)[0])

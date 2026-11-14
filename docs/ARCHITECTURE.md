@@ -82,7 +82,10 @@ flowchart TD
 
 The terrain is defined as the bilinear blend between pixel centres. Every height, skyline and error figure refers to that surface. A point outside the data, or in a hole, raises `CoverageError`; a height is never guessed.
 
-Two facts established by tests that the skyline search will rely on: the projection never shrinks distances (two points are never farther apart on the Moon than on the sheet), and each value of a "highest terrain" table is an upper limit for everything beneath it, with unknown terrain counted as high, not low.
+Two facts established by tests that the skyline search will rely on, with their limits:
+
+- The projection never shrinks distances on the reference sphere: two points on the 1737.4 km sphere are never farther apart than on the sheet. Points standing on high ground are slightly farther apart than their feet (0.3 % at 5 km), so the search must allow for that factor.
+- Each value of a "highest terrain" table is an upper limit for everything beneath it in that one map, with unknown terrain counted as high, not low. It says nothing about a finer map nested over the same area; each map needs its own table.
 
 ## Timetable and fixtures
 

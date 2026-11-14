@@ -130,6 +130,20 @@ def test_wrong_array_shape_is_refused():
         HeightGrid("bad", SPEC, np.zeros((100, 60)))
 
 
+@pytest.mark.parametrize("rows,cols", [(3, 1), (1, 3), (1, 1)])
+def test_grids_too_small_to_interpolate_are_refused(rows, cols):
+    """Found by review: a one-column grid crashed during interpolation."""
+    with pytest.raises(ValueError, match="at least 2 x 2"):
+        GridSpec(10.0, 0.0, 30.0, rows, cols)
+    with pytest.raises(ValueError, match="positive"):
+        GridSpec(0.0, 0.0, 30.0, 4, 4)
+
+
+def test_smallest_grid_interpolates():
+    grid = HeightGrid("two", GridSpec(10.0, 0.0, 20.0, 2, 2), [[0.0, 10.0], [20.0, 30.0]])
+    assert grid.height_xy(10.0, 10.0) == pytest.approx([15.0])
+
+
 # ---- "Highest terrain in an area" ------------------------------------------------------
 
 def test_cell_max_is_the_highest_of_the_four_corners():
@@ -151,6 +165,11 @@ def test_every_pyramid_value_is_an_upper_limit_for_everything_beneath_it(shape):
             for j in range(level.shape[1]):
                 beneath = cells[i * size:(i + 1) * size, j * size:(j + 1) * size]
                 assert level[i, j] == beneath.max()
+
+
+def test_pyramid_refuses_an_empty_array():
+    with pytest.raises(ValueError, match="empty"):
+        max_pyramid(np.zeros((2, 0)), missing_as=0.0)
 
 
 def test_pyramid_never_assumes_unknown_terrain_is_low():
@@ -199,6 +218,21 @@ def test_service_region_limit_follows_from_the_widest_map():
     source = ElevationSource([_flat("80S", 80.0, 304_000.0, 0.0)])
     assert source.service_lat_max() == pytest.approx(-80.0, abs=0.002)
     assert source.service_lat_max() < -80.0, "304,000 m is just short of the 80 S circle"
+
+
+def test_service_region_uses_the_widest_map_even_if_it_is_not_the_coarsest():
+    narrow_coarse = _flat("coarse", 240.0, 48_000.0, 0.0)
+    wide_fine = _flat("fine", 80.0, 304_000.0, 0.0)
+    assert ElevationSource([narrow_coarse, wide_fine]).service_lat_max() == pytest.approx(-80.0, abs=0.002)
+
+
+def test_no_service_region_when_no_map_contains_the_pole():
+    """Found by review: a map away from the pole reported a false latitude."""
+    off_pole = SyntheticElevation([], grids=((100.0, 20_000.0),), center=(-85.0, 0.0))
+    with pytest.raises(CoverageError):
+        off_pole.height(-90.0, 0.0)
+    with pytest.raises(CoverageError, match="south pole"):
+        off_pole.service_lat_max()
 
 
 # ---- Synthetic terrain ------------------------------------------------------------------
