@@ -57,8 +57,27 @@ The four windows not rescanned (both limbs, the edge of the service region, the 
 
 **Limit that remains.** At the pole an event can hang on a hair: a turning point of the Sun's edge can pass within thousandths of a degree of the horizon. The fixture builder refuses any window where that margin is under 0.002° (`test_fixture_builder_refuses_a_window_where_an_event_hangs_on_a_hair`). The closest in the current fixture is 0.0031°, for the Sun 0.5° from the pole (printed by `test_a_finer_scan_finds_the_same_events`). On real terrain this fragility is what the lit / blocked / uncertain classification exists for.
 
+## Skyline method (synthetic terrain)
+
+Verified in `python/tests/test_skyline.py`, without any real map. The engine returns, for every wedge, a lower limit (the elevation of a real terrain point in the wedge) and a proven upper limit. Each test checks that the true answer lies between them.
+
+| Check | Result |
+| --- | --- |
+| Smooth sphere, 2 m and 10 m mast: the horizon is `acos(R / (R + h))` below level (0.0869° and 0.1944°) | Inside the interval in all 3600 directions; interval narrower than ±0.00001° |
+| Full ring wall 3 km away, 300 m high | Between the two hand-calculated angles for the wall's near face, one pixel diagonal either side (5.5° to 5.7°) |
+| Wall sectors due east, north, south and west, 1 km from the pole and at 85°S | Raised in exactly the wedges inside the sector, the smooth horizon elsewhere |
+| A 300 m spike 10 km away whose whole footprint lies between two wedge centre lines | Found, at 1.542° as calculated by hand. Rays along the wedge centre lines provably see only flat ground there |
+| An 800 m peak 9 km away behind a 60 m ridge 1.5 km away (2.2°) | The peak is reported (4.92°), not the ridge |
+| A peak 12 km away present only in the coarse map of two nested maps | Found, at the hand-calculated angle |
+| A 100 m mast whose smooth horizon (18.6 km) lies beyond a 12 km map | Refused with `CoverageError`, no cut-off. With a 25 km map: the exact 0.6147° dip |
+| Unmapped terrain left at the real-data assumption (up to 11,000 m) | Refused when it could matter |
+| 25 random cones within 6 km; brute force with 16 points in each of 40,000 cells (2.5 million points) | No point rises above the upper limit of its wedge (worst: 0.000000000005° below it, rounding) |
+
+**Numerical error.** Half the interval width is the numerical part of the error bound. It was ±0.0000001° on the smooth sphere and averaged ±0.00085° (largest ±0.0028°) in the brute-force world, whose steep cones 1 to 6 km away are the hardest case for the ceiling. The ceiling pairs a piece's highest point with its nearest distance, which is loose on steep slopes facing the observer. A tighter proven ceiling is possible later if the real data needs it.
+
 ## Not yet verified
 
 - Elevation reading: the projection is verified (the engine's formulas agree with the projection declared inside the four coarse map files to better than a micrometre, `test_projection_is_the_one_the_map_files_declare`). Pixel registration against known features and published heights: with the LOLA reader.
-- Skyline on synthetic terrain, the stopping rule, the error bound and the independent line-of-sight check: with the skyline pull requests.
+- The full skyline error bound (`skyline_err_deg`: map height error, horizontal error, numerical error) and the independent line-of-sight check: next pull request.
+- Skyline speed and interval width on the real maps.
 - Illumination against published south polar studies: with the real products.

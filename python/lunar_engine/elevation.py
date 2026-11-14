@@ -22,8 +22,11 @@ How terrain is stored, in plain words
     every skyline and every error figure refers to it.
 
     An :class:`ElevationSource` holds one or more grids of different pixel
-    sizes covering nested areas, and always answers from the finest grid that
-    covers the point asked for.
+    sizes covering nested areas. Each grid is trusted inside one disc on the
+    sheet: the largest disc around the grid's centre that lies inside its
+    pixel centres and contains no missing value (see :meth:`HeightGrid.disc`).
+    The terrain at a point is the surface of the finest grid whose disc
+    contains the point. Outside every disc there is no data.
 
 Conventions (shared rules)
     Heights in metres above the sphere of radius 1737.4 km. Latitude and
@@ -91,6 +94,17 @@ def xy_to_unit(x_m, y_m) -> np.ndarray:
     return np.stack([4.0 * R_MOON_M * y / denominator,
                      4.0 * R_MOON_M * x / denominator,
                      -(four_r2 - x ** 2 - y ** 2) / denominator], axis=-1)
+
+
+def unit_to_xy(directions) -> tuple[np.ndarray, np.ndarray]:
+    """Direction from the Moon's centre to projected ``(x, y)`` in metres.
+
+    The inverse of :func:`xy_to_unit`: ``x = 2 R u_y / (1 - u_z)`` and
+    ``y = 2 R u_x / (1 - u_z)``. Undefined only at the north pole.
+    """
+    u = np.asarray(directions, dtype=float)
+    denominator = 1.0 - u[..., 2]
+    return 2.0 * R_MOON_M * u[..., 1] / denominator, 2.0 * R_MOON_M * u[..., 0] / denominator
 
 
 def scale_factor(lat_deg) -> np.ndarray:
@@ -190,6 +204,25 @@ class HeightGrid:
         self.spec = spec
         self._heights = heights
         self._errors = None if errors is None else np.asarray(errors, dtype=np.float32)
+        self._pyramids: dict[float, list[np.ndarray]] = {}
+        self._disc: tuple[float, float, float] | None = None
+
+    @property
+    def has_errors(self) -> bool:
+        """True if this map comes with a per-pixel height error."""
+        return self._errors is not None
+
+    def values(self, rows, cols) -> np.ndarray:
+        """Heights at whole pixel positions, metres.
+
+        Args:
+            rows, cols: integer arrays of the same shape (row and column indices).
+        """
+        return self._heights[rows, cols]
+
+    def error_values(self, rows, cols) -> np.ndarray | None:
+        """Height errors at whole pixel positions, metres, or ``None``."""
+        return None if self._errors is None else self._errors[rows, cols]
 
     def read(self, row0: int, row1: int, col0: int, col1: int) -> np.ndarray:
         """Heights of rows ``row0..row1-1`` and columns ``col0..col1-1``, metres."""
@@ -199,40 +232,76 @@ class HeightGrid:
         """Height errors of the same window, metres, or ``None`` if not available."""
         return None if self._errors is None else self._errors[row0:row1, col0:col1]
 
-    def _interpolate(self, reader, x_m, y_m) -> np.ndarray:
+    def _interpolate(self, getter, x_m, y_m) -> np.ndarray:
         """Bilinear blend of the four pixel centres around each point.
 
+        Args:
+            getter: :meth:`values` or :meth:`error_values`.
+            x_m, y_m: projected points, metres (any shape).
+
         Returns NaN where the point is outside the pixel centres or where any
-        of the four values is missing.
+        of the four values is missing. The result has the shape of ``x_m``
+        (at least one dimension).
         """
         x = np.atleast_1d(np.asarray(x_m, dtype=float))
         y = np.atleast_1d(np.asarray(y_m, dtype=float))
         out = np.full(x.shape, np.nan)
         inside = self.spec.covers(x, y)
-        if not inside.any():
+        if not inside.any() or getter(np.zeros(1, int), np.zeros(1, int)) is None:
             return out
         col = self.spec.col_of_x(x[inside])
         row = self.spec.row_of_y(y[inside])
         c0 = np.minimum(np.floor(col).astype(int), self.spec.n_cols - 2)
         r0 = np.minimum(np.floor(row).astype(int), self.spec.n_rows - 2)
         fc, fr = col - c0, row - r0
-        rmin, rmax, cmin, cmax = r0.min(), r0.max() + 2, c0.min(), c0.max() + 2
-        window = reader(rmin, rmax, cmin, cmax)
-        if window is None:
-            return out
-        window = np.asarray(window, dtype=float)
-        r, c = r0 - rmin, c0 - cmin
-        out[inside] = (window[r, c] * (1 - fr) * (1 - fc) + window[r, c + 1] * (1 - fr) * fc
-                       + window[r + 1, c] * fr * (1 - fc) + window[r + 1, c + 1] * fr * fc)
+        out[inside] = (getter(r0, c0) * (1 - fr) * (1 - fc) + getter(r0, c0 + 1) * (1 - fr) * fc
+                       + getter(r0 + 1, c0) * fr * (1 - fc) + getter(r0 + 1, c0 + 1) * fr * fc)
         return out
 
     def height_xy(self, x_m, y_m) -> np.ndarray:
         """Interpolated height at projected points, metres; NaN where unavailable."""
-        return self._interpolate(self.read, x_m, y_m)
+        return self._interpolate(self.values, x_m, y_m)
 
     def error_xy(self, x_m, y_m) -> np.ndarray:
         """Interpolated height error at projected points, metres; NaN where unavailable."""
-        return self._interpolate(self.read_error, x_m, y_m)
+        return self._interpolate(self.error_values, x_m, y_m)
+
+    def pyramid(self, missing_as: float) -> list[np.ndarray]:
+        """The "highest terrain in this block" tables of this map (cached).
+
+        See :func:`max_pyramid`. Stored as 32-bit numbers, which hold every
+        height of the map exactly.
+        """
+        key = float(missing_as)
+        if key not in self._pyramids:
+            self._pyramids[key] = max_pyramid(cell_max(self._heights), missing_as)
+        return self._pyramids[key]
+
+    def disc(self) -> tuple[float, float, float]:
+        """The disc on the sheet inside which this map is trusted (cached).
+
+        It is centred on the middle of the grid. Its radius is the largest
+        for which (a) every point inside can be interpolated, that is, lies
+        within the pixel centres, and (b) no missing value is used: the
+        radius stops at least one pixel diagonal short of the nearest missing
+        pixel, so every point inside has all four of its pixel values.
+
+        Returns:
+            ``(centre_x, centre_y, radius)``, metres. The radius is 0 if a
+            missing value sits at the very centre.
+        """
+        if self._disc is None:
+            spec = self.spec
+            cx = spec.x_left + spec.n_cols * spec.pixel_m / 2
+            cy = spec.y_top - spec.n_rows * spec.pixel_m / 2
+            radius = min(spec.n_cols - 1, spec.n_rows - 1) * spec.pixel_m / 2
+            missing = np.argwhere(np.isnan(self._heights))
+            if len(missing):
+                distance = np.hypot(spec.x_of_col(missing[:, 1]) - cx,
+                                    spec.y_of_row(missing[:, 0]) - cy).min()
+                radius = min(radius, distance - np.sqrt(2.0) * spec.pixel_m * (1 + 1e-9))
+            self._disc = (float(cx), float(cy), float(max(radius, 0.0)))
+        return self._disc
 
 
 def cell_max(heights: np.ndarray) -> np.ndarray:
@@ -248,7 +317,9 @@ def cell_max(heights: np.ndarray) -> np.ndarray:
     Returns:
         Array ``(n_rows - 1, n_cols - 1)``.
     """
-    h = np.asarray(heights, dtype=float)
+    h = np.asarray(heights)
+    if not np.issubdtype(h.dtype, np.floating):
+        h = h.astype(float)
     return np.maximum(np.maximum(h[:-1, :-1], h[:-1, 1:]), np.maximum(h[1:, :-1], h[1:, 1:]))
 
 
@@ -277,11 +348,13 @@ def max_pyramid(cells: np.ndarray, missing_as: float) -> list[np.ndarray]:
     """
     if np.size(cells) == 0:
         raise ValueError("cannot build a pyramid from an empty array")
-    level = np.where(np.isnan(cells), missing_as, cells).astype(float)
+    cells = np.asarray(cells)
+    dtype = cells.dtype if np.issubdtype(cells.dtype, np.floating) else np.float64
+    level = np.where(np.isnan(cells), missing_as, cells).astype(dtype)
     levels = [level]
     while level.shape != (1, 1):
         rows, cols = level.shape
-        padded = np.full((rows + rows % 2, cols + cols % 2), -np.inf)
+        padded = np.full((rows + rows % 2, cols + cols % 2), -np.inf, dtype=dtype)
         padded[:rows, :cols] = level
         level = padded.reshape(padded.shape[0] // 2, 2, padded.shape[1] // 2, 2).max(axis=(1, 3))
         levels.append(level)
@@ -297,15 +370,21 @@ class ElevationSource:
 
     Args:
         grids: the maps, in any order. They are kept finest first, and every
-            question is answered from the finest map that covers the point.
+            question is answered from the finest map whose trusted disc
+            (:meth:`HeightGrid.disc`) contains the point.
 
     Attributes:
         grids: the maps, finest pixel first.
         is_real: False for synthetic terrain. Products built from a source
             with ``is_real`` False must be marked as not real.
+        unknown_height_m: the most that terrain outside every map could rise
+            above the 1737.4 km sphere, metres. 11,000 m is above the highest
+            known point on the Moon (about 10,786 m), so nothing unmapped is
+            ever assumed to be lower than it could be.
     """
 
     is_real = True
+    unknown_height_m = 11_000.0
 
     def __init__(self, grids: list[HeightGrid]):
         if not grids:
@@ -318,14 +397,15 @@ class ElevationSource:
         return [grid.name for grid in self.grids]
 
     def grid_at(self, lat_deg: float, lon_deg: float) -> HeightGrid:
-        """The finest map covering a point.
+        """The finest map whose trusted disc contains a point.
 
         Raises:
             CoverageError: if no map covers it.
         """
-        x, y = to_xy(lat_deg, lon_deg)
+        x, y = (float(v) for v in to_xy(lat_deg, lon_deg))
         for grid in self.grids:
-            if bool(grid.spec.covers(x, y)):
+            cx, cy, radius = grid.disc()
+            if np.hypot(x - cx, y - cy) <= radius:
                 return grid
         raise CoverageError(f"no elevation data at latitude {lat_deg}, longitude {lon_deg}")
 
@@ -337,8 +417,8 @@ class ElevationSource:
         """Ground height at a point, metres above the 1737.4 km sphere.
 
         Raises:
-            CoverageError: if the point is outside every map or in a hole of
-                the finest map covering it. A height is never guessed.
+            CoverageError: if the point is outside every map's trusted disc.
+                A height is never guessed.
         """
         x, y = to_xy(lat_deg, lon_deg)
         value = float(self.grid_at(lat_deg, lon_deg).height_xy(x, y)[0])
@@ -351,7 +431,7 @@ class ElevationSource:
         """Published height error at a point, metres, or ``None`` if the map has none."""
         x, y = to_xy(lat_deg, lon_deg)
         grid = self.grid_at(lat_deg, lon_deg)
-        if grid.read_error(0, 1, 0, 1) is None:
+        if not grid.has_errors:
             return None
         value = float(grid.error_xy(x, y)[0])
         if np.isnan(value):
@@ -362,23 +442,18 @@ class ElevationSource:
     def service_lat_max(self) -> float:
         """Northernmost latitude at which every longitude is inside the data.
 
-        The maps are squares on the projected sheet. For each map, the
-        largest circle around the pole that fits inside its pixel centres is
-        found; the largest of those circles gives the latitude up to which
-        all longitudes are covered. Returns degrees.
+        For each map, the largest circle around the pole that fits inside its
+        trusted disc is found; the largest of those circles gives the
+        latitude up to which all longitudes are covered. Returns degrees.
 
         Raises:
-            CoverageError: if no map contains the pole, so that there is no
-                circle around the pole at all.
+            CoverageError: if no trusted disc contains the pole, so that there
+                is no circle around the pole at all.
         """
         reach = -np.inf
         for grid in self.grids:
-            spec = grid.spec
-            half = spec.pixel_m / 2
-            reach = max(reach, min(-(spec.x_left + half),
-                                   spec.x_left + spec.n_cols * spec.pixel_m - half,
-                                   spec.y_top - half,
-                                   -(spec.y_top - spec.n_rows * spec.pixel_m + half)))
+            cx, cy, radius = grid.disc()
+            reach = max(reach, radius - float(np.hypot(cx, cy)))
         if reach <= 0:
             raise CoverageError("no elevation map contains the south pole, so no latitude "
                                 "is covered at every longitude")
