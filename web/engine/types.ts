@@ -97,6 +97,51 @@ export interface DataBundle {
   shade: Map<string, ShadeGrid>;
 }
 
+/** A three-dimensional vector in the Moon-fixed frame or local tangent frame. */
+export interface Vector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** A body's local direction as seen from the observer. */
+export interface Direction {
+  az_deg: number;
+  el_deg: number;
+  distance_km: number;
+}
+
+/** The result of comparing a body disc with a skyline. */
+export interface Visibility {
+  fraction: number;
+  center_clearance_deg: number;
+  upper_edge_clearance_deg: number;
+  status: "visible" | "blocked" | "uncertain";
+}
+
+/** One event crossing, with the body disc's upper edge defining rise/set. */
+export interface Event {
+  time_ms: number;
+  kind: "rise" | "set";
+}
+
+/** The four event streams returned for a search window. */
+export interface EventSet {
+  sunrise: number[];
+  sunset: number[];
+  earthrise: number[];
+  earthset: number[];
+}
+
+/** Mission-planning durations and overlapping visibility windows. */
+export interface MissionMetrics {
+  time_to_next_sunset_ms?: number;
+  time_to_next_earthset_ms?: number;
+  sunlight_hours: number;
+  longest_night_ms: number;
+  both_visible_windows: Array<{ start_ms: number; end_ms: number }>;
+}
+
 /** Return the selected data folder, allowing deployment to switch real data on. */
 export function getDataFolder(): string {
   return (import.meta.env.VITE_DATA_FOLDER as string | undefined) ?? "/data-mock";
