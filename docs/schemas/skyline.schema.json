@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/skyline.schema.json",
+  "type": "object",
+  "title": "Skyline",
+  "description": "A skyline (Contract 3): for each azimuth, the highest elevation angle at which terrain appears from the eye of the observer. Used for skylines/{id}.json and for the /api/skyline response. Entry k of both arrays belongs to azimuth k * az_step_deg and covers the wedge of azimuths within half a step either side of it.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Latitude of the point actually used (after any rounding), degrees."
+    },
+    "lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Longitude of the point actually used (after any rounding), degrees, east positive."
+    },
+    "elev_m": {
+      "type": "number",
+      "description": "Ground height at the point, metres above the 1737.4 km sphere."
+    },
+    "mast_m": {
+      "type": "number",
+      "description": "Eye height above the ground, metres.",
+      "minimum": 0
+    },
+    "az_step_deg": {
+      "type": "number",
+      "description": "Spacing between azimuths, degrees. 360 / az_step_deg is a whole number.",
+      "exclusiveMinimum": 0
+    },
+    "skyline_deg": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -90,
+        "maximum": 90
+      },
+      "description": "360 / az_step_deg elevation angles, degrees above the local level plane (negative = below). Entry k is the maximum over its whole wedge.",
+      "minItems": 1
+    },
+    "skyline_err_deg": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "description": "360 / az_step_deg uncertainty bounds, degrees. The true skyline at entry k lies within skyline_deg[k] +/- skyline_err_deg[k].",
+      "minItems": 1
+    },
+    "dem": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Names of the elevation map(s) used. Show this with every result."
+    },
+    "resolution_m": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Pixel size of the finest elevation map used near the point, metres. Show this with every result."
+    },
+    "max_reach_km": {
+      "type": "number",
+      "description": "Farthest distance any azimuth had to search, km.",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "version",
+    "lat",
+    "lon",
+    "elev_m",
+    "mast_m",
+    "az_step_deg",
+    "skyline_deg",
+    "skyline_err_deg",
+    "dem",
+    "resolution_m",
+    "max_reach_km"
+  ],
+  "additionalProperties": false
+}

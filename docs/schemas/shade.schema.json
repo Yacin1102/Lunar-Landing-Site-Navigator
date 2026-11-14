@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/shade.schema.json",
+  "type": "object",
+  "title": "ShadeLabel",
+  "description": "Label of the shade grid for the 3D view (Contract 5): shade/{id}_skyline.bin and shade/{id}_normal.bin. Cells are laid out like the terrain patch (rows north to south, columns west to east). _skyline.bin holds n * n * n_az little-endian Int16 values, the azimuths of one cell together, starting at north and going clockwise; degrees = stored value * skyline_scale. _normal.bin holds n * n * 3 little-endian Float32 values: the unit surface normal of each cell as (east, north, up). All azimuths, elevations and normals are in the east/north/up frame of the patch centre, not of the individual cell.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "center_lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Latitude of the patch centre (the site), degrees."
+    },
+    "center_lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Longitude of the patch centre (the site), degrees, east positive."
+    },
+    "size_m": {
+      "type": "number",
+      "description": "Side length of the grid, metres: (n - 1) * spacing_m.",
+      "exclusiveMinimum": 0
+    },
+    "n": {
+      "type": "integer",
+      "description": "Cells per side. Odd.",
+      "minimum": 3
+    },
+    "spacing_m": {
+      "type": "number",
+      "description": "Distance between neighbouring cells, metres.",
+      "exclusiveMinimum": 0
+    },
+    "az_step_deg": {
+      "type": "number",
+      "description": "Spacing between azimuths, degrees. 360 / az_step_deg = n_az.",
+      "exclusiveMinimum": 0
+    },
+    "n_az": {
+      "type": "integer",
+      "description": "Number of azimuths stored per cell.",
+      "minimum": 1
+    },
+    "skyline_scale": {
+      "type": "number",
+      "description": "Multiply a stored Int16 by this to get degrees.",
+      "exclusiveMinimum": 0
+    },
+    "mast_m": {
+      "type": "number",
+      "description": "Eye height above the ground used for every cell, metres.",
+      "minimum": 0
+    },
+    "dem": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Names of the elevation map(s) used. Show this with every result."
+    },
+    "resolution_m": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Pixel size of the finest elevation map used near the point, metres. Show this with every result."
+    }
+  },
+  "required": [
+    "version",
+    "center_lat",
+    "center_lon",
+    "size_m",
+    "n",
+    "spacing_m",
+    "az_step_deg",
+    "n_az",
+    "skyline_scale",
+    "mast_m",
+    "dem",
+    "resolution_m"
+  ],
+  "additionalProperties": false
+}

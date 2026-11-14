@@ -8,9 +8,10 @@ Plan approved on 2026-11-14.
 
 | PR | State |
 | --- | --- |
-| 1 Download script | Built, in review |
-| 2 Web handoff | **Next** |
-| 3 to 11 | Not started |
+| 1 Download script | Built, in review (PR #4) |
+| 2 Web handoff | Built, in review |
+| 3 Timetable and fixtures | **Next** |
+| 4 to 11 | Not started |
 
 Data on disk: the 8 SPICE kernels and the 4 coarse maps (downloaded 2026-11-14 as the live test of the script). The 8 full-resolution maps (33.8 GB): waiting for the download to be started.
 
@@ -18,7 +19,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 1): 32 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 2): 65 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -181,6 +182,23 @@ Each step is reported with its real output.
 - DE440 is the build ephemeris and DE442 a measured comparison. This departs from the spec's suggestion of "the latest ephemeris".
 - The download script lives at `python/scripts/download_data.py`.
 - One new Python package: `jsonschema`, for validating files against the schemas. numba will be proposed in PR 5 only if timing shows it is needed.
+
+## Contract interpretations awaiting approval
+
+PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where the spec left a choice open, I made one so the web side has something exact to build on. None changes a field the spec names; each is a place where the spec was silent or said two things. They are in force in the schemas, the types and the mock data until you say otherwise.
+
+1. **`sites.json`, `altaz.json` and `events.json` are objects, not bare lists**: `{"version": 1, "sites": [...]}` and `{"version": 1, "cases": [...]}`. The spec asks for "a list" and also for a `version` in every JSON; a bare list cannot carry one.
+2. **`dem` is a list of names**, in skylines, terrain labels and shade labels, because several maps can contribute to one product.
+3. **A skyline entry covers the wedge centred on its azimuth**: entry `k` is the maximum over azimuths within half a step either side of `k * az_step_deg`.
+4. **`size_m = (n - 1) * spacing_m`, with `n` odd**, for terrain patches and shade grids, so the site is exactly the centre sample.
+5. **A terrain value is the ground height above the site's level plane, along the site's vertical.** This is how the Moon's curvature is "included": flat ground falls away from the centre.
+6. **Shade grid angles and normals are in the patch centre's frame**, not each cell's own. The browser then computes the Sun's direction once per time step for the whole patch.
+7. **Manifest fields**: `data_kind`, `built_ms`, `service_region` (`lat_min`, `lat_max`), `files` (`path`, `contract`, `version`, `bytes`) and `sites` (`id`, `has_terrain`, `has_shade_grid`).
+8. **API shapes**: `/api/health` returns `ok`, `real_terrain`, `service_region` and the default and accepted `az_step_deg` and `mast_m`. A refused request returns `{"version": 1, "ok": false, "error": {"code", "param", "message"}}` with HTTP 400 or 422. API responses carry `version` like files do.
+9. **Fixture cases may carry an optional `name`** saying what the case is meant to expose.
+10. **No extra fields**: the schemas reject any field the contract does not list.
+
+Still to be fixed, with the PR that needs them: the default and accepted `az_step_deg` and the default `mast_m` (PR 7; the mock uses 0.1 degrees and 2 m), the rounding of custom points (PR 7), the category names (PR 9), and the Sun and Earth radii used for disc edges (PR 3).
 
 ## Proposed spec changes
 

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/api_health.schema.json",
+  "type": "object",
+  "title": "ApiHealth",
+  "description": "Response of GET /api/health (Contract 7).",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "ok": {
+      "type": "boolean",
+      "const": true,
+      "description": "The server is running."
+    },
+    "real_terrain": {
+      "type": "boolean",
+      "description": "True if the server reads the real NASA elevation maps. False means synthetic terrain for development: do not show its skylines as real verdicts."
+    },
+    "service_region": {
+      "type": "object",
+      "title": "ServiceRegion",
+      "description": "The part of the Moon the app covers: all longitudes between two latitudes.",
+      "properties": {
+        "lat_min": {
+          "type": "number",
+          "description": "Southern limit, degrees (-90).",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lat_max": {
+          "type": "number",
+          "description": "Northern limit, degrees. Points north of this are refused.",
+          "minimum": -90,
+          "maximum": 90
+        }
+      },
+      "required": [
+        "lat_min",
+        "lat_max"
+      ],
+      "additionalProperties": false
+    },
+    "az_step_deg_default": {
+      "type": "number",
+      "description": "az_step_deg used when the request gives none, degrees.",
+      "exclusiveMinimum": 0
+    },
+    "az_step_deg_allowed": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "description": "Accepted az_step_deg values, degrees.",
+      "minItems": 1
+    },
+    "mast_m_default": {
+      "type": "number",
+      "description": "mast_m used when the request gives none, metres.",
+      "minimum": 0
+    },
+    "mast_m_max": {
+      "type": "number",
+      "description": "Largest accepted mast_m, metres.",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "version",
+    "ok",
+    "real_terrain",
+    "service_region",
+    "az_step_deg_default",
+    "az_step_deg_allowed",
+    "mast_m_default",
+    "mast_m_max"
+  ],
+  "additionalProperties": false
+}

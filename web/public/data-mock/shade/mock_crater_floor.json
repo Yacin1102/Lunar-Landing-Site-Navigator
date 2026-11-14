@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "center_lat": -89.55,
+  "center_lon": 120.0,
+  "size_m": 4800.0,
+  "n": 25,
+  "spacing_m": 200.0,
+  "az_step_deg": 5.0,
+  "n_az": 72,
+  "skyline_scale": 0.003,
+  "mast_m": 2.0,
+  "dem": [
+    "SYNTHETIC (mock landscape, not NASA data)"
+  ],
+  "resolution_m": 20.0
+}
