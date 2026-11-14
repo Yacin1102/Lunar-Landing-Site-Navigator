@@ -17,8 +17,8 @@
 export interface EphemLabel {
   /** Format version of this file. Increased on any format change. */
   version: 1;
-  /** UTC time of row 0, milliseconds since 1970-01-01. */
-  t0_ms: number;
+  /** UTC time of row 0, milliseconds since 1970-01-01: 16 Nov 2026 00:00 UTC. */
+  t0_ms: 1794787200000;
   /** Time between rows, seconds. Read it from here; do not assume a value. */
   step_s: number;
   /** Number of rows in ephem.bin. */
@@ -77,7 +77,7 @@ export interface Site {
 export interface SiteList {
   /** Format version of this file. Increased on any format change. */
   version: 1;
-  /** The curated sites. */
+  /** The 10 curated sites. */
   sites: Site[];
 }
 
@@ -195,7 +195,10 @@ export interface ShadeLabel {
 export interface ServiceRegion {
   /** Southern limit, degrees (-90). */
   lat_min: number;
-  /** Northern limit, degrees. Points north of this are refused. */
+  /**
+   * Northern limit, degrees. Always south of the equator: the app covers the south polar
+   * region only. Points north of this are refused.
+   */
   lat_max: number;
 }
 

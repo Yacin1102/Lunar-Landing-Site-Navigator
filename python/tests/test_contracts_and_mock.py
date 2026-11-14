@@ -165,10 +165,10 @@ def test_checker_catches_flags_that_disagree_with_the_files(broken):
 
 
 def test_checker_catches_files_the_manifest_does_not_know(broken):
-    (broken / "skylines/stray.json").write_text("{}")
+    (broken / "skylines/mock_peak.json.bak").write_text("{}")
     (broken / "terrain/mock_ridge.json").unlink()
     found = _problems(broken)
-    assert any("skylines/stray.json exists but is not listed" in p for p in found)
+    assert any("skylines/mock_peak.json.bak exists but is not listed" in p for p in found)
     assert any("terrain/mock_ridge.json is listed but does not exist" in p for p in found)
 
 
@@ -182,20 +182,60 @@ def test_checker_requires_the_timetable_unless_told_otherwise(broken):
 
 
 def test_checker_checks_the_timetable_binary(tmp_path):
-    label = {"version": 1, "t0_ms": 1794787200000, "step_s": 3600, "count": 3,
+    count = 115_057                                                   # hourly, to 1 Jan 2040
+    label = {"version": 1, "t0_ms": 1794787200000, "step_s": 3600, "count": count,
              "columns": list(contracts.EPHEM_COLUMNS), "units": "km", "frame": "MOON_ME",
              "origin": "MOON", "aberration": "LT+S"}
-    good = np.tile(np.array([1.5e8, 0, 0, 3.8e5, 0, 0], dtype="<f4"), (3, 1))
+    good = np.tile(np.array([1.5e8, 0, 0, 3.8e5, 0, 0], dtype="<f4"), (count, 1))
     path = tmp_path / "ephem.bin"
 
     good.tofile(path)
     assert contracts.ephem_problems(label, path) == []
-    good[:2].tofile(path)
-    assert contracts.ephem_problems(label, path) == ["ephem.bin is 48 bytes, expected count*6*4 = 72"]
+    good[:-1].tofile(path)
+    assert contracts.ephem_problems(label, path) == [
+        f"ephem.bin is {(count - 1) * 24} bytes, expected count*6*4 = {count * 24}"]
     (good / 1000).astype("<f4").tofile(path)                          # metres mistaken for km, say
     assert len(contracts.ephem_problems(label, path)) == 2
+    good[:-1].tofile(path)                                            # one row short of 2040
+    assert any("before 1 Jan 2040" in p
+               for p in contracts.ephem_problems({**label, "count": count - 1}, path))
     assert contracts.schema_problems({**label, "frame": "IAU_MOON"}, "ephem") != []
+    assert contracts.schema_problems({**label, "t0_ms": 0}, "ephem") != []
     assert contracts.schema_problems({**label, "columns": list(contracts.EPHEM_COLUMNS[::-1])}, "ephem") != []
+
+
+def test_checker_refuses_nan_and_infinity(broken):
+    """Python writes NaN into JSON happily; a browser then rejects the whole file."""
+    record = _json(MOCK / "skylines/mock_peak.json")
+    record["skyline_deg"][5] = float("nan")
+    record["skyline_err_deg"][7] = float("inf")
+    found = contracts.skyline_problems(record)
+    assert "skyline_deg/5: not a finite number" in found
+    assert "skyline_err_deg/7: not a finite number" in found
+
+    (broken / "skylines/mock_ridge.json").write_text(json.dumps(record))   # file contains NaN
+    assert any("mock_ridge.json: not valid JSON" in p for p in _problems(broken))
+
+
+def test_checker_requires_exactly_ten_sites_and_iso_dates(broken):
+    _edit(broken / "sites.json", lambda d: d["sites"].pop())
+    assert "sites.json: sites: does not satisfy minItems: 10" in _problems(broken)
+    sites = _json(MOCK / "sites.json")
+    sites["sites"][1]["date_utc"] = "next Tuesday"
+    assert any("date_utc" in p for p in contracts.schema_problems(sites, "sites"))
+
+
+def test_checker_keeps_the_service_region_in_the_south(broken):
+    _edit(broken / "manifest.json", lambda d: d["service_region"].update(lat_max=90.0))
+    assert any("manifest.json: service_region/lat_max" in p for p in _problems(broken))
+
+
+def test_checker_catches_files_of_a_site_that_is_not_in_the_list(broken):
+    shutil.copy(broken / "skylines/mock_peak.json", broken / "skylines/ghost.json")
+    _edit(broken / "manifest.json", lambda d: d["files"].append(
+        {"path": "skylines/ghost.json", "contract": "skyline", "version": 1,
+         "bytes": (broken / "skylines/ghost.json").stat().st_size}))
+    assert "skylines/ghost.json: does not belong to any site in sites.json" in _problems(broken)
 
 
 # ---- Geometry conventions --------------------------------------------------------

@@ -136,7 +136,9 @@ Angular radius of a disc: `asin(body_radius / |d|)`. The exact radii used by the
 
 ## Lit, blocked or uncertain
 
-At the pole the Sun skims the skyline for days, so the answer has three values, not two. The recommended definition:
+At the pole the Sun skims the skyline for days, so the answer has three values, not two.
+
+The spec words it as: lit when "the whole relevant part of the disc is above skyline + error", blocked when it is "below skyline - error", uncertain in between. That sentence can be read in more than one way, so the reading below is **proposed and awaiting approval** (see `docs/PROGRESS.md`). It answers the spec's question "does sunlight reach this point: yes or no, and how much of the disc clears the terrain?":
 
 1. Compute the fraction of the Sun's disc above the skyline twice: once against `skyline_deg + skyline_err_deg` (pessimistic, gives `f_low`) and once against `skyline_deg - skyline_err_deg` (optimistic, gives `f_high`).
 2. **Lit**: `f_low > 0`. Some of the disc is certainly visible.
@@ -209,3 +211,6 @@ These are interpretations of the spec, made so the web side has something exact 
 6. The manifest's fields, including `data_kind`.
 7. The shape of `/api/health` and of error responses.
 8. Fixture cases may carry an optional `name`.
+9. The reading of lit, blocked and uncertain given above.
+10. A curated site's skyline is computed at exactly its `sites.json` coordinates, with no rounding.
+11. Azimuths in the fixtures are in 0 (included) to 360 (excluded).

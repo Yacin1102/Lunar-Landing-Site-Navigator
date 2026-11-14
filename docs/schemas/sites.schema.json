@@ -41,7 +41,7 @@
           },
           "category": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$",
+            "pattern": "^[a-z0-9_-]+$",
             "description": "Short lowercase group name for the menu. Group by whatever values appear; do not hard-code the set."
           },
           "mission": {
@@ -50,7 +50,8 @@
           },
           "date_utc": {
             "type": "string",
-            "description": "Info-card text: a date in ISO 8601."
+            "description": "Info-card text: a date in ISO 8601.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})?)?$"
           },
           "country": {
             "type": "string",
@@ -80,8 +81,9 @@
         ],
         "additionalProperties": false
       },
-      "description": "The curated sites.",
-      "minItems": 1
+      "description": "The 10 curated sites.",
+      "minItems": 10,
+      "maxItems": 10
     }
   },
   "required": [

@@ -77,7 +77,9 @@ MOCK_SITES = [
 def _write_json(path: Path, data, compact: bool = False) -> None:
     """Write JSON with Unix line endings (sizes must be the same on every system)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(data, separators=(",", ":")) if compact else json.dumps(data, indent=2)
+    # allow_nan=False: NaN and Infinity are not valid JSON and must never be written.
+    text = (json.dumps(data, separators=(",", ":"), allow_nan=False) if compact
+            else json.dumps(data, indent=2, allow_nan=False))
     path.write_text(text + "\n", encoding="utf-8", newline="\n")
 
 

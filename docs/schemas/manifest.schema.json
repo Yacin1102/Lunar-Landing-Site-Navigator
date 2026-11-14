@@ -35,9 +35,9 @@
         },
         "lat_max": {
           "type": "number",
-          "description": "Northern limit, degrees. Points north of this are refused.",
           "minimum": -90,
-          "maximum": 90
+          "exclusiveMaximum": 0,
+          "description": "Northern limit, degrees. Always south of the equator: the app covers the south polar region only. Points north of this are refused."
         }
       },
       "required": [

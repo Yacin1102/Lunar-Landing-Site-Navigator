@@ -38,6 +38,9 @@ SCHEMA_NAMES = ("ephem", "sites", "skyline", "terrain", "shade", "manifest",
 #: Order and names of the six values in each timetable row (Contract 1).
 EPHEM_COLUMNS = ("sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z")
 
+#: The timetable must reach this time: 1 Jan 2040 00:00 UTC, milliseconds since 1970.
+EPHEM_END_MS = 2_208_988_800_000
+
 
 @lru_cache(maxsize=None)
 def _validator(name: str) -> Draft202012Validator:
@@ -56,11 +59,29 @@ def schema_problems(document, name: str) -> list[str]:
     Returns:
         One sentence per violation, each starting with where it is.
     """
-    problems = []
-    for error in sorted(_validator(name).iter_errors(document), key=lambda e: list(e.path)):
+    problems = [f"{where}: not a finite number" for where in _non_finite(document)]
+    for error in sorted(_validator(name).iter_errors(document), key=lambda e: str(list(e.path))):
         where = "/".join(str(part) for part in error.path) or "(top level)"
-        problems.append(f"{where}: {error.message[:200]}")
+        message = error.message
+        if len(message) > 200:      # the message quotes the whole offending value
+            message = f"does not satisfy {error.validator}: {error.validator_value!r}"[:200]
+        problems.append(f"{where}: {message}")
     return problems
+
+
+def _non_finite(node, where: str = "") -> list[str]:
+    """Paths of every NaN or infinite number in a parsed document.
+
+    Python reads and writes ``NaN`` and ``Infinity`` in JSON, but they are not
+    valid JSON: a browser refuses the whole file. They must never appear.
+    """
+    if isinstance(node, float) and not np.isfinite(node):
+        return [where or "(top level)"]
+    if isinstance(node, dict):
+        return [p for key, value in node.items() for p in _non_finite(value, f"{where}/{key}".strip("/"))]
+    if isinstance(node, list):
+        return [p for i, value in enumerate(node) for p in _non_finite(value, f"{where}/{i}".strip("/"))]
+    return []
 
 
 def az_count(az_step_deg: float) -> int | None:
@@ -163,17 +184,20 @@ def ephem_problems(label, bin_path: Path) -> list[str]:
 
     The binary must hold ``count`` rows of six little-endian Float32 values,
     all finite. Sanity: the Sun about one astronomical unit away, the Earth
-    at lunar distance.
+    at lunar distance. The last row must be at or after 1 Jan 2040 00:00 UTC.
     """
     problems = schema_problems(label, "ephem")
     if problems:
         return problems
+    last_ms = label["t0_ms"] + (label["count"] - 1) * label["step_s"] * 1000
+    if last_ms < EPHEM_END_MS:
+        problems.append(f"timetable ends at {last_ms:.0f} ms, before 1 Jan 2040 ({EPHEM_END_MS})")
     size = Path(bin_path).stat().st_size
     if size != label["count"] * 24:
-        return [f"ephem.bin is {size} bytes, expected count*6*4 = {label['count'] * 24}"]
+        return problems + [f"ephem.bin is {size} bytes, expected count*6*4 = {label['count'] * 24}"]
     rows = np.fromfile(bin_path, dtype="<f4").reshape(-1, 6)
     if not np.all(np.isfinite(rows)):
-        return ["ephem.bin contains values that are not finite numbers"]
+        return problems + ["ephem.bin contains values that are not finite numbers"]
     sun_km = np.linalg.norm(rows[:, :3], axis=1)
     earth_km = np.linalg.norm(rows[:, 3:], axis=1)
     if sun_km.min() < 1.45e8 or sun_km.max() > 1.55e8:
@@ -185,8 +209,11 @@ def ephem_problems(label, bin_path: Path) -> list[str]:
 
 def _load(path: Path, problems: list[str]):
     """Parse a JSON file, recording a problem instead of raising."""
+    def refuse(token):
+        raise ValueError(f"{token} is not valid JSON; a browser would reject the file")
+
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        return json.loads(Path(path).read_text(encoding="utf-8"), parse_constant=refuse)
     except FileNotFoundError:
         problems.append(f"{path.name}: file is missing")
     except ValueError as error:
@@ -218,6 +245,8 @@ def data_folder_problems(folder: Path, allow_missing_ephem: bool = False) -> lis
     manifest = _load(folder / "manifest.json", problems)
     if manifest is not None:
         found = schema_problems(manifest, "manifest")
+        if not found and manifest["service_region"]["lat_min"] > manifest["service_region"]["lat_max"]:
+            found = ["service_region: lat_min is north of lat_max"]
         add("manifest.json", found)
         if found:
             manifest = None
@@ -281,6 +310,14 @@ def data_folder_problems(folder: Path, allow_missing_ephem: bool = False) -> lis
             if not found and position != (site["lat"], site["lon"]):
                 found = ["position differs from sites.json"]
             add(f"{kind}/{sid}", found)
+
+    known = {"sites.json", "ephem.json", "ephem.bin", "manifest.json"}
+    for sid in ids:
+        known |= {f"skylines/{sid}.json", f"terrain/{sid}.json", f"terrain/{sid}.bin",
+                  f"shade/{sid}.json", f"shade/{sid}_skyline.bin", f"shade/{sid}_normal.bin"}
+    for path in sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file()):
+        if path not in known:
+            problems.append(f"{path}: does not belong to any site in sites.json")
 
     if manifest is not None:
         on_disk = {p.relative_to(folder).as_posix(): p.stat().st_size

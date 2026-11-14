@@ -12,7 +12,8 @@
     },
     "t0_ms": {
       "type": "integer",
-      "description": "UTC time of row 0, milliseconds since 1970-01-01."
+      "const": 1794787200000,
+      "description": "UTC time of row 0, milliseconds since 1970-01-01: 16 Nov 2026 00:00 UTC."
     },
     "step_s": {
       "type": "number",
