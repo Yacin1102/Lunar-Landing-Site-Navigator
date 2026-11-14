@@ -1,4 +1,4 @@
-import type { Direction, EphemerisLabel, Vector3 } from "./types";
+import type { Direction, EphemerisLabel, Vector3 } from "./runtime-types";
 import { clamp, degToRad, dot, lerp, magnitude, radToDeg } from "./math";
 
 /** The spherical radius required by the shared Moon height reference. */

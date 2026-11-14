@@ -1,13 +1,6 @@
-import type {
-  DataBundle,
-  EphemerisLabel,
-  Manifest,
-  ShadeGrid,
-  Site,
-  Skyline,
-  TerrainPatch,
-} from "./types";
-import { getDataFolder } from "./types";
+import type { EphemerisLabel, DataBundle, ShadeGrid, TerrainPatch } from "./runtime-types";
+import type { Manifest, SiteList, Skyline } from "./types";
+import { getDataFolder } from "./runtime-types";
 
 /** Fetch JSON and throw a useful error when a prepared file is unavailable. */
 async function fetchJson<T>(url: string): Promise<T> {
@@ -49,7 +42,8 @@ function decodeInt16(buffer: ArrayBuffer, count: number): Int16Array {
 export async function loadDataBundle(folder = getDataFolder()): Promise<DataBundle> {
   const base = folder.replace(/\/$/, "");
   const manifest = await fetchJson<Manifest>(`${base}/manifest.json`);
-  const sites = await fetchJson<Site[]>(`${base}/sites.json`);
+  const siteList = await fetchJson<SiteList>(`${base}/sites.json`);
+  const sites = siteList.sites;
   const ephemerisLabel = await fetchJson<EphemerisLabel>(`${base}/ephem.json`);
   const ephemerisBinary = await fetchBinary(`${base}/ephem.bin`);
   const skylines = new Map<string, Skyline>();

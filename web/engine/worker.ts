@@ -2,7 +2,8 @@ import { calculateMetrics } from "./metrics";
 import { directionsAt } from "./astro";
 import { findEvents } from "./events";
 import { classifyVisibility } from "./visibility";
-import type { EphemerisLabel, Skyline } from "./types";
+import type { EphemerisLabel } from "./runtime-types";
+import type { Skyline } from "./types";
 
 type WorkerRequest = {
   id: number;

@@ -1,4 +1,4 @@
-import type { EventSet, MissionMetrics, Visibility } from "./types";
+import type { EventSet, MissionMetrics } from "./runtime-types";
 
 /** Convert event lists and sampled visibility into mission-planning durations. */
 export function calculateMetrics(

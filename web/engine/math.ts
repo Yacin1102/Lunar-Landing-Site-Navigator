@@ -1,4 +1,4 @@
-import type { Vector3 } from "./types";
+import type { Vector3 } from "./runtime-types";
 
 /** Convert degrees to radians at the edge of a trigonometric calculation. */
 export function degToRad(degrees: number): number {

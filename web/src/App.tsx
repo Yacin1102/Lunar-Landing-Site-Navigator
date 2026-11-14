@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadDataBundle } from "../engine/data";
-import type { DataBundle } from "../engine/types";
+import type { DataBundle } from "../engine/runtime-types";
 
 // Render the site menu and make the prepared-data state visible to mission planners.
 export default function App() {

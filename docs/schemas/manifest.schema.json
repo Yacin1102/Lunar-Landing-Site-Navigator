@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/manifest.schema.json",
+  "type": "object",
+  "title": "Manifest",
+  "description": "manifest.json (spec section 12): what the data folder contains. Written last.",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of this file. Increased on any format change."
+    },
+    "data_kind": {
+      "type": "string",
+      "enum": [
+        "mock",
+        "real"
+      ],
+      "description": "mock = invented landscape for development; never show results from it as real verdicts. real = built from NASA data."
+    },
+    "built_ms": {
+      "type": "integer",
+      "description": "When the folder was built, UTC milliseconds since 1970-01-01."
+    },
+    "service_region": {
+      "type": "object",
+      "title": "ServiceRegion",
+      "description": "The part of the Moon the app covers: all longitudes between two latitudes.",
+      "properties": {
+        "lat_min": {
+          "type": "number",
+          "description": "Southern limit, degrees (-90).",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lat_max": {
+          "type": "number",
+          "minimum": -90,
+          "exclusiveMaximum": 0,
+          "description": "Northern limit, degrees. Always south of the equator: the app covers the south polar region only. Points north of this are refused."
+        }
+      },
+      "required": [
+        "lat_min",
+        "lat_max"
+      ],
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "ManifestFile",
+        "description": "One file in the data folder.",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path relative to the data folder, forward slashes."
+          },
+          "contract": {
+            "type": "string",
+            "enum": [
+              "ephem",
+              "sites",
+              "skyline",
+              "terrain",
+              "shade"
+            ],
+            "description": "Which contract the file belongs to."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Format version of that contract.",
+            "minimum": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "description": "File size, bytes.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "path",
+          "contract",
+          "version",
+          "bytes"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Every file produced, except the manifest itself."
+    },
+    "sites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "ManifestSite",
+        "description": "Which optional files a site has.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "description": "Site id, as in sites.json."
+          },
+          "has_terrain": {
+            "type": "boolean",
+            "description": "Terrain patch files exist."
+          },
+          "has_shade_grid": {
+            "type": "boolean",
+            "description": "Shade grid files exist."
+          }
+        },
+        "required": [
+          "id",
+          "has_terrain",
+          "has_shade_grid"
+        ],
+        "additionalProperties": false
+      },
+      "description": "One entry per site in sites.json."
+    }
+  },
+  "required": [
+    "version",
+    "data_kind",
+    "built_ms",
+    "service_region",
+    "files",
+    "sites"
+  ],
+  "additionalProperties": false
+}

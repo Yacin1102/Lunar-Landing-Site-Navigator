@@ -1,4 +1,4 @@
-import type { Direction } from "./types";
+import type { Direction } from "./runtime-types";
 import { clamp, degToRad, dot, normalize } from "./math";
 
 /** Solar irradiance at one lunar site after inverse-square distance scaling. */

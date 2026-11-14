@@ -1,12 +1,285 @@
 {
   "version": 1,
   "data_kind": "mock",
-  "build_date": "2026-11-14",
-  "service_region": { "min_lat": -90, "max_lat": -80, "min_lon": -180, "max_lon": 180 },
-  "files": ["manifest.json", "sites.json", "ephem.json", "ephem.bin"],
+  "built_ms": 1794691041311,
+  "service_region": {
+    "lat_min": -90.0,
+    "lat_max": -80.0
+  },
+  "files": [
+    {
+      "path": "shade/mock_crater_floor.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 286
+    },
+    {
+      "path": "shade/mock_crater_floor_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 7500
+    },
+    {
+      "path": "shade/mock_crater_floor_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 90000
+    },
+    {
+      "path": "shade/mock_crater_rim.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 287
+    },
+    {
+      "path": "shade/mock_crater_rim_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 7500
+    },
+    {
+      "path": "shade/mock_crater_rim_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 90000
+    },
+    {
+      "path": "sites.json",
+      "contract": "sites",
+      "version": 1,
+      "bytes": 3027
+    },
+    {
+      "path": "skylines/mock_behind_peak.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 44951
+    },
+    {
+      "path": "skylines/mock_crater_floor.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 46638
+    },
+    {
+      "path": "skylines/mock_crater_rim.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 44412
+    },
+    {
+      "path": "skylines/mock_east_plain.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 45818
+    },
+    {
+      "path": "skylines/mock_far_highland.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 47014
+    },
+    {
+      "path": "skylines/mock_near_pole.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 43053
+    },
+    {
+      "path": "skylines/mock_peak.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 45071
+    },
+    {
+      "path": "skylines/mock_peak_north_foot.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 44997
+    },
+    {
+      "path": "skylines/mock_ridge.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 47017
+    },
+    {
+      "path": "skylines/mock_second_crater.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 43034
+    },
+    {
+      "path": "terrain/mock_behind_peak.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_behind_peak.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 212
+    },
+    {
+      "path": "terrain/mock_crater_floor.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_crater_floor.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 216
+    },
+    {
+      "path": "terrain/mock_crater_rim.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_crater_rim.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 216
+    },
+    {
+      "path": "terrain/mock_east_plain.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_east_plain.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 210
+    },
+    {
+      "path": "terrain/mock_far_highland.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_far_highland.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 212
+    },
+    {
+      "path": "terrain/mock_near_pole.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_near_pole.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 215
+    },
+    {
+      "path": "terrain/mock_peak.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_peak.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 213
+    },
+    {
+      "path": "terrain/mock_peak_north_foot.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_peak_north_foot.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 212
+    },
+    {
+      "path": "terrain/mock_ridge.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_ridge.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 215
+    },
+    {
+      "path": "terrain/mock_second_crater.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 58564
+    },
+    {
+      "path": "terrain/mock_second_crater.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 216
+    }
+  ],
   "sites": [
-    { "id": "mock-ridge", "has_terrain": true, "has_shade_grid": true },
-    { "id": "mock-crater", "has_terrain": true, "has_shade_grid": false },
-    { "id": "mock-plateau", "has_terrain": false, "has_shade_grid": false }
+    {
+      "id": "mock_crater_floor",
+      "has_terrain": true,
+      "has_shade_grid": true
+    },
+    {
+      "id": "mock_crater_rim",
+      "has_terrain": true,
+      "has_shade_grid": true
+    },
+    {
+      "id": "mock_peak",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_peak_north_foot",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_behind_peak",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_ridge",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_second_crater",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_far_highland",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_east_plain",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_near_pole",
+      "has_terrain": true,
+      "has_shade_grid": false
+    }
   ]
 }

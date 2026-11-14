@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { panelPowerW, simulateBattery, solarIrradianceWm2 } from "./power";
-import type { Direction } from "./types";
+import type { Direction } from "./runtime-types";
 
 const sun: Direction = { az_deg: 0, el_deg: 90, distance_km: 149_597_870.7 };
 

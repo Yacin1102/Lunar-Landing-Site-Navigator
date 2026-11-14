@@ -1,4 +1,4 @@
-import type { DataBundle } from "./types";
+import type { DataBundle } from "./runtime-types";
 
 /** Send a browser calculation to the worker and resolve its typed result. */
 export function evaluateInWorker(

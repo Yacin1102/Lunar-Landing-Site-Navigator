@@ -1,4 +1,5 @@
-import type { Direction, EphemerisLabel, EventSet, Skyline, Vector3 } from "./types";
+import type { Direction, EphemerisLabel, EventSet } from "./runtime-types";
+import type { Skyline } from "./types";
 import { directionsAt, discRadiusDeg, directionFromBody, interpolateBody, skylineAt } from "./astro";
 
 /** Find all upper-disc horizon crossings by scanning ten-minute intervals and bisecting. */

@@ -18,7 +18,7 @@ describe("event search", () => {
       {
         version: 1, lat: -90, lon: 0, elev_m: 0, mast_m: 0, az_step_deg: 90,
         skyline_deg: [0, 0, 0, 0], skyline_err_deg: [0, 0, 0, 0],
-        dem: "test", resolution_m: 1, max_reach_km: 1,
+        dem: ["test"], resolution_m: 1, max_reach_km: 1,
       },
       { lat: -90, lon: 0, elev_m: 0 },
       0,

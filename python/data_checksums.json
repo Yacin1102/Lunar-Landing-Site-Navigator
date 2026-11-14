@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "files": {
+    "dem/LDEM_60S_240MPP_ADJ.TIF": {
+      "sha256": "3f9663257b63022f2b0d5a623482ff3cadddceb91594a4e4ca14a94d8cec8b34",
+      "size": 218961039,
+      "recorded_utc": "2026-11-14T20:28:20Z"
+    },
+    "dem/LDEM_60S_240MPP_ADJ_ERR.TIF": {
+      "sha256": "6b987570acf20cba527d29a519a9b1fd9d4550e98a81d4b8c1be4903b6d38fab",
+      "size": 267005175,
+      "recorded_utc": "2026-11-14T20:28:05Z"
+    },
+    "dem/LDEM_80S_80MPP_ADJ.TIF": {
+      "sha256": "82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a",
+      "size": 189158392,
+      "recorded_utc": "2026-11-14T20:26:47Z"
+    },
+    "dem/LDEM_80S_80MPP_ADJ_ERR.TIF": {
+      "sha256": "e89306914bb209143f61ba66d341703d75221339424b774c6a1eb3c6c370ffc6",
+      "size": 254808965,
+      "recorded_utc": "2026-11-14T20:30:02Z"
+    },
+    "kernels/de440.bsp": {
+      "sha256": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
+      "size": 119799808,
+      "recorded_utc": "2026-11-14T20:13:19Z"
+    },
+    "kernels/de442.bsp": {
+      "sha256": "8d5001fab315eeff222cc51f7cf7ffcdb43fb38fb9ac73ff09e09a5b361fd388",
+      "size": 119771136,
+      "recorded_utc": "2026-11-14T20:13:54Z"
+    },
+    "kernels/moon_080317.tf": {
+      "sha256": "78732477b96f9863e7b0d65bcee3c22b8707ca5ed0db56d1173319cb2e8c7993",
+      "size": 21437,
+      "recorded_utc": "2026-11-14T20:13:57Z"
+    },
+    "kernels/moon_de440_250416.tf": {
+      "sha256": "a47c71e9c9f33796bdafb2c9d69a7ee447b6016ecad80f71cd6f3e479f9cf768",
+      "size": 19478,
+      "recorded_utc": "2026-11-14T20:12:11Z"
+    },
+    "kernels/moon_pa_de421_1900-2050.bpc": {
+      "sha256": "656f90616403d75a75f0cd6c8830fc5b44f8cb4facb5ccb8915e752b397520cf",
+      "size": 1770496,
+      "recorded_utc": "2026-11-14T20:13:56Z"
+    },
+    "kernels/moon_pa_de440_200625.bpc": {
+      "sha256": "60cd55aa401ea2ea97360636f567554bfe4e37bb829f901b4460a455dfaf783f",
+      "size": 12863488,
+      "recorded_utc": "2026-11-14T20:12:43Z"
+    },
+    "kernels/naif0012.tls": {
+      "sha256": "678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b",
+      "size": 5257,
+      "recorded_utc": "2026-11-14T20:12:09Z"
+    },
+    "kernels/pck00011.tpc": {
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size": 131226,
+      "recorded_utc": "2026-11-14T20:12:10Z"
+    }
+  }
+}

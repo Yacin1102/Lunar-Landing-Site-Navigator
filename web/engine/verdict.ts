@@ -1,4 +1,4 @@
-import type { Visibility } from "./types";
+import type { Visibility } from "./runtime-types";
 
 /** Keep the provisional three-way light definition in one replaceable module. */
 export function provisionalVerdict(visibility: Visibility): Visibility["status"] {

@@ -1,4 +1,5 @@
-import type { Direction, Skyline, Visibility } from "./types";
+import type { Direction, Visibility } from "./runtime-types";
+import type { Skyline } from "./types";
 import { clamp, degToRad, radToDeg } from "./math";
 import { discRadiusDeg, skylineAt } from "./astro";
 

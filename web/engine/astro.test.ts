@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { directionFromBody, discRadiusDeg, interpolateBody, skylineAt } from "./astro";
 import { visibleDiscFraction } from "./visibility";
+import type { Skyline } from "./types";
 
 describe("astro core", () => {
   it("uses north-clockwise azimuth and degrees", () => {
@@ -32,8 +33,8 @@ describe("astro core", () => {
       {
         version: 1, lat: -89, lon: 0, elev_m: 0, mast_m: 0, az_step_deg: 90,
         skyline_deg: [0, 0, 0, 0], skyline_err_deg: [0, 0, 0, 0],
-        dem: "test", resolution_m: 1, max_reach_km: 1,
-      },
+        dem: ["test"], resolution_m: 1, max_reach_km: 1,
+      } satisfies Skyline,
     );
     expect(fraction).toBe(1);
   });

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "lat": -86.02,
+  "lon": 1.0,
+  "elev_m": 4961.591,
+  "size_m": 4800.0,
+  "n": 121,
+  "spacing_m": 40.0,
+  "dem": [
+    "SYNTHETIC (mock landscape, not NASA data)"
+  ],
+  "resolution_m": 20.0
+}
