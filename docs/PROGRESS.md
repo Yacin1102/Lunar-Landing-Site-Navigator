@@ -4,9 +4,24 @@ Scope of this plan: the Python engine (`python/`), the files it writes to `web/p
 
 ## Status
 
-**Plan awaiting approval. Nothing is built yet.** Next after approval: PR 1 (download script), then start the download.
+Plan approved on 2026-11-14.
 
-Test command (from PR 1 on): `python -m pytest python/tests -v -rs`. Last result: none yet.
+| PR | State |
+| --- | --- |
+| 1 Download script | Built, in review |
+| 2 Web handoff | **Next** |
+| 3 to 11 | Not started |
+
+Data on disk: the 8 SPICE kernels (downloaded 2026-11-14 as the live test of the script). Coarse and full maps: waiting for the download to be started.
+
+Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip install -r python/requirements.txt`.
+
+Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
+
+Last result (PR 1): 19 passed, 12 skipped, 0 failed. Skipped, all waiting for data:
+
+- `test_coarse_map_opens` (4 cases, one per coarse map): waiting for group `coarse`.
+- `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
 ## Principle: nothing waits on the download
 
@@ -68,17 +83,16 @@ Coarse versions of the same product family, same projection and frame, covering 
 
 ### The download script
 
-`python/scripts/download_data.py`, driven by a committed list `python/data_files.json` (URL, destination, group, expected size, SHA-256).
+`python/scripts/download_data.py`, driven by a committed list `python/data_files.json` (URL, destination, group, expected size). Checksums are kept in `python/data_checksums.json`.
 
 - **Resumable.** Each file downloads to `name.part` using HTTP range requests and is renamed only when complete and verified. Interrupt it at any time and run the same command again: finished files are skipped, a partial file continues from its last byte. If a server refuses range requests, that one file restarts and the script says so.
-- **Checksums.** Neither NAIF nor PGDA publishes checksums for these files as far as I have found. So on the first download the script checks the byte count against the size the server reports, computes the SHA-256, and writes it into `python/data_files.json`, which I then commit. From then on every download and every `--verify` run must match that recorded value. PR 1 states plainly which files had a published checksum to compare against and which did not.
+- **Checksums.** Neither NAIF nor PGDA publishes checksums for these files as far as I have found. So on the first download the script checks the byte count against the size the server reports, computes the SHA-256, and writes it into `python/data_checksums.json`, which I then commit. From then on every download and every `--verify` run must match that recorded value. PR 1 states plainly which files had a published checksum to compare against and which did not.
 - **Progress.** One line per file with percent, speed and time remaining, plus an overall "file 7 of 21, 12.4 of 36.1 GB" line. A log is written to `python/dem/download.log`.
-- **Stands alone.** It imports nothing from the engine, so it runs while I work.
+- **Stands alone.** It uses only the Python standard library and imports nothing from the engine, so it needs no install and runs while I work.
 
-Commands, from the repository root in a separate PowerShell window, once PR 1 is on your machine:
+Command, from the repository root in a separate PowerShell window:
 
 ```powershell
-pip install -r python/requirements.txt
 python python/scripts/download_data.py
 ```
 
@@ -101,8 +115,8 @@ The skyline engine, stopping rule, `skyline_err_deg`, the independent line-of-si
 
 ### Tests that need real data
 
-- Marked `@pytest.mark.realdata("kernels")`, `("dem_coarse")`, `("dem_full")` or `("sites5m")`.
-- A test is skipped only when a file it needs is missing or fails its checksum. Once the files are there it runs with no change to any command.
+- Marked `@pytest.mark.realdata("kernels")`, `("coarse")`, `("full")` or `("sites5m")`: the group names of `python/data_files.json`.
+- A test is skipped only when a file of its group is missing, has the wrong size, or has no recorded checksum. Once the files are there it runs with no change to any command. Re-reading 35 GB on every test run would take minutes, so the full checksum re-check is `download_data.py --verify`, not the test run.
 - Every pytest run ends with a table: each skipped test, and the file it is waiting for. **Every time I report test results I will list the skipped tests by name**, not just a count.
 - JPL Horizons answers used as references are saved in the repo with the query that produced them, so those tests do not need the network.
 
@@ -150,7 +164,7 @@ Each step is reported with its real output.
 
 1. **Verify the downloads.** `python python/scripts/download_data.py --verify`. Every file present, right size, right SHA-256. If anything is missing, run the download command again and continue with what is there.
 2. **Read the labels** of the full-resolution files and record them in `python/DATA.md`. Confirm the service region boundary.
-3. **Run the real-data tests.** `python -m pytest python/tests -v -rs`. The `dem_full` and `sites5m` tests now run on their own. Report any test still skipped and why.
+3. **Run the real-data tests.** `.venv\Scripts\python -m pytest python/tests -v -rs`. The `dem_full` and `sites5m` tests now run on their own. Report any test still skipped and why.
 4. **Build the real products**, in order: skylines for the 10 sites, terrain patches, shade grids, manifest. `python python/scripts/build_products.py` (resumable; the shade grids take longest).
 5. **Validate against the schemas.** `python python/scripts/validate_data.py web/public/data`. JSON against `docs/schemas/`, binary sizes against their labels.
 6. **Compare with the mocks.** `python python/scripts/compare_with_mock.py`. Same file names, fields, types and layout rules in `data/` and `data-mock/`; values differ by design. Any structural difference is a bug in one of the two.
