@@ -185,10 +185,12 @@ export default function App() {
         <div className="section-heading"><div><p className="eyebrow">1 · Where and when</p><h2>Mission scenario</h2></div><span className="help" title="A scenario is one site viewed at one UTC instant. Add up to four to compare mission options.">ⓘ</span></div>
         <div className="scenario-tabs" role="tablist" aria-label="Saved scenarios">
           {scenarios.map((scenario, index) => (
-            <button className={index === activeIndex ? "tab active" : "tab"} key={`${scenario.siteId}-${index}`} onClick={() => setActiveIndex(index)} type="button">
-              {allSites.find((site) => site.id === scenario.siteId)?.name ?? scenario.siteId}
-              {scenarios.length > 1 && <span className="tab-remove" onClick={(event) => { event.stopPropagation(); removeScenario(index); }} aria-label="Remove scenario">×</span>}
-            </button>
+            <div className="tab-group" key={`${scenario.siteId}-${index}`}>
+              <button className={index === activeIndex ? "tab active" : "tab"} onClick={() => setActiveIndex(index)} type="button">
+                {allSites.find((site) => site.id === scenario.siteId)?.name ?? scenario.siteId}
+              </button>
+              {scenarios.length > 1 && <button className="tab-remove" onClick={() => removeScenario(index)} type="button" aria-label={`Remove ${allSites.find((site) => site.id === scenario.siteId)?.name ?? "scenario"}`}>×</button>}
+            </div>
           ))}
         </div>
         <div className="form-grid">
