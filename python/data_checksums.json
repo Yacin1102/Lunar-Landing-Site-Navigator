@@ -11,6 +11,16 @@
       "size": 267005175,
       "recorded_utc": "2026-11-14T20:28:05Z"
     },
+    "dem/LDEM_75S_30MPP_ADJ.TIF": {
+      "sha256": "56dd4290379a4f94ff1e22fed232a87781158107bf20cd27568955f8bfdaaf9c",
+      "size": 2802850273,
+      "recorded_utc": "2026-11-14T22:02:44Z"
+    },
+    "dem/LDEM_80S_20MPP_ADJ.TIF": {
+      "sha256": "09b7ca80f9e6a146f970225d18af72fc02787669b3ef51b888e347d2b6845649",
+      "size": 2696082051,
+      "recorded_utc": "2026-11-14T22:00:35Z"
+    },
     "dem/LDEM_80S_80MPP_ADJ.TIF": {
       "sha256": "82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a",
       "size": 189158392,

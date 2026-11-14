@@ -81,6 +81,10 @@ First read of the GeoTIFF headers (2026-11-14). The full label notes, with tests
 | Extent | A square, not a circle: the 80°S maps span -304,000 to 304,000 m in x and y (7600 pixels of 80 m); the 60°S maps span -931,200 to 931,200 m (7760 pixels of 240 m). The corners reach beyond the named latitude |
 | Error maps | Same grid; values from 0.019 to 8.96 (metres) in the 80 m map |
 | Compression | Deflate, so a damaged block fails to decompress |
+| Projection parameters | `latitude_of_origin` -90, `central_meridian` 0, no false easting or northing: true scale at the pole, longitude 0 toward +y, 90 east toward +x |
+| Layout | Square pixels, no rotation, row 0 at the largest y; the pole is exactly at the middle of the grid, on a pixel corner |
+
+Checked by tests on all four coarse files: the engine's own projection formulas give the same position as the file's declared projection (through the PROJ library) to better than a micrometre (`test_projection_is_the_one_the_map_files_declare`), and the layout is as the table says (`test_map_files_are_laid_out_as_grid_spec_assumes`).
 
 ## Group 3: full-resolution elevation maps (`python/dem/`)
 

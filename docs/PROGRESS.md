@@ -10,9 +10,10 @@ Plan approved on 2026-11-14.
 | --- | --- |
 | 1 Download script | Built, in review (PR #4) |
 | 2 Web handoff | Built, in review (PR #5) |
-| 3 Timetable and fixtures | Built, in review |
-| 4 Elevation interface and synthetic terrain | **Next** |
-| 5 to 11 | Not started |
+| 3 Timetable and fixtures | Built, in review (PR #6) |
+| 4 Elevation interface and synthetic terrain | Built, in review |
+| 5 Skyline core | **Next** |
+| 6 to 11 | Not started |
 
 Data on disk: the 8 SPICE kernels and the 4 coarse maps (downloaded 2026-11-14 as the live test of the script). The 8 full-resolution maps (33.8 GB): waiting for the download to be started.
 
@@ -20,7 +21,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 3): 100 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 4): 132 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
