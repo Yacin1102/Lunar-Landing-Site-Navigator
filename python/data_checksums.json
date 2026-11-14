@@ -1,6 +1,26 @@
 {
   "version": 1,
   "files": {
+    "dem/LDEM_60S_240MPP_ADJ.TIF": {
+      "sha256": "3f9663257b63022f2b0d5a623482ff3cadddceb91594a4e4ca14a94d8cec8b34",
+      "size": 218961039,
+      "recorded_utc": "2026-11-14T20:28:20Z"
+    },
+    "dem/LDEM_60S_240MPP_ADJ_ERR.TIF": {
+      "sha256": "6b987570acf20cba527d29a519a9b1fd9d4550e98a81d4b8c1be4903b6d38fab",
+      "size": 267005175,
+      "recorded_utc": "2026-11-14T20:28:05Z"
+    },
+    "dem/LDEM_80S_80MPP_ADJ.TIF": {
+      "sha256": "82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a",
+      "size": 189158392,
+      "recorded_utc": "2026-11-14T20:26:47Z"
+    },
+    "dem/LDEM_80S_80MPP_ADJ_ERR.TIF": {
+      "sha256": "e89306914bb209143f61ba66d341703d75221339424b774c6a1eb3c6c370ffc6",
+      "size": 254808965,
+      "recorded_utc": "2026-11-14T20:30:02Z"
+    },
     "kernels/de440.bsp": {
       "sha256": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
       "size": 119799808,

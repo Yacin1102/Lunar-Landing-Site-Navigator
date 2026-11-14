@@ -7,15 +7,22 @@ Role
     interrupted.
 
 How it works, in plain words
-    * Files are fetched in a fixed order: SPICE kernels first (small, needed
+    * Files are started in a fixed order: SPICE kernels first (small, needed
       first), then the coarse elevation maps, then the full-resolution maps,
-      then the 5 m site maps.
+      then the 5 m site maps. Four files are in flight at a time, because the
+      elevation server limits each connection to about 0.5 MB/s.
+    * Only one copy of the script can download into a folder at a time.
     * Each file is written to ``<name>.part``. Only when the whole file has
       arrived and passed its checks is it renamed to ``<name>``. A file
       without the ``.part`` ending is therefore always complete.
     * If the script stops (Ctrl+C, power cut, network loss), run the same
       command again. Finished files are skipped. A ``.part`` file continues
-      from its last byte, using an HTTP "Range" request.
+      with an HTTP "Range" request from the last byte known to be safely on
+      the disk. Every 64 MB the script forces the file onto the disk and
+      notes the position in ``<name>.part.json``; bytes after that position
+      are fetched again, because after a power cut they may be garbage. The
+      request also tells the server which version of the file the start came
+      from, so a file replaced on the server is never glued onto an old start.
     * Checks on every file: the byte count must equal the size recorded in
       ``data_files.json``, and the SHA-256 checksum must equal the one in
       ``python/data_checksums.json``. NAIF and PGDA do not publish checksums
@@ -38,6 +45,7 @@ engine, so it can run before anything else is installed.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime as _dt
 import hashlib
 import http.client
@@ -45,6 +53,7 @@ import json
 import os
 import shutil
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -58,6 +67,14 @@ DEFAULT_MANIFEST = PYTHON_DIR / "data_files.json"
 DEFAULT_CHECKSUMS = PYTHON_DIR / "data_checksums.json"
 
 CHUNK_BYTES = 1024 * 1024
+#: A partial file is forced onto the disk after this many new bytes.
+SYNC_BYTES = 64 * 1024 * 1024
+#: Files downloaded at the same time. The PGDA server gives each connection
+#: about 0.5 MB/s (measured 2026-11-14), so one at a time would take about
+#: 19 hours for 35 GB. Four is what a web browser would open.
+DEFAULT_WORKERS = 4
+
+_CHECKSUM_LOCK = threading.Lock()
 USER_AGENT = "lunar-landing-site-navigator-downloader/1 (NASA Space Apps entry)"
 
 
@@ -231,30 +248,39 @@ def _duration(seconds: float) -> str:
     return f"{minutes}m{secs:02d}s"
 
 
-class Reporter:
-    """Prints progress and writes the log file.
+class Stopped(Exception):
+    """Raised inside a download when the run is being interrupted."""
 
-    On a terminal it redraws one line a few times a second. When output is
-    redirected it prints a full line every 30 seconds instead. Events (file
-    started, finished, failed) always go to the screen and to the log.
+
+class Reporter:
+    """Prints progress and writes the log file. Safe to use from several threads.
+
+    On a terminal it redraws one status line a few times a second: overall
+    progress, speed, time left, and the percentage of each file in flight.
+    When output is redirected it prints that line every 30 seconds instead.
+    Events (file started, finished, failed) always go to the screen and to
+    the log.
 
     Args:
         total_bytes: size of everything in this run, bytes.
         done_bytes: bytes already on disk when the run starts.
-        n_files: number of files in this run.
         log_path: log file to append to, or ``None`` for no log.
         stream: where to print (default: standard output).
+
+    Attributes:
+        stop: set to ask every download in flight to stop cleanly.
     """
 
-    def __init__(self, total_bytes: int, done_bytes: int, n_files: int,
+    def __init__(self, total_bytes: int, done_bytes: int,
                  log_path: Path | None = None, stream=None):
         self.total_bytes = total_bytes
         self.done_bytes = done_bytes
-        self.n_files = n_files
         self.log_path = log_path
         self.stream = stream if stream is not None else sys.stdout
         self.interactive = bool(getattr(self.stream, "isatty", lambda: False)())
-        self.index = 0
+        self.stop = threading.Event()
+        self._lock = threading.RLock()
+        self._active: dict[str, tuple[int, int]] = {}
         self._last_draw = 0.0
         self._rate_mark = (time.monotonic(), 0)
         self._rate = 0.0
@@ -263,51 +289,72 @@ class Reporter:
 
     def event(self, message: str) -> None:
         """Print a full line and append it to the log with a UTC time."""
-        if self._line_open:
-            self.stream.write("\n")
-            self._line_open = False
-        self.stream.write(message + "\n")
-        self.stream.flush()
-        if self.log_path is not None:
-            self.log_path.parent.mkdir(parents=True, exist_ok=True)
-            stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
-            with open(self.log_path, "a", encoding="utf-8") as log:
-                log.write(f"{stamp} {message}\n")
+        with self._lock:
+            if self._line_open:
+                self.stream.write("\r" + " " * self._width() + "\r")
+                self._line_open = False
+            self.stream.write(message + "\n")
+            self.stream.flush()
+            if self.log_path is not None:
+                self.log_path.parent.mkdir(parents=True, exist_ok=True)
+                stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+                with open(self.log_path, "a", encoding="utf-8") as log:
+                    log.write(f"{stamp} {message}\n")
 
     def add(self, n: int) -> None:
         """Count ``n`` newly received bytes."""
-        self.done_bytes += n
-        self._session_bytes += n
+        with self._lock:
+            self.done_bytes += n
+            self._session_bytes += n
 
     def forget(self, n: int) -> None:
         """Un-count ``n`` bytes that had to be thrown away and fetched again."""
-        self.done_bytes -= n
+        with self._lock:
+            self.done_bytes -= n
+
+    def finished(self, name: str) -> None:
+        """Remove a file from the status line."""
+        with self._lock:
+            self._active.pop(name, None)
+
+    def _width(self) -> int:
+        return max(40, shutil.get_terminal_size((120, 20)).columns - 1)
 
     def draw(self, name: str, have: int, size: int, force: bool = False) -> None:
-        """Redraw the progress line for the current file."""
-        now = time.monotonic()
-        interval = 0.5 if self.interactive else 30.0
-        if not force and now - self._last_draw < interval:
-            return
-        self._last_draw = now
-        mark_time, mark_bytes = self._rate_mark
-        if now - mark_time >= 2.0:
-            self._rate = (self._session_bytes - mark_bytes) / (now - mark_time)
-            self._rate_mark = (now, self._session_bytes)
-        left = self.total_bytes - self.done_bytes
-        eta = _duration(left / self._rate) if self._rate > 0 else "--"
-        line = (
-            f"[{self.index}/{self.n_files}] {name}  "
-            f"{100.0 * have / size:5.1f}%  {_gb(have)} of {_gb(size)}  "
-            f"{self._rate / 1e6:5.1f} MB/s  |  all files: "
-            f"{_gb(self.done_bytes)} of {_gb(self.total_bytes)}, about {eta} left"
-        )
-        if self.interactive:
-            self.stream.write("\r" + line.ljust(118)[:118])
-            self._line_open = True
-        else:
-            self.stream.write(line + "\n")
-        self.stream.flush()
+        """Update one file's progress and redraw the status line if it is due."""
+        with self._lock:
+            self._active[name] = (have, size)
+            now = time.monotonic()
+            interval = 0.5 if self.interactive else 30.0
+            if not force and now - self._last_draw < interval:
+                return
+            self._last_draw = now
+            mark_time, mark_bytes = self._rate_mark
+            if now - mark_time >= 5.0:
+                self._rate = (self._session_bytes - mark_bytes) / (now - mark_time)
+                self._rate_mark = (now, self._session_bytes)
+            left = self.total_bytes - self.done_bytes
+            eta = _duration(left / self._rate) if self._rate > 0 else "--"
+            files = ", ".join(
+                f"{_short(n)} {100.0 * h / z:.0f}%" for n, (h, z) in self._active.items())
+            line = (
+                f"{_gb(self.done_bytes)} of {_gb(self.total_bytes)} "
+                f"({100.0 * self.done_bytes / max(1, self.total_bytes):.1f}%)  "
+                f"{self._rate / 1e6:.1f} MB/s  about {eta} left  |  {files}"
+            )
+            if self.interactive:
+                width = self._width()
+                self.stream.write("\r" + line.ljust(width)[:width])
+                self._line_open = True
+            else:
+                self.stream.write(line + "\n")
+            self.stream.flush()
+
+
+def _short(name: str) -> str:
+    """Shorten a file name for the status line (LDEM_80S_20MPP_ADJ.TIF -> 80S_20MPP_ADJ)."""
+    stem = name.rsplit(".", 1)[0]
+    return stem[5:] if stem.startswith("LDEM_") else stem
 
 
 # --------------------------------------------------------------------------
@@ -340,26 +387,90 @@ def _total_from_headers(response, already: int) -> tuple[int, bool]:
     return int(length), False
 
 
+def _state_path(part: Path) -> Path:
+    """The small side file that remembers how far ``part`` can be trusted."""
+    return part.with_name(part.name + ".json")
+
+
+def _read_state(part: Path) -> dict | None:
+    """Read the side file of a partial download, or ``None`` if unusable."""
+    try:
+        state = json.loads(_state_path(part).read_text(encoding="utf-8"))
+        return state if isinstance(state.get("synced"), int) else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def _write_state(part: Path, state: dict) -> None:
+    """Save the side file safely (write a temporary file, then swap)."""
+    path = _state_path(part)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(state), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def discard_partial(part: Path) -> None:
+    """Delete a partial download and its side file."""
+    for path in (part, _state_path(part)):
+        if path.exists():
+            path.unlink()
+
+
+def trusted_bytes(part: Path) -> int:
+    """How many leading bytes of a partial download are safe to keep.
+
+    Only bytes that were forced onto the disk (not just handed to the
+    operating system) and noted in the side file count. After a power cut the
+    end of a file can hold garbage even though its length looks right, so
+    anything beyond the noted position is not trusted. A partial file with no
+    side file is not trusted at all.
+
+    Returns:
+        A byte count, 0 when there is nothing to keep.
+    """
+    if not part.is_file():
+        return 0
+    state = _read_state(part)
+    if state is None:
+        return 0
+    return max(0, min(state["synced"], part.stat().st_size))
+
+
 def _fetch_once(entry: dict, part: Path, reporter: Reporter, timeout: float) -> None:
     """One attempt at filling ``part`` up to the full size.
 
-    Appends to ``part`` when the server honours the Range request, otherwise
-    starts the file again from byte 0.
+    Keeps only the trusted start of ``part`` (see :func:`trusted_bytes`) and
+    asks the server for the rest. The request carries an "If-Range" header
+    with the server's own date or tag for the file from the first attempt, so
+    a file that changed on the server in the meantime is sent whole instead of
+    being glued onto the old start. If the server does not resume, the file
+    starts again from byte 0.
     """
     size = entry["size"]
     name = Path(entry["dest"]).name
-    have = part.stat().st_size if part.exists() else 0
-    if have > size:
-        reporter.event(f"  {name}: partial file is larger than expected, starting again")
-        reporter.forget(have)
-        part.unlink()
-        have = 0
+    on_disk = part.stat().st_size if part.exists() else 0
+    have = min(trusted_bytes(part), size)
+    state = _read_state(part) or {}
+    if on_disk != have:
+        if on_disk:
+            reporter.event(f"  {name}: keeping the first {have} of {on_disk} bytes on disk; "
+                           "the rest was not confirmed written and is fetched again")
+        reporter.forget(on_disk - have if on_disk <= size else size - have)
+        if have:
+            with open(part, "r+b") as handle:
+                handle.truncate(have)
+        else:
+            discard_partial(part)
+            state = {}
     if have == size:
         return
 
     headers = {"User-Agent": USER_AGENT}
+    validator = state.get("validator")
     if have:
         headers["Range"] = f"bytes={have}-"
+        if validator:
+            headers["If-Range"] = validator
     request = urllib.request.Request(entry["url"], headers=headers)
     try:
         response = urllib.request.urlopen(request, timeout=timeout)
@@ -377,18 +488,48 @@ def _fetch_once(entry: dict, part: Path, reporter: Reporter, timeout: float) -> 
                 "the file on the server is not the recorded version", retry=False)
         if have and not resumed:
             reporter.event(
-                f"  {name}: server does not support resuming, starting this file again")
+                f"  {name}: server sent the whole file (it changed, or resuming is "
+                "not supported), starting this file again")
             reporter.forget(have)
             have = 0
+        # A strong ETag identifies the exact bytes; a weak one ("W/...") may
+        # not be used for resuming, so fall back to the modification date.
+        etag = response.headers.get("ETag", "")
+        current = (etag if etag and not etag.startswith("W/")
+                   else response.headers.get("Last-Modified"))
+        if resumed and validator and current and current != validator:
+            # Some servers resume even when asked not to. Check for ourselves.
+            raise DownloadError(
+                "the file changed on the server since the partial download began",
+                restart=True)
+        if not resumed:
+            state = {"validator": current, "synced": 0}
+            _write_state(part, state)
         with open(part, "ab" if resumed else "wb") as out:
-            while True:
-                block = response.read(CHUNK_BYTES)
-                if not block:
-                    break
-                out.write(block)
-                have += len(block)
-                reporter.add(len(block))
-                reporter.draw(name, have, size)
+            last_sync = have
+            try:
+                while True:
+                    if reporter.stop.is_set():
+                        raise Stopped()
+                    block = response.read(CHUNK_BYTES)
+                    if not block:
+                        break
+                    out.write(block)
+                    have += len(block)
+                    reporter.add(len(block))
+                    reporter.draw(name, have, size)
+                    if have - last_sync >= SYNC_BYTES:
+                        out.flush()
+                        os.fsync(out.fileno())
+                        state["synced"] = last_sync = have
+                        _write_state(part, state)
+            finally:
+                # Also on a network error: force what arrived onto the disk,
+                # then note how far the file can be trusted.
+                out.flush()
+                os.fsync(out.fileno())
+                state["synced"] = out.tell()
+                _write_state(part, state)
     if have != size:
         raise DownloadError(f"connection closed after {have} of {size} bytes")
 
@@ -427,20 +568,17 @@ def download_file(entry: dict, root: Path, checksums: dict, checksums_path: Path
 
     final.parent.mkdir(parents=True, exist_ok=True)
     if final.exists():
-        if final.stat().st_size == size and not part.exists():
-            # Complete-looking file with no recorded checksum: check it like a
-            # fresh download instead of fetching it again.
-            os.replace(final, part)
-        else:
-            bad = final.with_name(final.name + ".bad")
-            os.replace(final, bad)
-            reporter.event(f"  {name}: unexpected file moved aside to {bad.name}")
+        # A file this script did not finish and verify is never adopted.
+        bad = final.with_name(final.name + ".bad")
+        reporter.forget(min(final.stat().st_size, size))
+        os.replace(final, bad)
+        reporter.event(f"  {name}: unverified file moved aside to {bad.name}")
 
-    reporter.event(f"[{reporter.index}/{reporter.n_files}] {name} ({_gb(size)})")
+    reporter.event(f"start  {name} ({_gb(size)})")
     attempts = 0
     checksum_retries = 0
     while True:
-        before = part.stat().st_size if part.exists() else 0
+        before = trusted_bytes(part)
         try:
             _fetch_once(entry, part, reporter, timeout)
             reporter.draw(name, size, size, force=True)
@@ -448,42 +586,47 @@ def download_file(entry: dict, root: Path, checksums: dict, checksums_path: Path
             recorded = checksums["files"].get(dest)
             if recorded is not None and recorded["sha256"] != actual:
                 reporter.forget(size)
-                part.unlink()
+                discard_partial(part)
                 checksum_retries += 1
                 raise DownloadError(
                     f"checksum mismatch (expected {recorded['sha256'][:12]}..., "
                     f"got {actual[:12]}...); file discarded",
                     retry=checksum_retries <= 1)
             os.replace(part, final)
+            _state_path(part).unlink(missing_ok=True)
+            reporter.finished(name)
             if recorded is None:
-                checksums["files"][dest] = {
-                    "sha256": actual,
-                    "size": size,
-                    "recorded_utc": _dt.datetime.now(_dt.timezone.utc)
-                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
-                }
-                save_checksums(checksums, checksums_path)
-                reporter.event(f"  done, checksum recorded: {actual}")
+                with _CHECKSUM_LOCK:
+                    checksums["files"][dest] = {
+                        "sha256": actual,
+                        "size": size,
+                        "recorded_utc": _dt.datetime.now(_dt.timezone.utc)
+                        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }
+                    save_checksums(checksums, checksums_path)
+                reporter.event(f"done   {name}, checksum recorded: {actual}")
             else:
-                reporter.event(f"  done, checksum matches: {actual}")
+                reporter.event(f"done   {name}, checksum matches: {actual}")
             return "downloaded"
         except DownloadError as error:
             problem = error
             if error.restart and part.exists():
                 reporter.forget(part.stat().st_size)
-                part.unlink()
+                discard_partial(part)
         except (OSError, http.client.HTTPException) as error:
             problem = DownloadError(f"network error: {error}")
 
-        now_have = part.stat().st_size if part.exists() else 0
+        now_have = trusted_bytes(part)
         attempts = 1 if now_have > before else attempts + 1
         if not problem.retry or attempts >= max_attempts:
-            reporter.event(f"  FAILED {name}: {problem}")
+            reporter.finished(name)
+            reporter.event(f"FAILED {name}: {problem}")
             raise problem
         wait = retry_wait_s * min(attempts, 6)
         reporter.event(f"  {name}: {problem}; retrying in {wait:.0f} s "
                        f"from byte {now_have}")
-        time.sleep(wait)
+        if reporter.stop.wait(wait):
+            raise Stopped()
 
 
 # --------------------------------------------------------------------------
@@ -494,53 +637,119 @@ def _bytes_on_disk(entry: dict, root: Path) -> int:
     """Bytes of this file already present (complete file or ``.part``)."""
     final = Path(root) / entry["dest"]
     part = final.with_name(final.name + ".part")
-    for candidate in (final, part):
-        if candidate.is_file():
-            return min(candidate.stat().st_size, entry["size"])
+    if final.is_file():
+        return min(final.stat().st_size, entry["size"])
+    if part.is_file():
+        return min(part.stat().st_size, entry["size"])
     return 0
+
+
+class AlreadyRunning(Exception):
+    """Another copy of this script is downloading into the same folder."""
+
+
+class _RunLock:
+    """Makes sure only one download runs per data folder.
+
+    Holds an operating-system lock on ``dem/download.lock``. The system
+    releases it by itself if the process dies, so a crash never leaves the
+    folder locked. Two copies writing the same ``.part`` file would corrupt it.
+    """
+
+    def __init__(self, root: Path):
+        self.path = Path(root) / "dem" / "download.lock"
+        self.handle = None
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.handle = open(self.path, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+                self.handle.seek(0)
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self.handle.close()
+            self.handle = None
+            raise AlreadyRunning(
+                "another download is already running for this folder; "
+                "let it finish or stop it first")
+        return self
+
+    def __exit__(self, *exc):
+        if self.handle is not None:
+            self.handle.close()   # closing the file releases the lock
+            self.handle = None
 
 
 def run_download(files: list[dict], root: Path, checksums_path: Path,
                  stream=None, max_attempts: int = 30,
-                 retry_wait_s: float = 10.0, timeout: float = 60.0) -> list[str]:
-    """Download every file in ``files``, in the order given.
+                 retry_wait_s: float = 10.0, timeout: float = 60.0,
+                 workers: int = DEFAULT_WORKERS) -> list[str]:
+    """Download every file in ``files``, starting them in the order given.
 
+    Up to ``workers`` files are in flight at once, each on its own connection.
+    Files are started strictly in list order, so earlier groups finish first.
     A failed file does not stop the run: the rest are still fetched.
 
     Returns:
         ``dest`` of each file that failed (empty list means all are in place).
+
+    Raises:
+        AlreadyRunning: if another copy is downloading into ``root``.
+        KeyboardInterrupt: passed on after the files in flight were stopped
+            cleanly and their progress saved.
     """
     root = Path(root)
-    checksums = load_checksums(checksums_path)
-    total = sum(f["size"] for f in files)
-    done = sum(_bytes_on_disk(f, root) for f in files)
-    reporter = Reporter(total, done, len(files), root / "dem" / "download.log", stream)
-    reporter.event(f"Downloading {len(files)} files, {_gb(total)} in total, "
-                   f"{_gb(done)} already on disk. Destination: {root}")
-    root.mkdir(parents=True, exist_ok=True)
-    free = shutil.disk_usage(root).free
-    if free < total - done:
-        reporter.event(f"WARNING: only {_gb(free)} free on this disk, "
-                       f"{_gb(total - done)} still to download.")
+    with _RunLock(root):
+        checksums = load_checksums(checksums_path)
+        total = sum(f["size"] for f in files)
+        done = sum(_bytes_on_disk(f, root) for f in files)
+        reporter = Reporter(total, done, root / "dem" / "download.log", stream)
+        reporter.event(f"Downloading {len(files)} files, {_gb(total)} in total, "
+                       f"{_gb(done)} already on disk, {workers} at a time. "
+                       f"Destination: {root}")
+        free = shutil.disk_usage(root).free
+        if free < total - done:
+            reporter.event(f"WARNING: only {_gb(free)} free on this disk, "
+                           f"{_gb(total - done)} still to download.")
 
-    failed: list[str] = []
-    for index, entry in enumerate(files, start=1):
-        reporter.index = index
+        def one(entry: dict) -> bool:
+            """Fetch one file; True if it is in place afterwards."""
+            if reporter.stop.is_set():
+                raise Stopped()
+            try:
+                status = download_file(entry, root, checksums, checksums_path, reporter,
+                                       max_attempts, retry_wait_s, timeout)
+            except DownloadError:
+                return False
+            if status == "skipped":
+                reporter.event(f"skip   {Path(entry['dest']).name}: already complete")
+            return True
+
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, workers))
+        futures = [pool.submit(one, entry) for entry in files]
         try:
-            status = download_file(entry, root, checksums, checksums_path, reporter,
-                                   max_attempts, retry_wait_s, timeout)
-        except DownloadError:
-            failed.append(entry["dest"])
-            continue
-        if status == "skipped":
-            reporter.event(f"[{index}/{len(files)}] {Path(entry['dest']).name}: "
-                           "already complete, skipped")
-    if failed:
-        reporter.event(f"Finished with {len(failed)} file(s) FAILED: "
-                       + ", ".join(failed) + ". Run the same command again.")
-    else:
-        reporter.event(f"All {len(files)} files are in place and verified.")
-    return failed
+            # Wait in short steps so Ctrl+C is noticed at once on every system.
+            while concurrent.futures.wait(futures, timeout=0.5).not_done:
+                pass
+        except KeyboardInterrupt:
+            reporter.stop.set()
+            pool.shutdown(wait=True, cancel_futures=True)
+            reporter.event("Interrupted. Progress is saved.")
+            raise
+        pool.shutdown()
+        failed = [entry["dest"] for entry, future in zip(files, futures)
+                  if not future.result()]
+        if failed:
+            reporter.event(f"Finished with {len(failed)} file(s) FAILED: "
+                           + ", ".join(failed) + ". Run the same command again.")
+        else:
+            reporter.event(f"All {len(files)} files are in place and verified.")
+        return failed
 
 
 def run_verify(files: list[dict], root: Path, checksums_path: Path,
@@ -596,6 +805,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="re-check files on disk; download nothing")
     parser.add_argument("--list", action="store_true",
                         help="show the files in download order and exit")
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+                        help=f"files downloaded at the same time (default {DEFAULT_WORKERS})")
     parser.add_argument("--root", type=Path, default=PYTHON_DIR,
                         help="data root (default: the python/ folder)")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -611,10 +822,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.verify:
         return 1 if run_verify(files, args.root, args.checksums) else 0
     try:
-        failed = run_download(files, args.root, args.checksums)
+        failed = run_download(files, args.root, args.checksums, workers=args.workers)
+    except AlreadyRunning as error:
+        print(f"Not started: {error}.")
+        return 1
     except KeyboardInterrupt:
-        print("\nInterrupted. Run the same command again to continue "
-              "from where it stopped.")
+        print("Run the same command again to continue from where it stopped.")
         return 130
     return 1 if failed else 0
 

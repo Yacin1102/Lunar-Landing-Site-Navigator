@@ -12,20 +12,19 @@ Plan approved on 2026-11-14.
 | 2 Web handoff | **Next** |
 | 3 to 11 | Not started |
 
-Data on disk: the 8 SPICE kernels (downloaded 2026-11-14 as the live test of the script). Coarse and full maps: waiting for the download to be started.
+Data on disk: the 8 SPICE kernels and the 4 coarse maps (downloaded 2026-11-14 as the live test of the script). The 8 full-resolution maps (33.8 GB): waiting for the download to be started.
 
 Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip install -r python/requirements.txt`.
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 1): 19 passed, 12 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 1): 32 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
-- `test_coarse_map_opens` (4 cases, one per coarse map): waiting for group `coarse`.
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
 ## Principle: nothing waits on the download
 
-The full NASA data is about 36 GB and takes a night to download. The work is ordered so that only the last step needs it.
+The full NASA data is 35 GB. The elevation server gives each connection about 0.6 MB/s (measured), so the script downloads four files at a time; the full-resolution maps should take roughly 5 to 6 hours. The work is ordered so that only the last step needs it.
 
 | Arrives | What | Unblocks |
 | --- | --- | --- |
@@ -85,9 +84,11 @@ Coarse versions of the same product family, same projection and frame, covering 
 
 `python/scripts/download_data.py`, driven by a committed list `python/data_files.json` (URL, destination, group, expected size). Checksums are kept in `python/data_checksums.json`.
 
-- **Resumable.** Each file downloads to `name.part` using HTTP range requests and is renamed only when complete and verified. Interrupt it at any time and run the same command again: finished files are skipped, a partial file continues from its last byte. If a server refuses range requests, that one file restarts and the script says so.
+- **Resumable.** Each file downloads to `name.part` using HTTP range requests and is renamed only when complete and verified. Interrupt it at any time and run the same command again: finished files are skipped, a partial file continues. Every 64 MB the script forces the partial file onto the disk and notes the position; a resume keeps only the bytes up to that position, because after a power cut later bytes may be garbage. A resume also names the file version it started from, so a file replaced on the server restarts instead of being glued onto an old start. Both NASA servers were tested and honour this.
 - **Checksums.** Neither NAIF nor PGDA publishes checksums for these files as far as I have found. So on the first download the script checks the byte count against the size the server reports, computes the SHA-256, and writes it into `python/data_checksums.json`, which I then commit. From then on every download and every `--verify` run must match that recorded value. PR 1 states plainly which files had a published checksum to compare against and which did not.
-- **Progress.** One line per file with percent, speed and time remaining, plus an overall "file 7 of 21, 12.4 of 36.1 GB" line. A log is written to `python/dem/download.log`.
+- **Four files at a time.** One connection to the elevation server measured about 0.5 MB/s, which would mean about 19 hours for 35 GB. Four connections measured about 2.5 MB/s in total. Files are still started in list order. `--workers N` changes the number.
+- **One copy only.** A second copy started in the same folder refuses to run, because two writers would corrupt a partial file.
+- **Progress.** One status line with total progress, speed, time remaining and the percentage of each file in flight. A log is written to `python/dem/download.log`.
 - **Stands alone.** It uses only the Python standard library and imports nothing from the engine, so it needs no install and runs while I work.
 
 Command, from the repository root in a separate PowerShell window:
@@ -146,8 +147,8 @@ So that review does not hold up the evening, each PR branches from the one befor
 
 | # | Pull request | Needs | What it delivers | How it is proven |
 | --- | --- | --- | --- | --- |
-| 8 | LOLA reader | coarse maps | `LolaElevation`: projection both ways, pixel registration, no-data, height reference, nesting of maps. Labels of the coarse files recorded in `python/DATA.md`. | On coarse maps: projection round trips, known features at published positions and heights (Shackleton, Malapert massif), a mirrored or rotated read fails. The same tests at full resolution are written now, marked `dem_full`, and skipped until morning. |
-| 9 | Site list (Contract 2) | coarse maps for the first check | `sites.json` with 10 sites, `python/sites_sources.md` with a source per coordinate, 5 m site files added to the download list. Researched by a background agent while PRs 4 to 7 are built; I check every coordinate and source myself before it goes in. | Schema; every site inside the service region; terrain at each site matches the source's description on the coarse map. The same check at full resolution is marked `dem_full`. |
+| 8 | LOLA reader | coarse maps | `LolaElevation`: projection both ways, pixel registration, no-data, height reference, nesting of maps. Labels of the coarse files recorded in `python/DATA.md`. | On coarse maps: projection round trips, known features at published positions and heights (Shackleton, Malapert massif), a mirrored or rotated read fails. The same tests at full resolution are written now, marked `realdata("full")`, and skipped until morning. |
+| 9 | Site list (Contract 2) | coarse maps for the first check | `sites.json` with 10 sites, `python/sites_sources.md` with a source per coordinate, 5 m site files added to the download list. Researched by a background agent while PRs 4 to 7 are built; I check every coordinate and source myself before it goes in. | Schema; every site inside the service region; terrain at each site matches the source's description on the coarse map. The same check at full resolution is marked `realdata("full")`. |
 | 10 | Terrain patch, shade grid and manifest builders (Contracts 4, 5, Manifest) | PR 7 | The builders, resumable, run on synthetic terrain. | Centre value 0; curvature drop matches the formula; orientation; shade-grid centre cell equals the site's full skyline within tolerance; normals on a synthetic slope. |
 
 **Morning: needs the full maps**
@@ -163,13 +164,15 @@ I cannot promise how many of PRs 1 to 10 fit in one evening. The order guarantee
 Each step is reported with its real output.
 
 1. **Verify the downloads.** `python python/scripts/download_data.py --verify`. Every file present, right size, right SHA-256. If anything is missing, run the download command again and continue with what is there.
-2. **Read the labels** of the full-resolution files and record them in `python/DATA.md`. Confirm the service region boundary.
-3. **Run the real-data tests.** `.venv\Scripts\python -m pytest python/tests -v -rs`. The `dem_full` and `sites5m` tests now run on their own. Report any test still skipped and why.
-4. **Build the real products**, in order: skylines for the 10 sites, terrain patches, shade grids, manifest. `python python/scripts/build_products.py` (resumable; the shade grids take longest).
-5. **Validate against the schemas.** `python python/scripts/validate_data.py web/public/data`. JSON against `docs/schemas/`, binary sizes against their labels.
-6. **Compare with the mocks.** `python python/scripts/compare_with_mock.py`. Same file names, fields, types and layout rules in `data/` and `data-mock/`; values differ by design. Any structural difference is a bug in one of the two.
-7. **Check the live API on real terrain.** Its answer equals the built file for all 10 sites.
-8. **Hand over.** Tell the web agent to switch from `data-mock/` to `data/`, update this file, open PR 11.
+2. **Commit the checksums.** The download wrote the SHA-256 of each map into `python/data_checksums.json`. Commit it, so the repository records all 20.
+3. **Read every map in full.** Decompress every block of every GeoTIFF once. No published checksum exists to compare the first download against, and a damaged compressed block fails to decompress, so this is the independent check on the first copy.
+4. **Read the labels** of the full-resolution files and record them in `python/DATA.md`. Confirm the service region boundary.
+5. **Run the real-data tests.** `.venv\Scripts\python -m pytest python/tests -v -rs`. The tests marked `realdata("full")` and `realdata("sites5m")` now run on their own. Report any test still skipped and why.
+6. **Build the real products**, in order: skylines for the 10 sites, terrain patches, shade grids, manifest. `python python/scripts/build_products.py` (resumable; the shade grids take longest).
+7. **Validate against the schemas.** `python python/scripts/validate_data.py web/public/data`. JSON against `docs/schemas/`, binary sizes against their labels.
+8. **Compare with the mocks.** `python python/scripts/compare_with_mock.py`. Same file names, fields, types and layout rules in `data/` and `data-mock/`; values differ by design. Any structural difference is a bug in one of the two.
+9. **Check the live API on real terrain.** Its answer equals the built file for all 10 sites.
+10. **Hand over.** Tell the web agent to switch from `data-mock/` to `data/`, update this file, open PR 11.
 
 ## Decisions taken
 

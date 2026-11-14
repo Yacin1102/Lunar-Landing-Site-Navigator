@@ -19,7 +19,15 @@ The script can be interrupted at any time. Running the same command again skips 
 
 ## About the checksums
 
-NAIF and PGDA do not publish checksums for these files, so there was nothing official to compare the first download against. For every file, the first download was accepted when its byte count equalled the size the server reported on 2026-11-14 (recorded in `data_files.json`), and its SHA-256 was then written to `data_checksums.json`. Every later download and every `--verify` run must reproduce that checksum, so a changed or damaged file is caught. This proves the files stay the same over time; it cannot prove the very first copy was undamaged beyond its size. The first real-data tests (the kernels load in SPICE, each map opens as a raster) cover that for each file as it arrives.
+**State on 2026-11-14: 12 of 20 checksums are recorded (the 8 SPICE kernels and the 4 coarse maps). The 8 full-resolution maps have none yet; theirs are written when the maps finish downloading and are committed then.**
+
+NAIF and PGDA do not publish checksums for these files, so there is nothing official to compare a first download against. The script therefore works like this:
+
+- A first download is accepted when its byte count equals the size the server reported on 2026-11-14 (recorded in `data_files.json`). Its SHA-256 is then written to `data_checksums.json`.
+- Every later download and every `--verify` run must reproduce that checksum, so a file that changes or is damaged afterwards is caught.
+- To keep a first download from being damaged by an interruption, a resumed download keeps only bytes that were forced onto the disk, and restarts if the server's copy changed in the meantime.
+
+What this cannot prove is that the very first copy matches NASA's, beyond its size. Two independent checks cover that: the kernels are loaded in SPICE and give sane Sun and Earth distances (test `test_build_kernels_load_and_cover_the_timetable`), and every block of every elevation map is decompressed once after download, which fails on a damaged block.
 
 ## Group 1: SPICE kernels (`python/kernels/`)
 
@@ -61,7 +69,18 @@ The product page states: cloud-optimised GeoTIFF, south polar stereographic proj
 
 Why: they are the same product family as the full-resolution maps (same projection, frame and processing) but 0.9 GB instead of 34 GB, so they arrive early. The elevation reader is developed on them, and they stay as a cross-check afterwards.
 
-Label notes: to be filled in from each file's GeoTIFF header when the elevation reader is built (projection parameters, pixel registration, no-data value, height reference, units).
+First read of the GeoTIFF headers (2026-11-14). The full label notes, with tests, come with the elevation reader.
+
+| Item | What the header says |
+| --- | --- |
+| Projection | "Moon (2015) - Sphere / Ocentric / South Polar", polar stereographic, metres |
+| Reference sphere | Radius 1,737,400 m, the project's height reference |
+| Values | Float32. Heights carry the processing note "1000.0 MUL", meaning the source grid in km was converted to metres. Range in the 80 m map: -7295.5 to 7026.3 |
+| No data | NaN |
+| Pixel registration | `AREA_OR_POINT = Area`, `node_offset = 1`: a value belongs to a pixel's area, not to a grid node |
+| Extent | A square, not a circle: the 80°S maps span -304,000 to 304,000 m in x and y (7600 pixels of 80 m); the 60°S maps span -931,200 to 931,200 m (7760 pixels of 240 m). The corners reach beyond the named latitude |
+| Error maps | Same grid; values from 0.019 to 8.96 (metres) in the 80 m map |
+| Compression | Deflate, so a damaged block fails to decompress |
 
 ## Group 3: full-resolution elevation maps (`python/dem/`)
 

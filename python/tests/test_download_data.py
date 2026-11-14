@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -28,6 +29,18 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         server = self.server
+        with server.count_lock:
+            server.in_flight += 1
+            server.max_in_flight = max(server.max_in_flight, server.in_flight)
+        try:
+            time.sleep(server.delay_s)
+            self._serve()
+        finally:
+            with server.count_lock:
+                server.in_flight -= 1
+
+    def _serve(self):
+        server = self.server
         name = self.path.lstrip("/")
         range_header = self.headers.get("Range")
         server.requests.append((name, range_header))
@@ -36,7 +49,11 @@ class _Handler(BaseHTTPRequestHandler):
             return
         body = server.files[name]
         start = 0
-        if range_header and server.support_range:
+        if_range = self.headers.get("If-Range")
+        server.if_ranges.append(if_range)
+        current = (if_range is None or if_range == server.last_modified
+                   or server.ignore_if_range)
+        if range_header and server.support_range and current:
             start = int(range_header.split("=")[1].split("-")[0])
             if start >= len(body):
                 self.send_error(416)
@@ -46,6 +63,7 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(200)
         payload = body[start:]
+        self.send_header("Last-Modified", server.last_modified)
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         if server.drop_after is not None:
@@ -65,6 +83,13 @@ def server():
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     httpd.files = {}
     httpd.requests = []
+    httpd.if_ranges = []
+    httpd.ignore_if_range = False
+    httpd.delay_s = 0.0
+    httpd.count_lock = threading.Lock()
+    httpd.in_flight = 0
+    httpd.max_in_flight = 0
+    httpd.last_modified = "Fri, 07 Jul 2023 22:03:02 GMT"
     httpd.support_range = True
     httpd.drop_after = None
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -91,11 +116,26 @@ def _entry(server, name: str, body: bytes, group: str = "kernels") -> dict:
             "dest": f"{group}/{name}", "size": len(body)}
 
 
+def _plant_partial(server, tmp_path, name: str, content: bytes, synced: int | None):
+    """Put a ``.part`` file on disk as an earlier, interrupted run would leave it.
+
+    ``synced`` is the position noted in the side file; ``None`` means no side file.
+    """
+    part = tmp_path / "kernels" / (name + ".part")
+    part.parent.mkdir(parents=True, exist_ok=True)
+    part.write_bytes(content)
+    if synced is not None:
+        (tmp_path / "kernels" / (name + ".part.json")).write_text(
+            json.dumps({"validator": server.last_modified, "synced": synced}))
+    return part
+
+
 def _run(files, tmp_path, **kwargs):
     """Run a download into ``tmp_path``; return (failed list, printed text)."""
     out = io.StringIO()
     kwargs.setdefault("retry_wait_s", 0.0)
     kwargs.setdefault("timeout", 5.0)
+    kwargs.setdefault("workers", 1)
     failed = dd.run_download(files, tmp_path, tmp_path / "sums.json", stream=out, **kwargs)
     return failed, out.getvalue()
 
@@ -135,8 +175,10 @@ def test_interrupted_download_resumes_from_the_right_byte(server, tmp_path):
     failed, _ = _run([entry], tmp_path)
     assert failed == []
     assert server.requests == [("big.bin", f"bytes={kept}-")]
+    assert server.if_ranges[-1] == server.last_modified
     assert (tmp_path / "kernels/big.bin").read_bytes() == body
     assert not part.exists()
+    assert not (tmp_path / "kernels/big.bin.part.json").exists()
 
 
 def test_a_drop_is_retried_within_one_run(server, tmp_path):
@@ -161,7 +203,7 @@ def test_finished_files_are_skipped_without_any_request(server, tmp_path):
 
     assert failed == []
     assert server.requests == []
-    assert "already complete, skipped" in text
+    assert "skip   a.bin: already complete" in text
 
 
 def test_corrupted_download_is_rejected(server, tmp_path):
@@ -194,15 +236,14 @@ def test_wrong_size_on_server_is_rejected_without_retry(server, tmp_path):
 def test_server_without_resume_support_restarts_the_file(server, tmp_path):
     body = _body(300_000)
     entry = _entry(server, "a.bin", body)
-    part = tmp_path / "kernels/a.bin.part"
-    part.parent.mkdir(parents=True)
-    part.write_bytes(body[:1000])
+    _plant_partial(server, tmp_path, "a.bin", body[:1000], synced=1000)
     server.support_range = False
 
     failed, text = _run([entry], tmp_path)
 
     assert failed == []
-    assert "does not support resuming" in text
+    assert server.requests[0] == ("a.bin", "bytes=1000-")
+    assert "starting this file again" in text
     assert (tmp_path / "kernels/a.bin").read_bytes() == body
 
 
@@ -212,7 +253,7 @@ def test_stale_partial_file_with_wrong_content_is_caught(server, tmp_path):
     entry = _entry(server, "a.bin", body)
     _run([entry], tmp_path)
     (tmp_path / "kernels/a.bin").unlink()
-    (tmp_path / "kernels/a.bin.part").write_bytes(b"x" * 1000)
+    _plant_partial(server, tmp_path, "a.bin", b"x" * 1000, synced=1000)
 
     failed, text = _run([entry], tmp_path)
 
@@ -220,6 +261,101 @@ def test_stale_partial_file_with_wrong_content_is_caught(server, tmp_path):
     assert failed == []
     assert "checksum mismatch" in text
     assert (tmp_path / "kernels/a.bin").read_bytes() == body
+
+
+def test_bytes_not_confirmed_on_disk_are_fetched_again_on_a_first_download(server, tmp_path):
+    """After a power cut the end of a partial file may be garbage of the right length.
+
+    No checksum is recorded yet for a first download, so the garbage could not be
+    caught afterwards. It must never be kept in the first place.
+    """
+    body = _body(300_000)
+    entry = _entry(server, "a.bin", body)
+    # 100,000 good bytes were confirmed written; 50,000 more are on disk but zeroed.
+    _plant_partial(server, tmp_path, "a.bin", body[:100_000] + bytes(50_000), synced=100_000)
+
+    failed, text = _run([entry], tmp_path)
+
+    assert failed == []
+    assert server.requests == [("a.bin", "bytes=100000-")]
+    assert "not confirmed written" in text
+    assert (tmp_path / "kernels/a.bin").read_bytes() == body
+    sums = json.loads((tmp_path / "sums.json").read_text())
+    assert sums["files"]["kernels/a.bin"]["sha256"] == hashlib.sha256(body).hexdigest()
+
+
+def test_partial_file_without_its_side_file_is_not_trusted(server, tmp_path):
+    body = _body(200_000)
+    entry = _entry(server, "a.bin", body)
+    _plant_partial(server, tmp_path, "a.bin", b"y" * 50_000, synced=None)
+
+    failed, _ = _run([entry], tmp_path)
+
+    assert failed == []
+    assert server.requests == [("a.bin", None)], "must ask for the whole file"
+    assert (tmp_path / "kernels/a.bin").read_bytes() == body
+
+
+def test_file_replaced_on_the_server_is_not_glued_onto_the_old_start(server, tmp_path):
+    old, new = _body(200_000, seed=1), _body(200_000, seed=2)   # same size
+    entry = _entry(server, "a.bin", old)
+    _plant_partial(server, tmp_path, "a.bin", old[:80_000], synced=80_000)
+    server.files["a.bin"] = new
+    server.last_modified = "Sat, 08 Jul 2023 10:00:00 GMT"
+
+    failed, text = _run([entry], tmp_path)
+
+    assert failed == []
+    assert "starting this file again" in text
+    assert (tmp_path / "kernels/a.bin").read_bytes() == new
+
+
+def test_changed_file_is_caught_even_if_the_server_resumes_anyway(server, tmp_path):
+    """A server may ignore the version sent with a resume request; the script checks itself."""
+    old, new = _body(200_000, seed=1), _body(200_000, seed=2)
+    entry = _entry(server, "a.bin", old)
+    _plant_partial(server, tmp_path, "a.bin", old[:80_000], synced=80_000)
+    server.files["a.bin"] = new
+    server.last_modified = "Sat, 08 Jul 2023 10:00:00 GMT"
+    server.ignore_if_range = True
+
+    failed, text = _run([entry], tmp_path)
+
+    assert failed == []
+    assert "changed on the server" in text
+    assert (tmp_path / "kernels/a.bin").read_bytes() == new
+
+
+def test_progress_is_forced_to_disk_and_noted_while_downloading(server, tmp_path, monkeypatch):
+    monkeypatch.setattr(dd, "CHUNK_BYTES", 10_000)
+    monkeypatch.setattr(dd, "SYNC_BYTES", 30_000)
+    body = _body(200_000)
+    entry = _entry(server, "a.bin", body)
+    server.drop_after = 95_000
+
+    failed, _ = _run([entry], tmp_path, max_attempts=1)
+
+    assert failed == ["kernels/a.bin"]
+    part = tmp_path / "kernels/a.bin.part"
+    state = json.loads((tmp_path / "kernels/a.bin.part.json").read_text())
+    assert state["synced"] == part.stat().st_size > 0
+    assert state["validator"] == server.last_modified
+    assert dd.trusted_bytes(part) == part.stat().st_size
+
+
+def test_unverified_complete_looking_file_is_not_adopted(server, tmp_path):
+    body = _body(100_000)
+    entry = _entry(server, "a.bin", body)
+    final = tmp_path / "kernels/a.bin"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(bytes(100_000))             # right size, wrong content, no checksum
+
+    failed, text = _run([entry], tmp_path)
+
+    assert failed == []
+    assert "unverified file moved aside" in text
+    assert final.read_bytes() == body
+    assert (tmp_path / "kernels/a.bin.bad").exists()
 
 
 def test_one_failed_file_does_not_stop_the_others(server, tmp_path):
@@ -231,6 +367,42 @@ def test_one_failed_file_does_not_stop_the_others(server, tmp_path):
 
     assert failed == ["kernels/nope.bin"]
     assert (tmp_path / "kernels/ok.bin").exists()
+
+
+def test_several_files_download_at_once_and_all_arrive_intact(server, tmp_path):
+    server.delay_s = 0.2
+    bodies = {f"f{i}.bin": _body(60_000, seed=i) for i in range(6)}
+    entries = [_entry(server, name, body) for name, body in bodies.items()]
+
+    failed, text = _run(entries, tmp_path, workers=3)
+
+    assert failed == []
+    assert server.max_in_flight == 3, "three connections at a time, no more and no fewer"
+    for name, body in bodies.items():
+        assert (tmp_path / "kernels" / name).read_bytes() == body
+    sums = json.loads((tmp_path / "sums.json").read_text())
+    assert len(sums["files"]) == 6
+    assert "All 6 files are in place and verified." in text
+
+
+def test_files_are_started_in_list_order_when_downloading_in_parallel(server, tmp_path):
+    server.delay_s = 0.05
+    entries = [_entry(server, f"f{i}.bin", _body(20_000, seed=i)) for i in range(8)]
+
+    _run(entries, tmp_path, workers=2)
+
+    first_four = {name for name, _ in server.requests[:4]}
+    assert first_four == {"f0.bin", "f1.bin", "f2.bin", "f3.bin"}
+
+
+def test_a_second_copy_refuses_to_run_in_the_same_folder(server, tmp_path):
+    entry = _entry(server, "a.bin", _body(10_000))
+    with dd._RunLock(tmp_path):
+        with pytest.raises(dd.AlreadyRunning):
+            _run([entry], tmp_path)
+    assert server.requests == []
+    failed, _ = _run([entry], tmp_path)     # the lock is free again afterwards
+    assert failed == []
 
 
 def test_verify_reports_each_kind_of_problem_and_downloads_nothing(server, tmp_path):
