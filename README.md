@@ -1,6 +1,6 @@
 # Lunar Landing Site Navigator
 
-A web app that shows, for any lunar site and date, whether the Sun and Earth are visible, for how long, and what that means for power and communications.
+A web app that shows, for any site and date in the Moon's south polar region, whether sunlight reaches the site and the Earth is visible, for how long, and what that means for power and communications.
 
 ## The hackathon
 
@@ -18,7 +18,7 @@ The Sun skims the horizon there, shadows stretch for kilometres, and small chang
 
 ## Planned features
 
-- Curated landing sites and custom coordinates
+- 10 curated south polar landing sites and custom south polar coordinates
 - Date and time selection with a timeline and animation
 - Sun and Earth position in the site's sky, accounting for surrounding terrain
 - Countdowns to sunset and Earthset

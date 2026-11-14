@@ -1,0 +1,8 @@
+spiceypy
+numpy
+rasterio
+fastapi
+uvicorn
+requests
+pytest
+matplotlib

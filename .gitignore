@@ -1,0 +1,20 @@
+# Large downloaded NASA data (downloaded by the engine's data script; never commit)
+python/kernels/
+python/dem/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node / web
+node_modules/
+web/dist/
+
+# Editors and OS
+.vscode/
+
+# Local environment
+.env

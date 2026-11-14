@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(pytest *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git switch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push origin part-*)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
+      "WebFetch(domain:naif.jpl.nasa.gov)",
+      "WebFetch(domain:imbrium.mit.edu)",
+      "WebFetch(domain:pgda.gsfc.nasa.gov)",
+      "WebFetch(domain:ssd-api.jpl.nasa.gov)",
+      "WebFetch(domain:ssd.jpl.nasa.gov)",
+      "WebFetch(domain:code.claude.com)",
+      "Bash(git checkout *)",
+      "Bash(git push -u origin part-*)",
+      "Bash(git branch *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(uvicorn *)",
+      "Bash(curl http://localhost*)",
+      "Bash(mkdir *)",
+      "WebFetch(domain:pds-geosciences.wustl.edu)",
+      "WebFetch(domain:ode.rsl.wustl.edu)",
+      "WebFetch(domain:nssdc.gsfc.nasa.gov)",
+      "WebFetch(domain:www.nasa.gov)",
+      "WebFetch(domain:science.nasa.gov)"
+    ],
+    "deny": [
+      "Bash(git push origin main)",
+      "Bash(git push --force *)",
+      "Read(./.env)"
+    ]
+  }
+}
