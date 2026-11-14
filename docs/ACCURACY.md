@@ -1,0 +1,64 @@
+# Accuracy
+
+What has been verified, against what, and the error that remains. Every figure here is printed by a test in `python/tests/`; the test is named so the figure can be reproduced. This page grows with each pull request. The skyline, which will dominate the error budget, is not built yet.
+
+## Sun and Earth directions
+
+Verified in `python/tests/test_ephemeris.py`.
+
+### Against JPL Horizons
+
+JPL Horizons is NASA's online ephemeris service and shares no code with this project. It was asked for the apparent azimuth and elevation of the Sun and the Earth from five lunar surface sites (latitudes 80°S to 89.9°S, all sides of the pole, heights from 4 km below to 5 km above the reference sphere) at six dates from November 2026 to 1 January 2040. Its replies are saved with the exact queries in `python/tests/data/horizons_altaz.json`. Horizons states that it uses the Moon's `MEAN_ME` high-precision orientation, the frame this project uses.
+
+| Compared with Horizons, 60 directions | Worst azimuth difference | Worst elevation difference | Test |
+| --- | --- | --- | --- |
+| Engine, computed directly for the site | 0.00000054° | 0.00000007° | `test_directions_agree_with_jpl_horizons` |
+| Browser method (timetable, interpolation, shift to the site) | 0.000026° (either angle) | | `test_browser_method_agrees_with_jpl_horizons` |
+
+The spec asks for agreement "to a few thousandths of a degree where achievable". The direct calculation agrees about ten thousand times better than that, which also confirms the frame, the east/north/up conventions and the time conversion.
+
+### Error budget for a direction computed in the browser
+
+| Source | Sun | Earth | How it was measured |
+| --- | --- | --- | --- |
+| Timetable: hourly rows, stored as Float32, cubic interpolation | 0.0000017° | 0.0000005° | 500 random sites and times against the exact Moon-centre vector (`test_interpolating_the_timetable_adds_negligible_error`) |
+| Shifting from the Moon's centre to the site by subtracting the site position | 0.00000016° | 0.000027° | Same test, against a direct calculation for the site |
+| Choice of ephemeris, DE440 or DE442 | 0.00000001° | 0.00000005° | `test_de442_gives_the_same_directions_as_de440` |
+| Total for the browser method | 0.0000018° | 0.000027° | Same test as the first two rows |
+
+For scale: the Sun's disc is 0.53° wide and the TypeScript pass mark is 0.01°.
+
+The second row is built into Contract 1. The timetable holds what is seen from the Moon's centre, with the light-time and aberration corrections worked out for the centre; the browser then shifts the vector to the site by subtraction. With no corrections at all the shift is exact (the two routes agree to rounding), and with the corrections they differ by up to 0.000026° for the Earth (`test_the_shift_to_the_site_is_exact_without_light_corrections`). It is 370 times smaller than the pass mark and far below any skyline uncertainty, so no change to the contract is proposed.
+
+**Straight-line interpolation** between rows instead of the cubic gives 0.00012° in total. That is still small, but the cubic costs nothing and is the recommended method.
+
+**Conclusion on the two open questions of the plan:** an hourly step and Float32 storage are both precise enough. No spec change is proposed.
+
+### Frame of the timetable against the frame of the elevation maps
+
+The LOLA maps are in the `MOON_ME` frame of the older DE421 ephemeris. The timetable uses `MOON_ME` from the current DE440 kernels, which NAIF built to be closely aligned with it. Measured over 2026 to 2040 at 2000 moments (`test_moon_me_is_within_a_metre_of_the_frame_of_the_lola_maps`): the two frames differ by at most 3.06e-7 radians, which is 0.0000175°, or 0.53 m on the Moon's surface. NAIF's own figure for 2000 to 2040 is 3.07e-7 radians.
+
+This is an offset between where the timetable places the Sun and where the maps place the terrain. It is ten times smaller than the finest map pixel is wide and will be carried into the skyline error budget as 0.0000175°.
+
+## Rise and set times (smooth Moon)
+
+The reference events in `events.json` are for a smooth sphere with the eye at ground level, the upper edge of the disc crossing the level horizon. Disc radii: Sun 695,700 km, Earth 6356.7519 km (its polar radius), both from `pck00011.tpc`.
+
+**The Earth's disc is treated as a circle, and this is the largest known error in the Earth's edge.** The Earth is flattened by 21 km. Seen from the Moon's south pole, the upper edge of its disc is near one of the Earth's poles, where the true limb is between 6356.75 km and about 6365 km from the centre depending on the date (estimated from the Earth's shape and the tilt between the two bodies' axes; not measured by a test). Using the polar radius therefore places the upper edge at most about 0.0012° too low and never too high: the app will not say the Earth's edge is visible when it is not. The equatorial radius would have placed it up to 0.0032° too high. This is about 45 times larger than the 0.000027° above, and still small beside the skyline uncertainty. It affects only the Earth's edge, not the Sun or the Earth's centre.
+
+| Check | Result | Test |
+| --- | --- | --- |
+| Each of the 110 stored events is a real crossing: the upper edge is on opposite sides of the horizon one second before and one second after | All 110 | `test_every_fixture_event_is_a_real_crossing_of_the_upper_edge` |
+| A finer first scan finds the same events to the millisecond | Same, in the four windows rescanned: two ordinary ones every 2 minutes instead of 10, and the two beside the pole every 5 minutes (the 400-day one for the Sun only) | `test_a_finer_scan_finds_the_same_events` |
+| The browser method, from the timetable, finds the same events | Worst timing difference 2.7 s (pass mark 60 s), on an Earth event at 80°S | `test_browser_method_passes_the_events_fixture_with_a_wide_margin` |
+| A graze that pokes above the horizon for under a minute between scan points is found, also in the first and last scan interval of a window | Found | `test_event_finder_catches_a_graze_between_scan_points`, `test_event_finder_catches_a_graze_right_at_the_edge_of_the_window` |
+
+The four windows not rescanned (both limbs, the edge of the service region, the end of the timetable) rely on the event finder's own turning-point search.
+
+**Limit that remains.** At the pole an event can hang on a hair: a turning point of the Sun's edge can pass within thousandths of a degree of the horizon. The fixture builder refuses any window where that margin is under 0.002° (`test_fixture_builder_refuses_a_window_where_an_event_hangs_on_a_hair`). The closest in the current fixture is 0.0031°, for the Sun 0.5° from the pole (printed by `test_a_finer_scan_finds_the_same_events`). On real terrain this fragility is what the lit / blocked / uncertain classification exists for.
+
+## Not yet verified
+
+- Elevation reading: the projection is verified (the engine's formulas agree with the projection declared inside the four coarse map files to better than a micrometre, `test_projection_is_the_one_the_map_files_declare`). Pixel registration against known features and published heights: with the LOLA reader.
+- Skyline on synthetic terrain, the stopping rule, the error bound and the independent line-of-sight check: with the skyline pull requests.
+- Illumination against published south polar studies: with the real products.

@@ -9,15 +9,15 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | TypeScript types for every contract | `web/engine/types.ts` | Final. Generated from the schemas; never edit by hand |
 | JSON Schemas | `docs/schemas/*.schema.json` | Final |
 | Mock data, contract-exact | `web/public/data-mock/` | Ready: sites, skylines, terrain patches, shade grids, manifest |
-| Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Coming next (engine PR 3). It will be the real timetable, not a mock |
-| Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Coming next (engine PR 3). Schemas and types are final now |
+| Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
+| Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
 | Live API | `http://localhost:8000/api/...` | Coming (engine PR 7), with a synthetic-terrain mode first. Response types are final now |
 | Real data | `web/public/data/` | Built after the NASA maps finish downloading |
 
 To start in a separate working copy:
 
 ```powershell
-git worktree add ..\Lunar-web -b web/app feat/web-handoff
+git worktree add ..\Lunar-web -b web/app feat/timetable
 ```
 
 ## The rules for the web side
@@ -75,7 +75,19 @@ const rows = new Float32Array(await (await fetch("data/ephem.bin")).arrayBuffer(
 // row i: rows[6*i] .. rows[6*i + 5]
 ```
 
-All browsers that matter are little-endian, so `Float32Array` reads the file directly. Interpolate between rows; the recommended method and its measured error arrive with the timetable (engine PR 3).
+All browsers that matter are little-endian, so `Float32Array` reads the file directly.
+
+**Interpolate with a cubic through four rows** (4-point Lagrange): for a time between rows `i` and `i+1`, use rows `i-1, i, i+1, i+2`. With `u` = position among those four rows, from 0 at row `i-1` to 3 at row `i+2`:
+
+```
+w0 = -(u-1)(u-2)(u-3)/6      w1 =  u(u-2)(u-3)/2
+w2 = -u(u-1)(u-3)/2          w3 =  u(u-1)(u-2)/6
+value = w0*row[i-1] + w1*row[i] + w2*row[i+1] + w3*row[i+2]      (each of the six columns)
+```
+
+In the first and last interval, use the four nearest rows (the first four or the last four) with the same formula. Measured against direct SPICE, this and the rest of the browser method are within 0.000002 degrees for the Sun and 0.00003 degrees for the Earth (`docs/ACCURACY.md`). Straight-line interpolation is about five times worse and saves nothing.
+
+The same steps are written out in Python as `interpolate_rows` and `view_from_rows` in `python/lunar_engine/ephemeris.py`, which the engine's tests run against the fixtures. Use them as a reference implementation.
 
 ### sites.json (type `SiteList`)
 
@@ -132,7 +144,7 @@ Use the full vectors and subtract the site position, as above. The Earth is clos
 
 At the pole itself north is undefined; nudge the point off the pole (for example to latitude -89.9999).
 
-Angular radius of a disc: `asin(body_radius / |d|)`. The exact radii used by the engine are fixed together with the fixtures (engine PR 3). The Sun's disc is about 0.53 degrees across and the Earth's about 1.9 degrees.
+Angular radius of a disc: `asin(body_radius / |d|)`, with `|d|` the distance from the eye. Use these radii, which the fixtures were made with: **Sun 695,700 km, Earth 6356.7519 km**. The Earth's value is its polar radius: from the south pole the upper edge of the Earth's disc is near one of the Earth's poles, so this is the closer and the cautious choice (`docs/ACCURACY.md`). The Sun's disc is about 0.53 degrees across and the Earth's about 1.9 degrees.
 
 ## Lit, blocked or uncertain
 
@@ -165,10 +177,14 @@ Types: `Skyline`, `ApiHealth`, `ApiError`. Not running yet; it arrives with engi
 
 ## The test fixtures
 
-Types: `AltAzFixture`, `EventsFixture`. Files arrive with engine PR 3 in `web/engine/tests/fixtures/`.
+Types: `AltAzFixture`, `EventsFixture`. Files are in `web/engine/tests/fixtures/`.
 
 - `altaz.json`: `cases` with `lat`, `lon`, `elev_m`, `mast_m`, `t_ms` and the correct `sunEl`, `sunAz`, `earthEl`, `earthAz`, computed with SPICE directly, not from the timetable. Your code, reading the timetable, must agree within **0.01 degrees**. Compare azimuths around the circle (359.99 and 0.01 are 0.02 apart).
-- `events.json`: `cases` with a site, a window and the lists `sunrise_ms`, `sunset_ms`, `earthrise_ms`, `earthset_ms`, for a smooth Moon with the eye at ground level. Rise and set are when the **upper edge** of the disc crosses the level horizon. Your code must find the same events within **60 seconds**.
+- `events.json`: `cases` with a site, a window and the lists `sunrise_ms`, `sunset_ms`, `earthrise_ms`, `earthset_ms`, for a smooth Moon with the eye at ground level (`elev_m` 0, `mast_m` 0). Rise and set are when the **upper edge** of the disc crosses the level horizon: centre elevation + angular radius = 0. Your code must find the same events within **60 seconds**.
+
+Each case has a `name` saying what it is meant to expose; print it when a case fails. The Python version of the browser method passes both fixtures with a wide margin: 0.000026 degrees at worst on directions and 2.7 seconds at worst on events.
+
+Things the event cases will catch: windows run up to 400 days, because 0.1 degrees from the pole the Sun rises about once a year; some windows have one more rise than sets; and near the pole a body can rise and set again within hours, so a scan that steps too coarsely and only looks for sign changes will miss events. Look for turning points of the edge elevation as well as sign changes.
 
 ## The mock data
 
@@ -194,7 +210,7 @@ The mock is good enough to exercise the app, not to judge it: its skylines come 
 ## Checking a data folder
 
 ```powershell
-.venv\Scripts\python python/scripts/validate_data.py web/public/data-mock --allow-missing-ephem
+.venv\Scripts\python python/scripts/validate_data.py web/public/data-mock
 ```
 
 This checks every file against its schema, binary sizes against their labels, and the manifest against what is on disk. The same check runs in the engine's tests.

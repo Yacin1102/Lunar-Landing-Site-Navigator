@@ -11,6 +11,15 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/geometry.py` | Exact geometry on the reference sphere: latitude/longitude to a direction, the local east/north/up frame, azimuth and elevation. | Nothing | Nothing |
 | `python/lunar_engine/contracts.py` | Decides whether a file, an API response or a whole data folder matches the contracts. | `docs/schemas/*.schema.json`, the files being checked | Nothing (returns a list of problems) |
 | `python/lunar_engine/mock_world.py` | An invented landscape given by formulas, with a brute-force skyline, terrain patch and shade grid. Used only for mock data. | Nothing | Nothing |
+| `python/lunar_engine/elevation.py` | Terrain heights behind one interface (`ElevationSource`): the polar projection, a map grid with interpolation between pixel centres, nested maps answered from the finest, and "highest terrain in a block" tables. | Map grids | Nothing |
+| `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
+| `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
+| `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
+| `python/lunar_engine/events_reference.py` | Reference rise and set times on a smooth Moon, for the fixtures only. | `ephemeris` | Nothing |
+| `python/lunar_engine/products.py` | Shared file writers: JSON, the timetable, the manifest. | A data folder | Files in it |
+| `python/scripts/build_ephem.py` | Builds the timetable (Contract 1). | SPICE via `ephemeris` | `ephem.bin`, `ephem.json`, refreshed `manifest.json` |
+| `python/scripts/build_fixtures.py` | Builds the fixtures for the TypeScript tests (Contract 6). | SPICE via `ephemeris`, `events_reference` | `web/engine/tests/fixtures/altaz.json`, `events.json` |
+| `python/scripts/fetch_horizons.py` | Fetches reference directions from JPL Horizons, for validation only. | The Horizons web service | `python/tests/data/horizons_altaz.json` |
 | `python/scripts/make_mock_data.py` | Builds the mock data folder from the invented landscape. | `mock_world` | `web/public/data-mock/` |
 | `python/scripts/gen_types.py` | Turns the schemas into TypeScript interfaces. | `docs/schemas/*.schema.json` | `web/engine/types.ts` |
 | `python/scripts/validate_data.py` | Command-line front end of `contracts.py` for a data folder. | A data folder | Report on screen |
@@ -59,6 +68,44 @@ flowchart LR
 A test fails if `types.ts` differs from what the schemas generate, or if the committed mock folder breaks any contract.
 
 Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Moon's centre, "north" is along the meridian toward the north pole (away from the south pole at these sites), "east" completes the right-handed set, and azimuth runs from north through east.
+
+## Elevation: one interface, two backends
+
+```mermaid
+flowchart TD
+    users["skyline engine, terrain patches,<br/>shade grids, live API<br/>(coming)"] --> source[ElevationSource<br/>height, height error, pixel size,<br/>finest map covering a point]
+    source --> grid[HeightGrid<br/>one map on the projected sheet,<br/>bilinear between pixel centres]
+    grid --> synth[SyntheticElevation<br/>cones, domes, walls from formulas,<br/>is_real = False]
+    grid -.-> lola["LOLA map reader<br/>(coming, PR 8)<br/>is_real = True"]
+    proj["projection: to_xy, to_lat_lon, xy_to_unit<br/>south polar stereographic, exact on the sphere"] --> grid
+```
+
+The terrain is defined as the bilinear blend between pixel centres. Every height, skyline and error figure refers to that surface. A point outside the data, or in a hole, raises `CoverageError`; a height is never guessed.
+
+Two facts established by tests that the skyline search will rely on, with their limits:
+
+- The projection never shrinks distances on the reference sphere: two points on the 1737.4 km sphere are never farther apart than on the sheet. Points standing on high ground are slightly farther apart than their feet (0.3 % at 5 km), so the search must allow for that factor.
+- Each value of a "highest terrain" table is an upper limit for everything beneath it in that one map, with unknown terrain counted as high, not low. It says nothing about a finer map nested over the same area; each map needs its own table.
+
+## Timetable and fixtures
+
+The timetable and the fixtures both come from SPICE but by different routes, so that the fixtures can test the timetable.
+
+```mermaid
+flowchart TD
+    kernels[(python/kernels/)] --> env[spice_env.py<br/>UTC ms to SPICE time]
+    env --> eph[ephemeris.py]
+    eph -- "Sun and Earth from the Moon's centre,<br/>every hour" --> be[build_ephem.py] --> ephem[ephem.bin + ephem.json]
+    eph -- "Sun and Earth seen from the site itself,<br/>at the exact moment" --> bf[build_fixtures.py]
+    ev[events_reference.py<br/>upper edge crosses the horizon] --> bf
+    eph --> ev
+    bf --> fixtures[altaz.json + events.json]
+    horizons[(JPL Horizons)] --> fh[fetch_horizons.py] --> saved[tests/data/horizons_altaz.json]
+    saved -. compared in tests .-> eph
+    ephem -. "browser method in Python,<br/>compared in tests" .-> fixtures
+```
+
+Times are UTC milliseconds since 1970 everywhere except inside `spice_env.py`, and angles are degrees everywhere except inside the trigonometry. SPICE's own time scale and radians never leave those modules.
 
 ## How one file is downloaded
 

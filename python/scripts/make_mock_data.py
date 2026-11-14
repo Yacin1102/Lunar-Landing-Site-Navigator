@@ -23,17 +23,15 @@ Usage (from the repository root)
 
 from __future__ import annotations
 
-import json
 import shutil
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lunar_engine import contracts, mock_world  # noqa: E402
+from lunar_engine import contracts, mock_world, products  # noqa: E402
 
 OUTPUT = contracts.REPO_DIR / "web" / "public" / "data-mock"
 
@@ -74,15 +72,6 @@ MOCK_SITES = [
 ]
 
 
-def _write_json(path: Path, data, compact: bool = False) -> None:
-    """Write JSON with Unix line endings (sizes must be the same on every system)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # allow_nan=False: NaN and Infinity are not valid JSON and must never be written.
-    text = (json.dumps(data, separators=(",", ":"), allow_nan=False) if compact
-            else json.dumps(data, indent=2, allow_nan=False))
-    path.write_text(text + "\n", encoding="utf-8", newline="\n")
-
-
 def build(output: Path = OUTPUT, built_ms: int | None = None, log=print) -> None:
     """Write the whole mock folder.
 
@@ -102,13 +91,13 @@ def build(output: Path = OUTPUT, built_ms: int | None = None, log=print) -> None
     for sid, name, lat, lon, category, notes, extra, has_shade in MOCK_SITES:
         log(f"{sid} ...")
         record = mock_world.site_skyline(lat, lon, MAST_M, SKYLINE_AZ_STEP_DEG)
-        _write_json(output / "skylines" / f"{sid}.json", record, compact=True)
+        products.write_json(output / "skylines" / f"{sid}.json", record, compact=True)
 
         common = {"dem": [mock_world.MOCK_DEM_NAME], "resolution_m": mock_world.MOCK_RESOLUTION_M}
         patch = mock_world.terrain_patch(lat, lon, TERRAIN_N, TERRAIN_SPACING_M)
         (output / "terrain").mkdir(exist_ok=True)
         patch.astype("<f4").tofile(output / "terrain" / f"{sid}.bin")
-        _write_json(output / "terrain" / f"{sid}.json", {
+        products.write_json(output / "terrain" / f"{sid}.json", {
             "version": 1, "lat": lat, "lon": lon, "elev_m": record["elev_m"],
             "size_m": (TERRAIN_N - 1) * TERRAIN_SPACING_M, "n": TERRAIN_N,
             "spacing_m": TERRAIN_SPACING_M, **common})
@@ -119,7 +108,7 @@ def build(output: Path = OUTPUT, built_ms: int | None = None, log=print) -> None
             (output / "shade").mkdir(exist_ok=True)
             np.round(skylines / SHADE_SCALE).astype("<i2").tofile(output / "shade" / f"{sid}_skyline.bin")
             normals.astype("<f4").tofile(output / "shade" / f"{sid}_normal.bin")
-            _write_json(output / "shade" / f"{sid}.json", {
+            products.write_json(output / "shade" / f"{sid}.json", {
                 "version": 1, "center_lat": lat, "center_lon": lon,
                 "size_m": (SHADE_N - 1) * SHADE_SPACING_M, "n": SHADE_N,
                 "spacing_m": SHADE_SPACING_M, "az_step_deg": SHADE_AZ_STEP_DEG,
@@ -129,30 +118,13 @@ def build(output: Path = OUTPUT, built_ms: int | None = None, log=print) -> None
         sites.append({"id": sid, "name": name, "lat": lat, "lon": lon, "category": category,
                       **extra, "notes": notes, "has_terrain": True, "has_shade_grid": has_shade})
 
-    _write_json(output / "sites.json", {"version": 1, "sites": sites})
-
-    def contract_of(path: str) -> str:
-        if path.startswith("ephem."):
-            return "ephem"
-        return {"sites.json": "sites", "skylines": "skyline", "terrain": "terrain",
-                "shade": "shade"}[path.split("/")[0]]
-
-    files = sorted(p for p in output.rglob("*") if p.is_file() and p.name != "manifest.json")
-    _write_json(output / "manifest.json", {
-        "version": 1,
-        "data_kind": "mock",
-        "built_ms": int(time.time() * 1000) if built_ms is None else built_ms,
-        "service_region": SERVICE_REGION,
-        "files": [{"path": p.relative_to(output).as_posix(),
-                   "contract": contract_of(p.relative_to(output).as_posix()),
-                   "version": 1, "bytes": p.stat().st_size} for p in files],
-        "sites": [{"id": s["id"], "has_terrain": s["has_terrain"],
-                   "has_shade_grid": s["has_shade_grid"]} for s in sites],
-    })
+    products.write_json(output / "sites.json", {"version": 1, "sites": sites})
+    products.write_manifest(output, "mock", SERVICE_REGION, built_ms)
 
 
 if __name__ == "__main__":
     build()
+    # The timetable is real data, added by build_ephem.py; accept its absence here.
     found = contracts.data_folder_problems(OUTPUT, allow_missing_ephem=True)
     print("\n".join(found) if found else f"Mock data written to {OUTPUT} and valid.")
     sys.exit(1 if found else 0)
