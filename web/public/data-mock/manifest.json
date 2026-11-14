@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "data_kind": "mock",
+  "build_date": "2026-11-14",
+  "service_region": { "min_lat": -90, "max_lat": -80, "min_lon": -180, "max_lon": 180 },
+  "files": ["manifest.json", "sites.json", "ephem.json", "ephem.bin"],
+  "sites": [
+    { "id": "mock-ridge", "has_terrain": true, "has_shade_grid": true },
+    { "id": "mock-crater", "has_terrain": true, "has_shade_grid": false },
+    { "id": "mock-plateau", "has_terrain": false, "has_shade_grid": false }
+  ]
+}

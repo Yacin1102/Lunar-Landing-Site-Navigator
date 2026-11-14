@@ -30,6 +30,21 @@ button {
   font-weight: 700;
 }
 
+.banner {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid #e8ba6e;
+  border-radius: 0.6rem;
+  color: #ffe4a8;
+  background: #5a3f16aa;
+}
+
+.banner.error {
+  border-color: #ef8f8f;
+  color: #ffd2d2;
+  background: #5a1d2aaa;
+}
+
 .app-shell {
   width: min(960px, calc(100% - 2rem));
   margin: 0 auto;
@@ -74,4 +89,23 @@ h2 {
   border-radius: 1rem;
   background: #101d31dd;
   box-shadow: 0 1.5rem 4rem #0005;
+}
+
+.site-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.site-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.site-list span {
+  color: #a9bad4;
+  font-size: 0.85rem;
 }

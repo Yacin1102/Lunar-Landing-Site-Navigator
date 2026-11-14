@@ -1,0 +1,38 @@
+[
+  {
+    "id": "mock-ridge",
+    "name": "Mock Ridge",
+    "lat": -89.2,
+    "lon": 15,
+    "category": "ridge",
+    "mission": "Synthetic test site",
+    "country": "synthetic",
+    "notes": "Synthetic high-ground site for browser tests.",
+    "has_terrain": true,
+    "has_shade_grid": true
+  },
+  {
+    "id": "mock-crater",
+    "name": "Mock Crater",
+    "lat": -88.6,
+    "lon": -45,
+    "category": "crater",
+    "mission": "Synthetic test site",
+    "country": "synthetic",
+    "notes": "Synthetic shadowed site for browser tests.",
+    "has_terrain": true,
+    "has_shade_grid": false
+  },
+  {
+    "id": "mock-plateau",
+    "name": "Mock Plateau",
+    "lat": -84,
+    "lon": 120,
+    "category": "plateau",
+    "mission": "Synthetic test site",
+    "country": "synthetic",
+    "notes": "Synthetic site without an attached display patch.",
+    "has_terrain": false,
+    "has_shade_grid": false
+  }
+]
