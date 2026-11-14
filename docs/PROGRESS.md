@@ -22,7 +22,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 5): 163 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 5): 165 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -186,7 +186,7 @@ Each step is reported with its real output.
 - The timetable is hourly, Float32, 115,057 rows (16 Nov 2026 00:00 to 1 Jan 2040 00:00 UTC inclusive), with `LT+S` correction. Measured in PR 3: precise to 0.0000017 degrees for the Sun; see `docs/ACCURACY.md`.
 - Disc radii: Sun 695,700 km and Earth 6356.7519 km, from `pck00011.tpc`. The Earth's is its polar radius: from the south pole the upper edge of the Earth's disc is near one of the Earth's poles. This keeps the Earth's edge within about 0.0012 degrees and never too high; the equatorial radius would be up to 0.0032 degrees too high. Raised by the contract review.
 - The web side should interpolate the timetable with a cubic through four rows; the formula is in `docs/WEB_HANDOFF.md`.
-- Skyline method (PR 5): a proven interval per wedge, from a search that sets areas aside only with proof (see `docs/ARCHITECTURE.md`). Reported skyline = middle of the interval; numerical error = half its width. Ground within 1 m of the point under the eye is not an obstacle. Target half-width 0.0005°, at most 8 cuts per cell.
+- Skyline method (PR 5): a proven interval per wedge, from a search that sets areas aside only with proof (see `docs/ARCHITECTURE.md`). Three proven ceilings, the lowest used: per block, per piece from its corners, and per wedge for pieces covering several wedges. Reported skyline = middle of the interval; numerical error = half its width. Ground within 1 m of the point under the eye is not an obstacle. Target half-width 0.0005°, at most 8 cuts per cell.
 - Map coverage (PR 5): each map is trusted inside the largest disc around its centre that has all its data; a coarser map takes over outside it. Terrain beyond every map is assumed up to 11,000 m high (above the highest known point on the Moon, about 10,786 m), and a skyline that could be affected by it is refused.
 - The download script lives at `python/scripts/download_data.py`.
 - One new Python package: `jsonschema`, for validating files against the schemas. numba will be proposed in PR 5 only if timing shows it is needed.
@@ -219,7 +219,8 @@ Still to be fixed, with the PR that needs them: the default and accepted `az_ste
 
 ## Open questions
 
-- **Skyline speed on the real maps (not yet measured).** On a synthetic 2000 x 2000 map with 60 cones it takes 6.7 s. The real 10 m map is about 42,000 x 42,000 pixels and skylines reach hundreds of km, so the time per site is unknown until PR 8. Reading the maps may need a cache on disk. For the live API, results are cached.
+- **Should the live API accept `mast_m = 0`?** With the eye exactly on the ground of a steep slope, the skyline interval widens to ±0.08° (±0.005° with a 2 m mast). It is still proven. Options for PR 7: allow it and let the wider interval show as "uncertain", or require a small minimum mast such as 0.5 m.
+- **Skyline speed on the real maps (not yet measured).** On a synthetic 2000 x 2000 map with 60 cones it takes 2.9 s. The real 10 m map is about 42,000 x 42,000 pixels and skylines reach hundreds of km, so the time per site is unknown until PR 8. Reading the maps may need a cache on disk. For the live API, results are cached.
 
 1. Contract 1 gives 115,056 hourly rows, which ends one hour before 1 Jan 2040 00:00. To reach "at least 1 Jan 2040" the timetable was built with 115,057 rows. Say if the count must be exactly 115,056.
 2. Sites outside 80°S (for example Chandrayaan-3 at about 69°S) cannot be included under the proposed service region. Candidates: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).

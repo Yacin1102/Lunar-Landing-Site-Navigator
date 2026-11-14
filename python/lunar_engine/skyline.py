@@ -72,6 +72,21 @@ Why no peak can be missed
       cap centre's azimuth plus or minus ``asin(sin(radius) / sin(distance))``.
       Azimuth does not depend on height, because the eye is on the vertical.
 
+    For pieces of a single cell a second, much tighter ceiling is also
+    proven, and the lower of the two is used (see :meth:`_Search._corner_geometry`).
+    The first ceiling alone is loose on steep slopes facing the observer,
+    because it pairs a piece's highest point with its nearest distance.
+
+    A piece that covers several wedges also gets a separate ceiling for each
+    of them, from only the part of the piece inside that wedge (see
+    :meth:`_Search._per_wedge_ceilings`). Without this, the highest part of
+    a piece would raise the ceiling of every wedge it touches. That matters
+    most along the contour of a slope, where the terrain's elevation angle
+    changes fastest with azimuth.
+
+    A margin of 1e-9 degrees is added to every ceiling for floating-point
+    rounding.
+
 Units: degrees, metres; ``MOON_ME``; see :mod:`lunar_engine.geometry`.
 """
 
@@ -95,6 +110,18 @@ MAX_DEPTH = 8
 #: First-look samples along a wedge's centre line are at most this many
 #: wedge widths of arc apart, and never closer than one pixel.
 SEED_SPACING_WEDGES = 4.0
+#: How sharply the projection bends, per square metre: an upper limit for
+#: the second derivative of ``xy_to_unit`` along a sheet axis. The true
+#: largest value is 1 / R^2 (at the pole; measured by a test); 5 / R^2 is
+#: used for margin.
+PROJECTION_CURVATURE_PER_M2 = 5.0 / R_MOON_M ** 2
+#: Added to every final ceiling to cover floating-point rounding, degrees.
+ROUNDING_MARGIN_DEG = 1e-9
+#: A piece covering between 2 and this many wedges gets a separate ceiling
+#: for each wedge (see ``_Search._per_wedge_ceilings``).
+MAX_WEDGES_PER_PIECE = 1024
+#: Pieces and wedges are treated in batches of this many pairs, to limit memory.
+_PAIR_BATCH = 200_000
 
 
 def wedge_count(az_step_deg: float) -> int:
@@ -171,6 +198,15 @@ class _CircularRangeMin:
             width *= 2
 
     def query(self, start: np.ndarray, count: np.ndarray) -> np.ndarray:
+        """Smallest value of each run.
+
+        Args:
+            start: index of each run's first entry (any integer; wraps round).
+            count: length of each run, 1 or more; ``n`` or more means all.
+
+        Returns:
+            One minimum per run.
+        """
         start = np.asarray(start, dtype=np.int64) % self.n
         count = np.asarray(count, dtype=np.int64)
         out = np.full(start.shape, self.global_min)
@@ -241,6 +277,7 @@ class _Search:
         return np.degrees(np.arctan2(r * np.cos(t) - self.eye_radius, r * np.sin(t)))
 
     def _wedge_of(self, az_deg: np.ndarray) -> np.ndarray:
+        """Wedge index of azimuths in degrees: ``round(az / step)``, wrapped round."""
         return np.floor((az_deg + self.step / 2.0) / self.step).astype(np.int64) % self.n
 
     def _ceilings(self, cx, cy, half_diag_m, h_max):
@@ -271,6 +308,149 @@ class _Search:
         last = np.floor((az_c + delta + self.step / 2.0) / self.step).astype(np.int64)
         count = np.where(everywhere, self.n, np.minimum(last - first + 1, self.n))
         return ceiling, first, count, theta_c
+
+    def _corner_geometry(self, corners, h_min, h_max, diag_m) -> dict:
+        """A tight, proven ceiling for pieces of single cells, and what it rests on.
+
+        How it is proven, in plain words. Let ``P1..P4`` be the piece's four
+        corner points on the terrain (exact 3D points) and ``P`` any terrain
+        point inside the piece.
+
+        1. Take the blend of the corner points with the same weights that give
+           ``P``'s height. That blend, ``Q``, lies inside the solid spanned by
+           the four corners. ``P`` differs from ``Q`` only because the sphere
+           and the projection are curved, by at most
+           ``(R + h_max) * curvature * diag^2 / 8 + (h_max - h_min) * diag / R``
+           metres (the standard error of bilinear interpolation, plus a
+           cross term). For a piece this is far below a millimetre.
+        2. Seen from the eye, ``Q``'s direction is a positive mix of the
+           corners' directions. All corner directions are within an angle
+           ``L`` of each other, so the mix has length at least ``cos L``
+           before it is scaled to length 1, and its upward part is no more
+           than the largest corner's. So ``sin(elevation of Q)`` is at most
+           ``m / cos L``, where ``m`` is the largest ``sin(elevation)`` of the
+           corners (or at most ``m`` if ``m`` is negative).
+        3. Moving from ``Q`` to ``P`` turns the line of sight by at most
+           ``asin(offset / distance)``, with the distance to ``Q`` at least the
+           nearest corner's distance less the size of the piece.
+
+        Args:
+            corners: four ``(x, y, h)`` tuples of arrays: sheet position and
+                height of each corner, metres.
+            h_min, h_max: lowest and highest corner height, metres.
+            diag_m: the piece's diagonal on the sheet, metres.
+
+        Returns:
+            A dict: ``ceiling`` (degrees; infinity where the argument does not
+            apply, for a piece too close to the eye or too large seen from
+            it), ``usable``, ``directions`` (array ``(4, N, 3)`` of the corner
+            directions from the eye), ``cos_l`` and ``turn_rad`` (the angle of
+            step 3).
+        """
+        points, directions, distances = [], [], []
+        for x, y, h in corners:
+            p = (R_MOON_M + h)[:, None] * xy_to_unit(x, y)
+            d = p - self.eye
+            length = np.sqrt(np.einsum("ij,ij->i", d, d))
+            points.append(p)
+            directions.append(d / length[:, None])
+            distances.append(length)
+        m = np.max([v @ self.up for v in directions], axis=0)
+        cos_l = np.full(len(m), 1.0)
+        span = np.zeros(len(m))
+        for i in range(4):
+            for j in range(i + 1, 4):
+                cos_l = np.minimum(cos_l, np.einsum("ij,ij->i", directions[i], directions[j]))
+                gap = points[i] - points[j]
+                span = np.maximum(span, np.sqrt(np.einsum("ij,ij->i", gap, gap)))
+        nearest = np.min(distances, axis=0) - span
+        offset = ((R_MOON_M + h_max) * PROJECTION_CURVATURE_PER_M2 * diag_m ** 2 / 8.0
+                  + (h_max - h_min) * diag_m / R_MOON_M + 1e-6)
+        usable = (cos_l > 0.5) & (nearest > 2.0 * offset) & (m < 0.9)
+        cos_l = np.maximum(cos_l, 0.5)
+        turn = np.arcsin(np.clip(offset / np.maximum(nearest, 1e-300), 0.0, 1.0))
+        sin_bound = np.where(m >= 0.0, m / cos_l, m)
+        ceiling = np.degrees(np.arcsin(np.clip(sin_bound, -1.0, 1.0)) + turn)
+        return {"ceiling": np.where(usable, ceiling, np.inf), "usable": usable,
+                "directions": np.array(directions), "cos_l": cos_l, "turn_rad": turn}
+
+    def _per_wedge_ceilings(self, geometry: dict, pieces: np.ndarray, first: np.ndarray,
+                            count: np.ndarray):
+        """A separate proven ceiling for each wedge a piece covers.
+
+        For wedge ``w`` only the part of the piece whose direction from the
+        eye lies in the wedge matters. In the argument of
+        :meth:`_corner_geometry`, that part lies in the solid spanned by the
+        corner directions, cut by the two vertical planes through the eye at
+        the wedge's edges (widened by the small turn of step 3). The upward
+        part of that cut solid is largest at one of its corners, and every
+        corner of it is either a corner direction inside the wedge or a point
+        where a line between two corner directions crosses a wedge edge. So
+        the largest upward part among those points bounds the upward part of
+        every point of the cut solid.
+
+        Scaling to length 1 then divides by the cut solid's shortest length.
+        Take the unit direction ``c`` of the mean of those points: every point
+        of the solid is at least as long as its length along ``c``, which is
+        smallest at one of the points. That is usually much closer to 1 than
+        ``cos L`` of the whole piece, because the cut solid is thin.
+
+        Args:
+            geometry: result of :meth:`_corner_geometry`.
+            pieces: indices of the pieces to treat.
+            first, count: the wedge range of every piece.
+
+        Returns:
+            ``(piece, wedge, ceiling_deg)``: one entry per piece and covered
+            wedge. ``wedge`` is not yet wrapped into ``0 .. n - 1``. A wedge
+            the cut solid does not reach gets -90.
+        """
+        reps = count[pieces]
+        piece = np.repeat(pieces, reps)
+        wedge = np.repeat(first[pieces], reps) + (
+            np.arange(reps.sum()) - np.repeat(np.cumsum(reps) - reps, reps))
+        if len(piece) == 0:
+            return piece, wedge, np.zeros(0)
+        ceiling = np.empty(len(piece))
+        for start in range(0, len(piece), _PAIR_BATCH):
+            part = slice(start, start + _PAIR_BATCH)
+            ceiling[part] = self._wedge_ceiling_batch(geometry, piece[part], wedge[part])
+        return piece, wedge, ceiling
+
+    def _wedge_ceiling_batch(self, geometry: dict, piece: np.ndarray, wedge: np.ndarray) -> np.ndarray:
+        """The computation of :meth:`_per_wedge_ceilings` for one batch of pairs, degrees."""
+        v = geometry["directions"][:, piece]                       # (4, P, 3)
+        widen = geometry["turn_rad"][piece] + 1e-12
+        a1 = np.radians((wedge - 0.5) * self.step) - widen
+        a2 = np.radians((wedge + 0.5) * self.step) + widen
+        # Directions with azimuth >= a1 satisfy n1 . v >= 0; azimuth <= a2: n2 . v >= 0.
+        n1 = -np.sin(a1)[:, None] * self.north + np.cos(a1)[:, None] * self.east
+        n2 = np.sin(a2)[:, None] * self.north - np.cos(a2)[:, None] * self.east
+        s1 = np.einsum("kpi,pi->kp", v, n1)
+        s2 = np.einsum("kpi,pi->kp", v, n2)
+        slack = 1e-15
+        points = [v[k] for k in range(4)]
+        valid = [(s1[k] >= -slack) & (s2[k] >= -slack) for k in range(4)]
+        for i in range(4):
+            for j in range(i + 1, 4):
+                for s_this, s_other in ((s1, s2), (s2, s1)):
+                    a, b = s_this[i], s_this[j]
+                    crosses = a * b < 0.0
+                    t = np.where(crosses, a / np.where(crosses, a - b, 1.0), 0.0)
+                    points.append(v[i] + t[:, None] * (v[j] - v[i]))
+                    valid.append(crosses & (s_other[i] + t * (s_other[j] - s_other[i]) >= -slack))
+        points = np.array(points)                                  # (16, P, 3)
+        valid = np.array(valid)                                    # (16, P)
+        upward = np.where(valid, points @ self.up, -np.inf).max(axis=0)
+        mean = np.where(valid[..., None], points, 0.0).sum(axis=0)
+        length = np.sqrt(np.einsum("pi,pi->p", mean, mean))
+        c = mean / np.maximum(length, 1e-300)[:, None]
+        along = np.where(valid, np.einsum("kpi,pi->kp", points, c), np.inf).min(axis=0)
+        shortest = np.maximum(along, geometry["cos_l"][piece])
+        with np.errstate(invalid="ignore"):      # pairs with no point in the wedge: -inf / inf
+            sin_bound = np.where(upward >= 0.0, upward / shortest, upward)
+        ceiling = np.degrees(np.arcsin(np.clip(sin_bound, -1.0, 1.0)) + geometry["turn_rad"][piece])
+        return np.where(np.isfinite(upward), ceiling, -90.0)
 
     # ---- which map is responsible where ------------------------------------
 
@@ -335,6 +515,13 @@ class _Search:
     # ---- step 2: blocks ---------------------------------------------------------
 
     def _search_grid(self, gi: int) -> None:
+        """Step 2 for map ``gi``: blocks from the whole map down to single cells.
+
+        At each level, blocks that are outside this map's responsibility are
+        skipped, blocks whose ceiling is not above the lower limit in any of
+        their wedges are set aside, and the rest are split into their four
+        quarters. Surviving single cells go to :meth:`_refine_cells`.
+        """
         grid = self.source.grids[gi]
         spec = grid.spec
         pyramid = grid.pyramid(self.source.unknown_height_m)
@@ -374,6 +561,16 @@ class _Search:
     # ---- step 3: cells and pieces of cells --------------------------------------
 
     def _refine_cells(self, gi: int, rows: np.ndarray, cols: np.ndarray) -> None:
+        """Step 3 for single cells of map ``gi`` (given by their top-left pixel).
+
+        Each cell is cut into ever smaller pieces. Inside a piece the ground
+        is still the exact bilinear blend of the cell's four pixel values, so
+        a piece's corner heights are exact. A piece is set aside when its
+        ceiling is not above the lower limit of its wedges, kept as final when
+        its ceiling is within the tolerance of it (or the depth limit is
+        reached), and cut into quarters otherwise. Final pieces' ceilings form
+        the upper limits.
+        """
         grid = self.source.grids[gi]
         spec = grid.spec
         v00 = grid.values(rows, cols).astype(float)
@@ -388,32 +585,60 @@ class _Search:
         size = 1.0
         depth = 0
         while len(rows):
-            corner_h = []
+            corners = []
             for a, b in ((0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0), (0.5, 0.5)):
                 rr, cc = fr + a * size, fc + b * size
                 h = (v00 * (1 - rr) * (1 - cc) + v01 * (1 - rr) * cc
                      + v10 * rr * (1 - cc) + v11 * rr * cc)
-                corner_h.append(h)
+                x, y = spec.x_of_col(cols + cc), spec.y_of_row(rows + rr)
+                corners.append((x, y, h))
                 # Corners of a piece are corners or centres of earlier pieces,
                 # except at the first level: sample them once, then centres only.
                 if depth == 0 or (a, b) == (0.5, 0.5):
-                    self._add_samples(spec.x_of_col(cols + cc), spec.y_of_row(rows + rr), h, gi)
-            h_max = np.maximum(np.maximum(corner_h[0], corner_h[1]),
-                               np.maximum(corner_h[2], corner_h[3]))
+                    self._add_samples(x, y, h, gi)
+            corners = corners[:4]
+            heights = [h for _, _, h in corners]
+            h_max = np.max(heights, axis=0)
+            h_min = np.min(heights, axis=0)
             cx = spec.x_of_col(cols + fc + size / 2.0)
             cy = spec.y_of_row(rows + fr + size / 2.0)
             half = size * spec.pixel_m * np.sqrt(0.5)
             ceiling, first, count, theta_c = self._ceilings(cx, cy, np.full(len(rows), half), h_max)
+            geometry = self._corner_geometry(corners, h_min, h_max, 2.0 * half)
+            ceiling = np.minimum(ceiling, geometry["ceiling"])
+            last_level = depth >= self.max_depth
+
+            # Pieces with one ceiling for their whole wedge range.
             seen = _CircularRangeMin(self.lower).query(first, count)
             alive = ceiling > seen
+            open_ = ceiling > seen + self.tol
+            # Pieces covering several wedges: a ceiling per wedge instead.
+            multi = geometry["usable"] & (count >= 2) & (count <= MAX_WEDGES_PER_PIECE)
+            piece, wedge, wedge_ceiling = self._per_wedge_ceilings(
+                geometry, np.flatnonzero(multi), first, count)
+            wedge_ceiling = np.minimum(wedge_ceiling, ceiling[piece])
+            wedge_lower = self.lower[wedge % self.n]
+            above = wedge_ceiling > wedge_lower
+            alive_m = np.zeros(len(rows), dtype=bool)
+            open_m = np.zeros(len(rows), dtype=bool)
+            np.logical_or.at(alive_m, piece, above)
+            np.logical_or.at(open_m, piece, wedge_ceiling > wedge_lower + self.tol)
+            alive = np.where(multi, alive_m, alive)
+            open_ = np.where(multi, open_m, open_)
+
             if depth == 0 and alive.any():
                 self.reach_theta = max(self.reach_theta, float(theta_c[alive].max()))
-            done = alive & ((ceiling <= seen + self.tol) | (depth >= self.max_depth))
-            if depth >= self.max_depth:
-                self.stats["pieces_at_max_depth"] += int((ceiling > seen + self.tol).sum())
-            self.final_el.append(ceiling[done])
-            self.final_start.append(first[done])
-            self.final_count.append(count[done])
+            done = alive & (~open_ | last_level)
+            if last_level:
+                self.stats["pieces_at_max_depth"] += int((alive & open_).sum())
+            single = done & ~multi
+            self.final_el.append(ceiling[single])
+            self.final_start.append(first[single])
+            self.final_count.append(count[single])
+            keep = done[piece] & above
+            self.final_el.append(wedge_ceiling[keep])
+            self.final_start.append(wedge[keep])
+            self.final_count.append(np.ones(int(keep.sum()), dtype=np.int64))
             self.stats["pieces"] += len(rows)
             split = alive & ~done
             if not split.any():
@@ -466,6 +691,7 @@ class _Search:
     # ---- all together ---------------------------------------------------------------
 
     def run(self) -> SkylineResult:
+        """Steps 1 to 4, then the upper limit per wedge from the final pieces."""
         started = time.perf_counter()
         for gi in range(len(self.source.grids)):
             self._seed(gi)
@@ -486,7 +712,7 @@ class _Search:
                 offsets = np.arange(reps.sum()) - np.repeat(np.cumsum(reps) - reps, reps)
                 wedges = (np.repeat(first[~full], reps) + offsets) % self.n
                 np.maximum.at(upper, wedges, np.repeat(el[~full], reps))
-        upper = np.maximum(upper, self.lower)
+        upper = np.maximum(upper, self.lower) + ROUNDING_MARGIN_DEG
 
         self.stats["seconds"] = time.perf_counter() - started
         self.stats["unmapped_terrain_from_km"] = beyond * R_MOON_M / 1000.0
@@ -510,8 +736,10 @@ def compute_skyline(source: ElevationSource, lat_deg: float, lon_deg: float,
             must nudge the point off it.
         mast_m: eye height above the ground, metres.
         az_step_deg: wedge width, degrees; must divide 360.
-        tolerance_deg: target half-width... see ``TOLERANCE_DEG``.
-        max_depth: see ``MAX_DEPTH``.
+        tolerance_deg: a piece of terrain is not cut further once its
+            ceiling is within this of the lower limit of its wedges, degrees
+            (``TOLERANCE_DEG``). It sets the target interval half-width.
+        max_depth: the most times one cell is cut into quarters (``MAX_DEPTH``).
 
     Returns:
         A :class:`SkylineResult`.

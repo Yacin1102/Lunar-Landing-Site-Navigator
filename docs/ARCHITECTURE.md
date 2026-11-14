@@ -108,7 +108,13 @@ flowchart TD
 
 Which map answers where: blocks wholly outside a map's trusted disc, or wholly inside a finer map's disc, are skipped for that map. Samples count for a map only where that map is the one trusted.
 
-The four facts that make the ceilings proofs and not estimates are listed in the docstring of `skyline.py`. In short: ground inside a cell is never above its highest corner; distances on the sphere are never longer than on the sheet, so a block lies inside a known circle on the sphere; elevation angle at a given height first rises and then falls with distance; and the azimuths of a circle seen from the eye are exactly known. Height does not change azimuth, because the eye is on the vertical.
+Three ceilings, each a proof; the lowest available is used:
+
+- **Block ceiling** (any block): the block's highest terrain at its nearest possible distance.
+- **Corner ceiling** (pieces of single cells): from the exact elevations of the piece's four corner points. The terrain inside the piece lies within a calculable distance (far below a millimetre) of the solid spanned by those points, and no direction into that solid looks higher than its highest corner except by a second-order amount.
+- **Per-wedge ceiling** (pieces covering 2 to 1024 wedges): the corner argument applied to only the part of the solid inside one wedge, cut by the wedge's two vertical edge planes. Without it, a piece's highest part would raise every wedge it touches.
+
+The four facts that make the block ceilings proofs and not estimates are listed in the docstring of `skyline.py`. In short: ground inside a cell is never above its highest corner; distances on the sphere are never longer than on the sheet, so a block lies inside a known circle on the sphere; elevation angle at a given height first rises and then falls with distance; and the azimuths of a circle seen from the eye are exactly known. Height does not change azimuth, because the eye is on the vertical.
 
 Choices fixed in `skyline.py`: ground within 1 m of the point under the eye is not an obstacle; the target interval half-width is 0.0005°; a cell is cut at most 8 times (to 1/256 of a pixel).
 

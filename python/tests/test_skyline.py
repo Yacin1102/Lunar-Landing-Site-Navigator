@@ -193,6 +193,33 @@ def test_a_tall_far_peak_behind_a_low_near_ridge_is_found():
 
 # ---- Never missing anything: against brute force ----------------------------------------
 
+def brute_force_max(world, result, site, mast_m, per_side):
+    """Highest elevation per wedge over ``per_side`` x ``per_side`` points in
+    every cell of the finest map, computed directly, degrees."""
+    grid = world.grids[0]
+    spec = grid.spec
+    east, north, up = enu_frame(*site)
+    eye = (R_MOON_M + result.elev_m + mast_m) * up
+    n = len(result.lower_deg)
+    step = result.az_step_deg
+    sub = (np.arange(per_side) + 0.5) / per_side
+    rr = (np.arange(spec.n_rows - 1)[:, None] + sub).ravel()
+    cc = (np.arange(spec.n_cols - 1)[:, None] + sub).ravel()
+    best = np.full(n, -90.0)
+    count = 0
+    for k in range(0, len(rr), 500):
+        x, y = np.meshgrid(spec.x_of_col(cc), spec.y_of_row(rr[k:k + 500]))
+        h = grid.height_xy(x.ravel(), y.ravel())
+        u = xy_to_unit(x.ravel(), y.ravel())
+        d = (R_MOON_M + h)[:, None] * u - eye
+        keep = np.linalg.norm(u - up, axis=1) * R_MOON_M > skyline.EXCLUDE_RADIUS_M
+        el = np.degrees(np.arctan2(d @ up, np.hypot(d @ east, d @ north)))[keep]
+        az = np.degrees(np.arctan2(d @ east, d @ north))[keep]
+        np.maximum.at(best, np.floor((az + step / 2) / step).astype(int) % n, el)
+        count += int(keep.sum())
+    return best, count
+
+
 def test_no_terrain_point_ever_rises_above_the_proven_ceiling():
     """Random cones around the site. Brute force: 16 points in every cell of
     the map. Every one must be at or below the ceiling of its wedge."""
@@ -203,35 +230,53 @@ def test_no_terrain_point_ever_rises_above_the_proven_ceiling():
         shapes.append(Cone(lat, lon, rng.uniform(200.0, 1_200.0), rng.uniform(30.0, 400.0)))
     world = SyntheticElevation(shapes, grids=[(40.0, 8_000.0)], center=SITE, beyond_maps_height_m=0.0)
     result = compute_skyline(world, *SITE, mast_m=2.0, az_step_deg=0.1)
-
-    grid = world.grids[0]
-    spec = grid.spec
-    east, north, up = enu_frame(*SITE)
-    eye = (R_MOON_M + result.elev_m + 2.0) * up
-    sub = (np.arange(4) + 0.5) / 4
-    rr = (np.arange(spec.n_rows - 1)[:, None] + sub).ravel()
-    cc = (np.arange(spec.n_cols - 1)[:, None] + sub).ravel()
-    x, y = np.meshgrid(spec.x_of_col(cc), spec.y_of_row(rr))
-    h = grid.height_xy(x.ravel(), y.ravel())
-    u = xy_to_unit(x.ravel(), y.ravel())
-    d = (R_MOON_M + h)[:, None] * u - eye
-    keep = np.linalg.norm(u - up, axis=1) * R_MOON_M > skyline.EXCLUDE_RADIUS_M
-    el = np.degrees(np.arctan2(d @ up, np.hypot(d @ east, d @ north)))[keep]
-    az = np.degrees(np.arctan2(d @ east, d @ north))[keep]
-    brute = np.full(3600, -90.0)
-    np.maximum.at(brute, np.floor((az + 0.05) / 0.1).astype(int) % 3600, el)
+    brute, points = brute_force_max(world, result, SITE, 2.0, per_side=4)
 
     worst = float((brute - result.upper_deg).max())
-    print(f"\n{keep.sum()} brute-force points: highest above the ceiling {worst:.2e} deg (must be <= 0); "
+    print(f"\n{points} brute-force points: highest above the ceiling {worst:.2e} deg (must be <= 0); "
           f"interval half-width mean {result.numerical_err_deg.mean():.5f}, "
           f"max {result.numerical_err_deg.max():.5f} deg; {result.stats['seconds']:.1f} s")
     assert worst <= 1e-9
     assert np.all(result.lower_deg <= result.upper_deg)
-    # Steep cones 1 km away are the hardest case for the ceiling (it pairs a
-    # piece's highest point with its nearest distance), so pieces reach the
-    # subdivision limit and the interval stays a little wider than the target.
-    assert result.numerical_err_deg.mean() < 0.001 and result.numerical_err_deg.max() < 0.005
+    assert result.numerical_err_deg.mean() < 0.0005 and result.numerical_err_deg.max() < 0.002
     assert result.skyline_deg.max() > 3.0, "the cones really are on the skyline"
+
+
+def test_on_a_steep_slope_the_interval_stays_narrow_and_proven():
+    """Found by review: on an 18 degree slope, pieces near the eye covered
+    several wedges and raised all their ceilings. Each wedge now gets its own
+    ceiling. The site is 100 m up the flank of a 1000 m cone, 2.7 km from
+    its top; the skyline climbs to the top uphill."""
+    apex = destination(*SITE, 2_700.0, 0.0)
+    world = SyntheticElevation([Cone(*apex, 3_000.0, 1_000.0)], grids=[(50.0, 25_000.0)],
+                               center=SITE, beyond_maps_height_m=0.0)
+    result = compute_skyline(world, *SITE, mast_m=2.0, az_step_deg=0.1)
+    brute, points = brute_force_max(world, result, SITE, 2.0, per_side=3)
+    err = result.numerical_err_deg
+    print(f"\nslope: {points} brute-force points, highest above the ceiling "
+          f"{(brute - result.upper_deg).max():.2e} deg; interval half-width mean {err.mean():.6f}, "
+          f"max {err.max():.6f} deg; {result.stats['seconds']:.1f} s")
+    assert result.elev_m == pytest.approx(100.0, abs=0.5)
+    assert float((brute - result.upper_deg).max()) <= 0.0
+    assert err.mean() < 0.0005 and err.max() < 0.01
+    assert result.skyline_deg.max() == pytest.approx(
+        el_exact(1_000.0, 2_700.0, result.elev_m + 2.0), abs=0.01), "uphill: the top of the cone"
+
+
+def test_the_projection_bends_no_more_than_the_ceiling_assumes():
+    """The tight ceiling needs an upper limit for the second derivative of
+    the projection (sheet metres to directions). Measured by finite
+    differences over the whole region: largest is 1 / R^2, at the pole."""
+    h = 1.0
+    worst = 0.0
+    for limit in (5_000.0, 300_000.0, 1_000_000.0):
+        q = np.linspace(-limit, limit, 301)
+        x, y = np.meshgrid(q, q)
+        for dx, dy in ((h, 0.0), (0.0, h)):
+            second = (xy_to_unit(x + dx, y + dy) - 2 * xy_to_unit(x, y) + xy_to_unit(x - dx, y - dy)) / h ** 2
+            worst = max(worst, float(np.linalg.norm(second, axis=-1).max()))
+    assert worst == pytest.approx(1.0 / R_MOON_M ** 2, rel=1e-3)
+    assert worst < skyline.PROJECTION_CURVATURE_PER_M2
 
 
 # ---- Nested maps ------------------------------------------------------------------------

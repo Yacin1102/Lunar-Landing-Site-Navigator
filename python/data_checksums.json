@@ -36,6 +36,11 @@
       "size": 254808965,
       "recorded_utc": "2026-11-14T20:30:02Z"
     },
+    "dem/LDEM_83S_10MPP_ADJ.TIF": {
+      "sha256": "6c548d47896e238616149cfe336a1174eb9c070e34e8b605425fc40f768bde51",
+      "size": 5116709568,
+      "recorded_utc": "2026-11-14T22:52:33Z"
+    },
     "kernels/de440.bsp": {
       "sha256": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
       "size": 119799808,
