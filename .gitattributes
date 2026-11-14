@@ -1,0 +1,8 @@
+# Data products and fixtures must be byte-identical on every system: the
+# manifest records file sizes, and binary files must never be line-converted.
+*.bin binary
+web/public/data/** -text
+web/public/data-mock/** -text
+web/engine/tests/fixtures/** -text
+web/engine/types.ts text eol=lf
+docs/schemas/*.json text eol=lf

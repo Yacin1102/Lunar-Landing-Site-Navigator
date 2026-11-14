@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "id": "mock_crater_floor",
+      "name": "Mock crater floor",
+      "lat": -89.55,
+      "lon": 120.0,
+      "category": "psr",
+      "notes": "Inside the deep mock crater. Walls about 20 degrees high all round: never lit.",
+      "has_terrain": true,
+      "has_shade_grid": true
+    },
+    {
+      "id": "mock_crater_rim",
+      "name": "Mock crater rim",
+      "lat": -89.245,
+      "lon": 130.0,
+      "category": "high_illumination",
+      "mission": "Mock mission A",
+      "date_utc": "2028-09-01T00:00:00Z",
+      "country": "Mockland",
+      "notes": "On the crest of the raised rim of the mock crater.",
+      "has_terrain": true,
+      "has_shade_grid": true
+    },
+    {
+      "id": "mock_peak",
+      "name": "Mock near-side peak",
+      "lat": -86.02,
+      "lon": 1.0,
+      "category": "high_illumination",
+      "notes": "Top of the 5 km mock mountain facing the Earth.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_peak_north_foot",
+      "name": "Mock plain north of the peak",
+      "lat": -85.0,
+      "lon": 0.0,
+      "category": "plain",
+      "mission": "Mock mission B",
+      "country": "Mockland",
+      "notes": "Earth-facing plain in front of the mock mountain.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_behind_peak",
+      "name": "Mock plain behind the peak",
+      "lat": -87.0,
+      "lon": 0.0,
+      "category": "plain",
+      "notes": "South of the mock mountain, which stands between this site and the Earth.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_ridge",
+      "name": "Mock ridge",
+      "lat": -88.3,
+      "lon": -120.0,
+      "category": "high_illumination",
+      "notes": "Top of a 2.5 km mock peak near the pole.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_second_crater",
+      "name": "Mock second crater floor",
+      "lat": -87.25,
+      "lon": -72.0,
+      "category": "psr",
+      "notes": "Floor of the second mock crater.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_far_highland",
+      "name": "Mock far-side highland",
+      "lat": -84.5,
+      "lon": 150.0,
+      "category": "plain",
+      "notes": "Far-side facing: the Earth stays near or below the horizon.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_east_plain",
+      "name": "Mock eastern plain",
+      "lat": -85.5,
+      "lon": 90.0,
+      "category": "plain",
+      "notes": "Flat ground on the eastern limb.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mock_near_pole",
+      "name": "Mock point beside the pole",
+      "lat": -89.95,
+      "lon": -30.0,
+      "category": "plain",
+      "notes": "1.5 km from the pole: tests azimuths where every direction is nearly north.",
+      "has_terrain": true,
+      "has_shade_grid": false
+    }
+  ]
+}
