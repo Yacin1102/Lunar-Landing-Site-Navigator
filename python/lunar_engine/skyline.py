@@ -374,6 +374,35 @@ class _Search:
         return {"ceiling": np.where(usable, ceiling, np.inf), "usable": usable,
                 "directions": np.array(directions), "cos_l": cos_l, "turn_rad": turn}
 
+    def _axis_clear(self, directions: np.ndarray, turn_rad: np.ndarray) -> np.ndarray:
+        """True where per-wedge ceilings are valid for a piece.
+
+        The two edge planes of a wedge, each moved outward by ``turn``, cross
+        along a vertical line whose horizontal offset from the eye is
+        ``turn / sin(step / 2)``. If the solid spanned by the corner
+        directions reached that line, the cut solid could have a corner on it
+        that :meth:`_per_wedge_ceilings` does not look at (found by review:
+        corner directions surrounding the zenith). This rules it out: take
+        the mean horizontal direction ``e`` of the corner directions; every
+        point of the solid has a horizontal part at least as long, along
+        ``e``, as the shortest corner's. If that is more than twice the
+        line's offset, the solid cannot reach the line.
+
+        Args:
+            directions: array ``(4, N, 3)`` of corner directions from the eye.
+            turn_rad: the turn of step 3 for each piece.
+
+        Returns:
+            Boolean array of length ``N``.
+        """
+        horizontal = directions - (directions @ self.up)[..., None] * self.up
+        mean = horizontal.sum(axis=0)
+        length = np.sqrt(np.einsum("ni,ni->n", mean, mean))
+        e = mean / np.maximum(length, 1e-300)[:, None]
+        along = np.einsum("kni,ni->kn", horizontal, e).min(axis=0)
+        line_offset = (turn_rad + 1e-12) / np.sin(np.radians(self.step) / 2.0)
+        return (length > 0.0) & (along > 2.0 * line_offset)
+
     def _per_wedge_ceilings(self, geometry: dict, pieces: np.ndarray, first: np.ndarray,
                             count: np.ndarray):
         """A separate proven ceiling for each wedge a piece covers.
@@ -382,12 +411,14 @@ class _Search:
         eye lies in the wedge matters. In the argument of
         :meth:`_corner_geometry`, that part lies in the solid spanned by the
         corner directions, cut by the two vertical planes through the eye at
-        the wedge's edges (widened by the small turn of step 3). The upward
-        part of that cut solid is largest at one of its corners, and every
-        corner of it is either a corner direction inside the wedge or a point
-        where a line between two corner directions crosses a wedge edge. So
-        the largest upward part among those points bounds the upward part of
-        every point of the cut solid.
+        the wedge's edges (each moved outward by the small turn of step 3).
+        The upward part of that cut solid is largest at one of its corners.
+        A corner of it is a corner direction inside the wedge, or a point
+        where a line between two corner directions crosses a wedge edge, or
+        a point where the solid meets the line along which the two edge
+        planes cross. The caller guarantees there is none of the last kind
+        (:meth:`_axis_clear`), so the largest upward part among the first
+        two kinds bounds the upward part of every point of the cut solid.
 
         Scaling to length 1 then divides by the cut solid's shortest length.
         Take the unit direction ``c`` of the mean of those points: every point
@@ -420,14 +451,20 @@ class _Search:
     def _wedge_ceiling_batch(self, geometry: dict, piece: np.ndarray, wedge: np.ndarray) -> np.ndarray:
         """The computation of :meth:`_per_wedge_ceilings` for one batch of pairs, degrees."""
         v = geometry["directions"][:, piece]                       # (4, P, 3)
-        widen = geometry["turn_rad"][piece] + 1e-12
-        a1 = np.radians((wedge - 0.5) * self.step) - widen
-        a2 = np.radians((wedge + 0.5) * self.step) + widen
+        a1 = np.radians((wedge - 0.5) * self.step)
+        a2 = np.radians((wedge + 0.5) * self.step)
         # Directions with azimuth >= a1 satisfy n1 . v >= 0; azimuth <= a2: n2 . v >= 0.
         n1 = -np.sin(a1)[:, None] * self.north + np.cos(a1)[:, None] * self.east
         n2 = np.sin(a2)[:, None] * self.north - np.cos(a2)[:, None] * self.east
-        s1 = np.einsum("kpi,pi->kp", v, n1)
-        s2 = np.einsum("kpi,pi->kp", v, n2)
+        # A terrain point in the wedge comes from a point of the solid whose
+        # direction is turned by at most `turn` (step 3). Its distance to each
+        # edge plane is then at least -turn, because points of the solid are
+        # no longer than 1. So the cut keeps points with n . Y >= -turn. (Not
+        # a rotation of the planes by `turn`: that would be too narrow for
+        # directions high above the horizon.)
+        widen = (geometry["turn_rad"][piece] + 1e-12)[None, :]
+        s1 = np.einsum("kpi,pi->kp", v, n1) + widen
+        s2 = np.einsum("kpi,pi->kp", v, n2) + widen
         slack = 1e-15
         points = [v[k] for k in range(4)]
         valid = [(s1[k] >= -slack) & (s2[k] >= -slack) for k in range(4)]
@@ -613,7 +650,9 @@ class _Search:
             alive = ceiling > seen
             open_ = ceiling > seen + self.tol
             # Pieces covering several wedges: a ceiling per wedge instead.
-            multi = geometry["usable"] & (count >= 2) & (count <= MAX_WEDGES_PER_PIECE)
+            multi = (geometry["usable"] & (count >= 2) & (count <= MAX_WEDGES_PER_PIECE)
+                     & (count < self.n)
+                     & self._axis_clear(geometry["directions"], geometry["turn_rad"]))
             piece, wedge, wedge_ceiling = self._per_wedge_ceilings(
                 geometry, np.flatnonzero(multi), first, count)
             wedge_ceiling = np.minimum(wedge_ceiling, ceiling[piece])

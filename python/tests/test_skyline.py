@@ -358,3 +358,66 @@ def test_wedge_count_and_the_range_minimum_table():
     got = table.query(starts, counts)
     for s, c, g in zip(starts, counts, got):
         assert g == values[(np.arange(c) + s) % 100].min()
+
+
+# ---- The per-wedge ceiling: two holes found by review -----------------------------
+
+def _bare_search(step_deg):
+    """A search object on flat ground, to call the ceiling functions directly."""
+    from lunar_engine.elevation import ElevationSource, GridSpec, HeightGrid
+    lat, lon = -89.9, 30.0
+    sx, sy = (float(v) for v in to_xy(lat, lon))
+    n, pixel = 50, 20.0
+    spec = GridSpec(pixel, sx - n * pixel / 2, sy + n * pixel / 2, n, n)
+    source = ElevationSource([HeightGrid("flat", spec, np.zeros((n, n), np.float32))])
+    return skyline._Search(source, lat, lon, 2.0, step_deg, skyline.TOLERANCE_DEG, skyline.MAX_DEPTH)
+
+
+def _direction(search, az_deg, el_deg):
+    a, e = math.radians(az_deg), math.radians(el_deg)
+    return (math.cos(e) * math.sin(a) * search.east + math.cos(e) * math.cos(a) * search.north
+            + math.sin(e) * search.up)
+
+
+def test_wedge_ceiling_covers_a_point_turned_into_the_wedge_high_above_the_horizon():
+    """A thin vertical sliver of directions 55 to 62 degrees up, just outside
+    wedge 100's edge. A terrain point may be turned from the sliver by up to
+    `turn`; at 62 degrees up, a turn moves the azimuth twice as far as it
+    would at the horizon. Rotating the edge planes by `turn` (the old way)
+    missed it and gave -90; the ceiling must cover the point."""
+    search = _bare_search(1.0)
+    turn = 1e-3
+    edge = 99.5                                            # wedge 100 starts here
+    sliver_az = edge - math.degrees(turn) * 1.05
+    corners = [_direction(search, sliver_az, 55.0), _direction(search, sliver_az, 62.0),
+               _direction(search, sliver_az - 1e-4, 55.0), _direction(search, sliver_az - 1e-4, 62.0)]
+    geometry = {"directions": np.array(corners)[:, None, :], "turn_rad": np.array([turn]),
+                "cos_l": np.array([0.99])}
+    point = _direction(search, edge + 1e-6, 62.0)          # inside wedge 100
+    assert math.acos(min(1.0, float(corners[1] @ point))) < turn, "the point is within the turn"
+    ceiling = search._wedge_ceiling_batch(geometry, np.array([0]), np.array([100]))[0]
+    assert ceiling >= 62.0
+
+
+def test_wedge_ceilings_are_not_used_when_corner_directions_surround_the_zenith():
+    """Corner directions all round the point overhead: the cut solid then has
+    corners on the vertical axis that the per-wedge calculation does not
+    examine (it reported 73 degrees where the solid reaches 89.8). Such a
+    piece must fall back to its single ceiling."""
+    search = _bare_search(1.0)
+    surround = np.array([_direction(search, 0, 63), _direction(search, 75, 60),
+                         _direction(search, 170, 62), _direction(search, 250, 61)])[:, None, :]
+    ordinary = np.array([_direction(search, 40.0, 5.0), _direction(search, 40.5, 5.0),
+                         _direction(search, 40.0, 5.2), _direction(search, 40.5, 5.2)])[:, None, :]
+    assert not search._axis_clear(surround, np.array([1e-9]))[0]
+    assert search._axis_clear(ordinary, np.array([1e-9]))[0]
+
+    # Why the fallback is needed: what the per-wedge calculation alone would say.
+    geometry = {"directions": surround, "turn_rad": np.array([1e-9]), "cos_l": np.array([0.5])}
+    ceiling = search._wedge_ceiling_batch(geometry, np.array([0]), np.array([300]))[0]
+    weights = np.random.default_rng(1).dirichlet([0.2] * 4, 400_000)
+    x = weights @ surround[:, 0, :]
+    az = np.degrees(np.arctan2(x @ search.east, x @ search.north)) % 360
+    el = np.degrees(np.arcsin(x @ search.up / np.linalg.norm(x, axis=1)))
+    in_wedge = np.abs((az - 300 + 180) % 360 - 180) <= 0.5
+    assert el[in_wedge].max() > ceiling + 5.0

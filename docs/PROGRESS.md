@@ -8,21 +8,23 @@ Plan approved on 2026-11-14.
 
 | PR | State |
 | --- | --- |
-| 1 Download script | Built, in review (PR #4) |
-| 2 Web handoff | Built, in review (PR #5) |
-| 3 Timetable and fixtures | Built, in review (PR #6) |
-| 4 Elevation interface and synthetic terrain | Built, in review (PR #7) |
+| 1 Download script | Merged (PR #4) |
+| 2 Web handoff | Merged (PR #5) |
+| 3 Timetable and fixtures | Merged (PRs #6 and #10) |
+| 4 Elevation interface and synthetic terrain | Merged (PR #7) |
 | 5 Skyline core | Built, in review |
 | 6 Error bound and independent check | **Next** |
 | 7 to 11 | Not started |
 
-Data on disk: the 8 SPICE kernels and the 4 coarse maps (downloaded 2026-11-14 as the live test of the script). The 8 full-resolution maps (33.8 GB): waiting for the download to be started.
+The web app (`web/`) is built separately and merged into `main` (PR #9). Engine work is done in a separate git worktree and never changes files under `web/` except the agreed data files, so the two do not conflict.
+
+Data on disk (2026-11-15): the 8 SPICE kernels, the 4 coarse maps, and the 4 full-resolution height maps. The 4 full-resolution error maps are still downloading.
 
 Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip install -r python/requirements.txt`.
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 5): 165 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 5): 167 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
