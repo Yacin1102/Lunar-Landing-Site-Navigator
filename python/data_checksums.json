@@ -11,11 +11,6 @@
       "size": 267005175,
       "recorded_utc": "2026-11-14T20:28:05Z"
     },
-    "dem/LDEM_60S_60MPP_ADJ.TIF": {
-      "sha256": "b03b5b3b3bf6a0eb8e871be7a7c04bcfa1f7d9c01c885db10655c9f26afc1f6a",
-      "size": 3089110093,
-      "recorded_utc": "2026-11-14T22:16:49Z"
-    },
     "dem/LDEM_75S_30MPP_ADJ.TIF": {
       "sha256": "56dd4290379a4f94ff1e22fed232a87781158107bf20cd27568955f8bfdaaf9c",
       "size": 2802850273,
@@ -35,11 +30,6 @@
       "sha256": "e89306914bb209143f61ba66d341703d75221339424b774c6a1eb3c6c370ffc6",
       "size": 254808965,
       "recorded_utc": "2026-11-14T20:30:02Z"
-    },
-    "dem/LDEM_83S_10MPP_ADJ.TIF": {
-      "sha256": "6c548d47896e238616149cfe336a1174eb9c070e34e8b605425fc40f768bde51",
-      "size": 5116709568,
-      "recorded_utc": "2026-11-14T22:52:33Z"
     },
     "kernels/de440.bsp": {
       "sha256": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
