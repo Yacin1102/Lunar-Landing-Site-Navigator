@@ -59,8 +59,7 @@ def test_doctests_in_the_modules():
 # ---- The committed mock folder -------------------------------------------------
 
 def test_mock_folder_matches_every_contract():
-    # The timetable is real data and is added by the timetable step.
-    assert contracts.data_folder_problems(MOCK, allow_missing_ephem=True) == []
+    assert contracts.data_folder_problems(MOCK) == []
 
 
 def test_mock_folder_is_marked_mock_everywhere():
@@ -178,7 +177,12 @@ def test_checker_catches_a_site_outside_the_service_region(broken):
 
 
 def test_checker_requires_the_timetable_unless_told_otherwise(broken):
-    assert "ephem.json: file is missing" in contracts.data_folder_problems(broken)
+    (broken / "ephem.json").unlink()
+    (broken / "ephem.bin").unlink()
+    _edit(broken / "manifest.json", lambda d: d.update(
+        files=[f for f in d["files"] if not f["path"].startswith("ephem.")]))
+    assert contracts.data_folder_problems(broken) == ["ephem.json: file is missing"]
+    assert contracts.data_folder_problems(broken, allow_missing_ephem=True) == []
 
 
 def test_checker_checks_the_timetable_binary(tmp_path):

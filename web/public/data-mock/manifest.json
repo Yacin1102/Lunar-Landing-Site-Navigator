@@ -1,12 +1,24 @@
 {
   "version": 1,
   "data_kind": "mock",
-  "built_ms": 1794691041311,
+  "built_ms": 1794691982852,
   "service_region": {
     "lat_min": -90.0,
     "lat_max": -80.0
   },
   "files": [
+    {
+      "path": "ephem.bin",
+      "contract": "ephem",
+      "version": 1,
+      "bytes": 2761368
+    },
+    {
+      "path": "ephem.json",
+      "contract": "ephem",
+      "version": 1,
+      "bytes": 268
+    },
     {
       "path": "shade/mock_crater_floor.json",
       "contract": "shade",

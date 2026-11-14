@@ -9,9 +9,10 @@ Plan approved on 2026-11-14.
 | PR | State |
 | --- | --- |
 | 1 Download script | Built, in review (PR #4) |
-| 2 Web handoff | Built, in review |
-| 3 Timetable and fixtures | **Next** |
-| 4 to 11 | Not started |
+| 2 Web handoff | Built, in review (PR #5) |
+| 3 Timetable and fixtures | Built, in review |
+| 4 Elevation interface and synthetic terrain | **Next** |
+| 5 to 11 | Not started |
 
 Data on disk: the 8 SPICE kernels and the 4 coarse maps (downloaded 2026-11-14 as the live test of the script). The 8 full-resolution maps (33.8 GB): waiting for the download to be started.
 
@@ -19,7 +20,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 2): 69 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 3): 92 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -179,7 +180,10 @@ Each step is reported with its real output.
 
 - The plan covers the Python engine only (agreed 2026-11-14).
 - Elevation budget is about 35 GB, including the per-pixel error maps (agreed 2026-11-14). The coarse maps add about 0.9 GB.
-- DE440 is the build ephemeris and DE442 a measured comparison. This departs from the spec's suggestion of "the latest ephemeris".
+- DE440 is the build ephemeris and DE442 a measured comparison. This departs from the spec's suggestion of "the latest ephemeris". Measured in PR 3: the two give the same Sun and Earth directions to 0.00000005 degrees over 2026 to 2040, so the choice does not affect any result. DE440 stays, because the Moon orientation file and JPL Horizons are built on it.
+- The timetable is hourly, Float32, 115,057 rows (16 Nov 2026 00:00 to 1 Jan 2040 00:00 UTC inclusive), with `LT+S` correction. Measured in PR 3: precise to 0.0000017 degrees for the Sun; see `docs/ACCURACY.md`.
+- Disc radii: Sun 695,700 km and Earth 6378.1366 km (equatorial), from `pck00011.tpc`.
+- The web side should interpolate the timetable with a cubic through four rows; the formula is in `docs/WEB_HANDOFF.md`.
 - The download script lives at `python/scripts/download_data.py`.
 - One new Python package: `jsonschema`, for validating files against the schemas. numba will be proposed in PR 5 only if timing shows it is needed.
 
@@ -207,10 +211,10 @@ Still to be fixed, with the PR that needs them: the default and accepted `az_ste
 ## Proposed spec changes
 
 1. **Manifest `data_kind` field** (`"mock"` or `"real"`). The spec lists what the manifest must contain but does not fix its fields, so this is an addition, not a change. It lets the web app refuse to show mock data as a real verdict.
-2. Two items will be answered with numbers in PR 3 and turned into proposals only if the numbers require it: whether an hourly step is fine enough, and whether Float32 is precise enough for the Sun vector (it rounds to about 9 km at the Sun's distance, about 0.000003 degrees). The web app must read `step_s` and `count` from the label and not assume them.
+2. Step and Float32: answered in PR 3, **no change proposed**. The hourly Float32 timetable with cubic interpolation is within 0.0000017 degrees for the Sun and 0.0000005 degrees for the Earth. A separate effect built into Contract 1 (the timetable is seen from the Moon's centre and shifted to the site by subtraction) adds 0.000027 degrees for the Earth. Both are far below the 0.01 degree pass mark. Details in `docs/ACCURACY.md`.
 
 ## Open questions
 
-1. Contract 1 gives 115,056 hourly rows, which ends one hour before 1 Jan 2040 00:00. To reach "at least 1 Jan 2040" I plan to write 115,057 rows. Say if the count must be exactly 115,056.
+1. Contract 1 gives 115,056 hourly rows, which ends one hour before 1 Jan 2040 00:00. To reach "at least 1 Jan 2040" the timetable was built with 115,057 rows. Say if the count must be exactly 115,056.
 2. Sites outside 80°S (for example Chandrayaan-3 at about 69°S) cannot be included under the proposed service region. Candidates: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).
 3. Mock shade grids are large (one skyline per cell). I plan to commit them for 2 of the 10 mock sites at a small grid size, with `has_shade_grid` false for the rest, which also exercises both paths in the web app. Say if the web side needs all 10.

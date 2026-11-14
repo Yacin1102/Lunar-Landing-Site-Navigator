@@ -1,0 +1,608 @@
+{
+ "version": 1,
+ "source": "JPL Horizons API, https://ssd.jpl.nasa.gov/api/horizons.api",
+ "fetched_utc": "2026-11-14T21:35:55Z",
+ "note": "Apparent azimuth and elevation (quantity 4), airless, observer on the lunar surface.",
+ "results": [
+  {
+   "body": "SUN",
+   "lat": -85.0,
+   "lon": 40.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'10'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'40.0,-85.0,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 50.289077043,
+     "el_deg": 4.756185783
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 162.014598639,
+     "el_deg": -6.03885252
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 183.658170341,
+     "el_deg": -4.180476308
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 229.690289044,
+     "el_deg": -3.347858622
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 305.146947688,
+     "el_deg": 4.366362985
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 301.146989777,
+     "el_deg": 3.35509858
+    }
+   ]
+  },
+  {
+   "body": "EARTH",
+   "lat": -85.0,
+   "lon": 40.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'399'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'40.0,-85.0,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 314.720201373,
+     "el_deg": 2.555136771
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 314.815205851,
+     "el_deg": 6.489388781
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 313.023581681,
+     "el_deg": 5.335910653
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 324.839722881,
+     "el_deg": 10.646646338
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 317.871805948,
+     "el_deg": 8.883648152
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 316.790715039,
+     "el_deg": 8.103990515
+    }
+   ]
+  },
+  {
+   "body": "SUN",
+   "lat": -89.9,
+   "lon": -120.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'10'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'-120.0,-89.9,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 210.075902432,
+     "el_deg": 1.466765448
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 322.114473645,
+     "el_deg": -1.202642858
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 343.648370789,
+     "el_deg": 0.905328614
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 29.57527314,
+     "el_deg": -0.021275346
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 105.35807089,
+     "el_deg": 1.452834944
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 101.302112247,
+     "el_deg": 0.742375265
+    }
+   ]
+  },
+  {
+   "body": "EARTH",
+   "lat": -89.9,
+   "lon": -120.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'399'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'-120.0,-89.9,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 114.783740124,
+     "el_deg": -1.008352198
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 115.128294721,
+     "el_deg": 2.910861197
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 113.275295559,
+     "el_deg": 1.874816948
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 125.295916972,
+     "el_deg": 6.486212452
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 118.306191973,
+     "el_deg": 5.112514308
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 117.187995538,
+     "el_deg": 4.399553582
+    }
+   ]
+  },
+  {
+   "body": "SUN",
+   "lat": -80.0,
+   "lon": 180.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'10'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'180.0,-80.0,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 269.806140528,
+     "el_deg": 1.543096833
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 22.335061492,
+     "el_deg": 7.97893191
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 44.185840043,
+     "el_deg": 8.021677146
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 89.563097981,
+     "el_deg": -0.032868921
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 165.206195651,
+     "el_deg": -8.194097846
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 161.076381282,
+     "el_deg": -8.706385127
+    }
+   ]
+  },
+  {
+   "body": "EARTH",
+   "lat": -80.0,
+   "lon": 180.0,
+   "elev_m": 0.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'399'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'180.0,-80.0,0.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 174.693215308,
+     "el_deg": -10.920048464
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 175.096765198,
+     "el_deg": -7.008897225
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 173.214445859,
+     "el_deg": -8.014107867
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 185.256810275,
+     "el_deg": -3.415159126
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 178.300010518,
+     "el_deg": -4.835791986
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 177.178119374,
+     "el_deg": -5.542282425
+    }
+   ]
+  },
+  {
+   "body": "SUN",
+   "lat": -88.0,
+   "lon": -90.0,
+   "elev_m": 5000.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'10'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'-90.0,-88.0,5.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 180.077198034,
+     "el_deg": -0.446699219
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 292.142385891,
+     "el_deg": -0.52815605
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 313.610879542,
+     "el_deg": 2.18943841
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 359.575097407,
+     "el_deg": 1.89169738
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 75.414138351,
+     "el_deg": 1.984014056
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 71.336643065,
+     "el_deg": 1.40263556
+    }
+   ]
+  },
+  {
+   "body": "EARTH",
+   "lat": -88.0,
+   "lon": -90.0,
+   "elev_m": 5000.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'399'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'-90.0,-88.0,5.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 84.763138829,
+     "el_deg": -0.784977535
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 85.237845619,
+     "el_deg": 3.120691723
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 83.351507512,
+     "el_deg": 2.146568452
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 95.520607408,
+     "el_deg": 6.354804659
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 88.488040205,
+     "el_deg": 5.215356992
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 87.346334563,
+     "el_deg": 4.540074597
+    }
+   ]
+  },
+  {
+   "body": "SUN",
+   "lat": -86.5,
+   "lon": 0.0,
+   "elev_m": -4000.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'10'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'0.0,-86.5,-4.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 90.171970817,
+     "el_deg": 1.545689084
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 202.180045589,
+     "el_deg": -4.523484709
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 223.668038508,
+     "el_deg": -1.723139659
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 269.58268832,
+     "el_deg": -0.133969296
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 345.306453181,
+     "el_deg": 4.86530699
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 341.253326839,
+     "el_deg": 4.0768688
+    }
+   ]
+  },
+  {
+   "body": "EARTH",
+   "lat": -86.5,
+   "lon": 0.0,
+   "elev_m": -4000.0,
+   "horizons_frame_line": "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}",
+   "query": {
+    "format": "text",
+    "COMMAND": "'399'",
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'coord@301'",
+    "COORD_TYPE": "'GEODETIC'",
+    "SITE_COORD": "'0.0,-86.5,-4.0'",
+    "TLIST": "'2461361.5','2461500.25','2462000.25','2463000.75','2464500.5','2466154.5'",
+    "QUANTITIES": "'4'",
+    "ANG_FORMAT": "'DEG'",
+    "CSV_FORMAT": "'YES'",
+    "EXTRA_PREC": "'YES'"
+   },
+   "rows": [
+    {
+     "jd_utc": 2461361.5,
+     "t_ms": 1794873600000,
+     "az_deg": 354.779210912,
+     "el_deg": 2.519848498
+    },
+    {
+     "jd_utc": 2461500.25,
+     "t_ms": 1806861600000,
+     "az_deg": 355.097410018,
+     "el_deg": 6.442445312
+    },
+    {
+     "jd_utc": 2462000.25,
+     "t_ms": 1850061600000,
+     "az_deg": 353.243677085,
+     "el_deg": 5.391784252
+    },
+    {
+     "jd_utc": 2463000.75,
+     "t_ms": 1936504800000,
+     "az_deg": 5.334932027,
+     "el_deg": 10.03192941
+    },
+    {
+     "jd_utc": 2464500.5,
+     "t_ms": 2066083200000,
+     "az_deg": 358.28479739,
+     "el_deg": 8.660751474
+    },
+    {
+     "jd_utc": 2466154.5,
+     "t_ms": 2208988800000,
+     "az_deg": 357.161233228,
+     "el_deg": 7.943172384
+    }
+   ]
+  }
+ ]
+}
