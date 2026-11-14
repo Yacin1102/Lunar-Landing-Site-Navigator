@@ -22,13 +22,13 @@ The spec asks for agreement "to a few thousandths of a degree where achievable".
 | Source | Sun | Earth | How it was measured |
 | --- | --- | --- | --- |
 | Timetable: hourly rows, stored as Float32, cubic interpolation | 0.0000017° | 0.0000005° | 500 random sites and times against the exact Moon-centre vector (`test_interpolating_the_timetable_adds_negligible_error`) |
-| Shifting from the Moon's centre to the site by subtracting the site position | 0.0000002° | 0.000027° | Same test, against a direct calculation for the site |
+| Shifting from the Moon's centre to the site by subtracting the site position | 0.00000016° | 0.000027° | Same test, against a direct calculation for the site |
 | Choice of ephemeris, DE440 or DE442 | 0.00000001° | 0.00000005° | `test_de442_gives_the_same_directions_as_de440` |
 | Total for the browser method | 0.0000018° | 0.000027° | Same test as the first two rows |
 
 For scale: the Sun's disc is 0.53° wide and the TypeScript pass mark is 0.01°.
 
-The second row is built into Contract 1. The timetable holds what is seen from the Moon's centre. Light from the Earth reaches a surface site up to 6 milliseconds earlier or later than it reaches the centre, and the Earth moves about 170 m in that time, which is 0.000027° at the Earth's distance. It is 370 times smaller than the pass mark and far below any skyline uncertainty, so no change to the contract is proposed.
+The second row is built into Contract 1. The timetable holds what is seen from the Moon's centre, with the light-time and aberration corrections worked out for the centre; the browser then shifts the vector to the site by subtraction. With no corrections at all the shift is exact (the two routes agree to rounding), and with the corrections they differ by up to 0.000026° for the Earth (`test_the_shift_to_the_site_is_exact_without_light_corrections`). It is 370 times smaller than the pass mark and far below any skyline uncertainty, so no change to the contract is proposed.
 
 **Straight-line interpolation** between rows instead of the cubic gives 0.00012° in total. That is still small, but the cubic costs nothing and is the recommended method.
 
@@ -42,18 +42,20 @@ This is an offset between where the timetable places the Sun and where the maps 
 
 ## Rise and set times (smooth Moon)
 
-The reference events in `events.json` are for a smooth sphere with the eye at ground level, the upper edge of the disc crossing the level horizon. Disc radii: Sun 695,700 km, Earth 6378.1366 km (equatorial), both from `pck00011.tpc`.
+The reference events in `events.json` are for a smooth sphere with the eye at ground level, the upper edge of the disc crossing the level horizon. Disc radii: Sun 695,700 km, Earth 6356.7519 km (its polar radius), both from `pck00011.tpc`.
+
+**The Earth's disc is treated as a circle, and this is the largest known error in the Earth's edge.** The Earth is flattened by 21 km. Seen from the Moon's south pole, the upper edge of its disc is near one of the Earth's poles, where the true limb is between 6356.75 km and about 6365 km from the centre depending on the date (estimated from the Earth's shape and the tilt between the two bodies' axes; not measured by a test). Using the polar radius therefore places the upper edge at most about 0.0012° too low and never too high: the app will not say the Earth's edge is visible when it is not. The equatorial radius would have placed it up to 0.0032° too high. This is about 45 times larger than the 0.000027° above, and still small beside the skyline uncertainty. It affects only the Earth's edge, not the Sun or the Earth's centre.
 
 | Check | Result | Test |
 | --- | --- | --- |
 | Each of the 110 stored events is a real crossing: the upper edge is on opposite sides of the horizon one second before and one second after | All 110 | `test_every_fixture_event_is_a_real_crossing_of_the_upper_edge` |
-| A scan every 2 minutes instead of every 10 finds the same events to the millisecond | Same | `test_a_finer_scan_finds_the_same_events` |
-| The browser method, from the timetable, finds the same events | Worst timing difference 2.7 s (pass mark 60 s) | `test_browser_method_passes_the_events_fixture_with_a_wide_margin` |
-| A graze that pokes above the horizon for under a minute between scan points is found | Found | `test_event_finder_catches_a_graze_between_scan_points` |
+| A finer first scan finds the same events to the millisecond | Same, in the four windows rescanned: two ordinary ones every 2 minutes instead of 10, and the two beside the pole every 5 minutes (the 400-day one for the Sun only) | `test_a_finer_scan_finds_the_same_events` |
+| The browser method, from the timetable, finds the same events | Worst timing difference 2.7 s (pass mark 60 s), on an Earth event at 80°S | `test_browser_method_passes_the_events_fixture_with_a_wide_margin` |
+| A graze that pokes above the horizon for under a minute between scan points is found, also in the first and last scan interval of a window | Found | `test_event_finder_catches_a_graze_between_scan_points`, `test_event_finder_catches_a_graze_right_at_the_edge_of_the_window` |
 
-The 2.7 s comes from the slowest event in the fixture, 0.5° from the pole, where the Earth's edge moves so slowly that the 0.000027° shift above takes seconds to cross.
+The four windows not rescanned (both limbs, the edge of the service region, the end of the timetable) rely on the event finder's own turning-point search.
 
-**Limit that remains.** At the pole an event can hang on a hair: a turning point of the Sun's edge can pass within thousandths of a degree of the horizon. The fixture builder refuses any window where that margin is under 0.002°. The closest in the current fixture is 0.0031°. On real terrain this fragility is what the lit / blocked / uncertain classification exists for.
+**Limit that remains.** At the pole an event can hang on a hair: a turning point of the Sun's edge can pass within thousandths of a degree of the horizon. The fixture builder refuses any window where that margin is under 0.002° (`test_fixture_builder_refuses_a_window_where_an_event_hangs_on_a_hair`). The closest in the current fixture is 0.0031°, for the Sun 0.5° from the pole (printed by `test_a_finer_scan_finds_the_same_events`). On real terrain this fragility is what the lit / blocked / uncertain classification exists for.
 
 ## Not yet verified
 

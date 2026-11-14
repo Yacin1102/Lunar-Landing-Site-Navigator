@@ -76,7 +76,8 @@ def test_utc_milliseconds_convert_to_the_same_instant_as_spice_does(utc, t_ms):
 
 def test_disc_radii_are_the_values_in_the_constants_kernel():
     assert spice.bodvrd("SUN", "RADII", 3)[1][0] == ephemeris.SUN_RADIUS_KM
-    assert spice.bodvrd("EARTH", "RADII", 3)[1][0] == ephemeris.EARTH_RADIUS_KM
+    assert spice.bodvrd("EARTH", "RADII", 3)[1][2] == ephemeris.EARTH_RADIUS_KM, "polar radius"
+    assert spice.bodvrd("EARTH", "RADII", 3)[1][0] == 6378.1366, "equatorial radius"
     assert spice.bodvrd("MOON", "RADII", 3)[1][0] == 1737.4
 
 
@@ -155,15 +156,15 @@ def test_interpolating_the_timetable_adds_negligible_error(timetable):
     is the timetable itself: hourly rows, stored as Float32, interpolated.
     The second is built into Contract 1: the timetable holds what is seen
     from the Moon's centre, and the browser shifts it to the site by
-    subtracting the site's position. Light leaves the Earth a few
-    milliseconds earlier or later for a site than for the centre, and the
-    Earth moves about 170 m in that time, which is 0.000027 degrees at the
-    Earth's distance. For the Sun the same effect is 100 times smaller.
+    subtracting the site's position. The light-time and aberration
+    corrections were worked out for the centre, not for the site (see
+    ``test_the_shift_to_the_site_is_exact_without_light_corrections``).
     """
     label, rows = timetable
     rng = np.random.default_rng(7)
     worst_cubic = {"SUN": 0.0, "EARTH": 0.0}
     worst_table = {"SUN": 0.0, "EARTH": 0.0}
+    worst_shift = {"SUN": 0.0, "EARTH": 0.0}
     worst_linear = 0.0
     for _ in range(500):
         lat, lon = rng.uniform(-90, -80), rng.uniform(-180, 180)
@@ -181,6 +182,9 @@ def test_interpolating_the_timetable_adds_negligible_error(timetable):
                                                      lat, lon, elev, mast)
             worst_table[body] = max(worst_table[body], abs(el_c - el_x),
                                     _az_diff(az_c, az_x) * np.cos(np.radians(el)))
+            # The shift's share: exact Moon-centre vector minus site, against direct.
+            worst_shift[body] = max(worst_shift[body], abs(el_x - el),
+                                    _az_diff(az_x, az) * np.cos(np.radians(el)))
             x = (t_ms - label["t0_ms"]) / (label["step_s"] * 1000.0)
             i = int(x)
             linear = rows[i] * (1 - (x - i)) + rows[min(i + 1, len(rows) - 1)] * (x - i)
@@ -190,12 +194,38 @@ def test_interpolating_the_timetable_adds_negligible_error(timetable):
     print(f"\nBrowser method against direct SPICE, 500 sites and times: worst error "
           f"Sun {worst_cubic['SUN']:.2e} deg, Earth {worst_cubic['EARTH']:.2e} deg. "
           f"Of that, hourly rows + Float32 + cubic interpolation: Sun {worst_table['SUN']:.2e}, "
-          f"Earth {worst_table['EARTH']:.2e}. With straight-line interpolation instead: "
-          f"{worst_linear:.2e} deg in total.")
+          f"Earth {worst_table['EARTH']:.2e}. Shift from the Moon's centre to the site: "
+          f"Sun {worst_shift['SUN']:.2e}, Earth {worst_shift['EARTH']:.2e}. "
+          f"With straight-line interpolation instead: {worst_linear:.2e} deg in total.")
     assert worst_table["SUN"] < 1e-5 and worst_table["EARTH"] < 1e-5
     assert worst_cubic["SUN"] < 1e-5
     assert worst_cubic["EARTH"] < 5e-5
     assert worst_linear < 5e-4
+
+
+def test_the_shift_to_the_site_is_exact_without_light_corrections():
+    """Where the Earth's 0.000027 degrees comes from.
+
+    With no light-time or aberration correction, "Moon-centre vector minus
+    site position" and "seen from the site" are the same thing and agree to
+    rounding. With the corrections they differ, because the corrections in
+    the timetable were worked out for the Moon's centre.
+    """
+    rng = np.random.default_rng(11)
+    worst = {"NONE": 0.0, "LT+S": 0.0}
+    for _ in range(100):
+        lat, lon = rng.uniform(-90, -80), rng.uniform(-180, 180)
+        t_ms = float(rng.integers(ephemeris.T0_MS, ephemeris.END_MS))
+        for correction in worst:
+            centre = ephemeris.moon_centre_vectors([t_ms], correction)[0][3:]
+            az_s, el_s, _ = ephemeris.view_from_rows(centre, lat, lon, 0.0, 2.0)
+            az_d, el_d, _ = ephemeris.direct_view("EARTH", lat, lon, 0.0, 2.0, t_ms, correction)
+            worst[correction] = max(worst[correction], abs(el_s - el_d),
+                                    _az_diff(az_s, az_d) * np.cos(np.radians(el_d)))
+    print(f"\nEarth, Moon-centre vector minus site against seen-from-site: "
+          f"{worst['NONE']:.2e} deg with no corrections, {worst['LT+S']:.2e} deg with LT+S")
+    assert worst["NONE"] < 1e-9
+    assert 1e-6 < worst["LT+S"] < 5e-5
 
 
 def test_interpolation_returns_the_rows_themselves_and_refuses_times_outside(timetable):
@@ -328,20 +358,34 @@ def test_every_fixture_event_is_a_real_crossing_of_the_upper_edge():
 
 
 def test_a_finer_scan_finds_the_same_events():
-    """Second method: scanning every 2 minutes instead of 10 must not find more or fewer."""
-    for case in _events()[:2]:
-        for body, rise_key, set_key in (("SUN", "sunrise_ms", "sunset_ms"),
-                                        ("EARTH", "earthrise_ms", "earthset_ms")):
+    """Second method: a finer first scan must not find more or fewer events.
+
+    Two ordinary windows are rescanned every 2 minutes instead of every 10.
+    The two windows beside the pole, where grazes happen, are rescanned every
+    5 minutes: the 200-day one for both bodies, the 400-day one for the Sun.
+    The smallest margin by which a turning point missed the horizon is
+    printed; the fixture builder refuses anything under 0.002 degrees.
+    """
+    cases = _events()
+    plan = [(cases[0], ("SUN", "EARTH"), 120.0), (cases[1], ("SUN", "EARTH"), 120.0),
+            (cases[5], ("SUN", "EARTH"), 300.0), (cases[4], ("SUN",), 300.0)]
+    keys = {"SUN": ("sunrise_ms", "sunset_ms"), "EARTH": ("earthrise_ms", "earthset_ms")}
+    assert "0.5 degrees from the pole" in cases[5]["name"] and "0.1 degrees from the pole" in cases[4]["name"]
+    for case, bodies, step in plan:
+        for body in bodies:
             edge = events_reference.direct_edge_elevation(body, case["lat"], case["lon"])
-            fine = events_reference.find_events(edge, case["start_ms"], case["end_ms"], scan_step_s=120.0)
-            assert fine["rise_ms"] == pytest.approx(case[rise_key], abs=1)
-            assert fine["set_ms"] == pytest.approx(case[set_key], abs=1)
+            fine = events_reference.find_events(edge, case["start_ms"], case["end_ms"], scan_step_s=step)
+            assert fine["rise_ms"] == pytest.approx(case[keys[body][0]], abs=1), (case["name"], body)
+            assert fine["set_ms"] == pytest.approx(case[keys[body][1]], abs=1), (case["name"], body)
+            print(f"\n{case['name']} / {body}: same events with a {step:.0f} s scan; "
+                  f"closest graze {fine['closest_graze_deg']:.4f} deg")
+            assert fine["closest_graze_deg"] >= 0.002
 
 
 def test_browser_method_passes_the_events_fixture_with_a_wide_margin(timetable):
     """The pass mark for TypeScript is 60 seconds."""
     radius = events_reference.BODY_RADIUS_KM
-    worst_s = 0.0
+    worst_s, worst_where = 0.0, ""
     for case in _events():
         for body, rise_key, set_key in (("SUN", "sunrise_ms", "sunset_ms"),
                                         ("EARTH", "earthrise_ms", "earthset_ms")):
@@ -353,8 +397,10 @@ def test_browser_method_passes_the_events_fixture_with_a_wide_margin(timetable):
             assert len(found["rise_ms"]) == len(case[rise_key]), (case["name"], body)
             assert len(found["set_ms"]) == len(case[set_key]), (case["name"], body)
             for a, b in zip(found["rise_ms"] + found["set_ms"], case[rise_key] + case[set_key]):
-                worst_s = max(worst_s, abs(a - b) / 1000.0)
-    print(f"\nBrowser method on the 8 event windows: worst timing error {worst_s:.3f} s (pass mark 60)")
+                if abs(a - b) / 1000.0 > worst_s:
+                    worst_s, worst_where = abs(a - b) / 1000.0, f"{body}, {case['name']}"
+    print(f"\nBrowser method on the 8 event windows: worst timing error {worst_s:.3f} s "
+          f"(pass mark 60), at: {worst_where}")
     assert worst_s < 5.0
 
 
@@ -368,6 +414,34 @@ def test_event_finder_catches_a_graze_between_scan_points():
     found = events_reference.find_events(edge, centre - 7_200_000, centre + 7_200_000)
     assert found["rise_ms"] == pytest.approx([centre - 30_000], abs=2)
     assert found["set_ms"] == pytest.approx([centre + 30_000], abs=2)
+
+
+@pytest.mark.parametrize("inside_s", [100, 250, 400])
+@pytest.mark.parametrize("at_end", [False, True])
+def test_event_finder_catches_a_graze_right_at_the_edge_of_the_window(inside_s, at_end):
+    """A one-minute graze inside the first or last scan interval of the window."""
+    start = 1_800_000_000_000
+    end = start + 4 * 3_600_000
+    centre = end - inside_s * 1000 if at_end else start + inside_s * 1000
+
+    def edge(t_ms):
+        return 0.001 - ((t_ms - centre) / 30_000.0) ** 2 * 0.001
+
+    found = events_reference.find_events(edge, start, end)
+    assert found["rise_ms"] == pytest.approx([centre - 30_000], abs=2)
+    assert found["set_ms"] == pytest.approx([centre + 30_000], abs=2)
+
+
+def test_fixture_builder_refuses_a_window_where_an_event_hangs_on_a_hair(monkeypatch):
+    import build_fixtures
+
+    monkeypatch.setattr(build_fixtures, "events_cases", lambda: [
+        {"name": "fragile", "lat": -85.0, "lon": 0.0, "start_ms": 0, "end_ms": 1}])
+    monkeypatch.setattr(events_reference, "smooth_moon_events", lambda *a: {
+        "sunrise_ms": [], "sunset_ms": [], "earthrise_ms": [], "earthset_ms": [],
+        "closest_graze_deg": 0.0019})
+    with pytest.raises(ValueError, match="fragile"):
+        build_fixtures.build_events(log=lambda line: None)
 
 
 def test_event_finder_reports_how_close_a_miss_was():

@@ -40,17 +40,26 @@ STEP_S = 3600
 END_MS = 2_208_988_800_000
 ROW_COUNT = (END_MS - T0_MS) // (STEP_S * 1000) + 1
 
-#: Radius used for the Earth's disc, km: the equatorial radius in pck00011.tpc.
-EARTH_RADIUS_KM = 6378.1366
+#: Radius used for the Earth's disc, km: the polar radius in pck00011.tpc.
+#: The Earth is flattened, and seen from the Moon's south pole the upper edge
+#: of its disc is near one of the Earth's poles. There the true limb is
+#: between 6356.75 and about 6365 km from the centre, depending on the date.
+#: The polar radius is therefore within about 0.0012 degrees of the true
+#: upper edge and never above it: the Earth's edge is never said to be
+#: visible when it is not. (The equatorial radius, 6378.14 km, would put the
+#: edge up to 0.0032 degrees too high.)
+EARTH_RADIUS_KM = 6356.7519
 #: Radius used for the Sun's disc, km: the value in pck00011.tpc.
 SUN_RADIUS_KM = 695_700.0
 
 
-def moon_centre_vectors(t_ms) -> np.ndarray:
+def moon_centre_vectors(t_ms, aberration: str = ABERRATION) -> np.ndarray:
     """Apparent Sun and Earth positions seen from the Moon's centre.
 
     Args:
         t_ms: array of UTC times, milliseconds since 1970.
+        aberration: SPICE correction; the default is the one every product
+            uses. ``"NONE"`` (no correction) exists for tests only.
 
     Returns:
         Array of shape ``(n, 6)``, km, ``MOON_ME``: ``sun_x, sun_y, sun_z,
@@ -60,8 +69,8 @@ def moon_centre_vectors(t_ms) -> np.ndarray:
     ets = np.atleast_1d(et_from_utc_ms(t_ms))
     out = np.empty((len(ets), 6))
     for i, et in enumerate(ets):
-        out[i, :3] = spice.spkpos("SUN", float(et), FRAME, ABERRATION, "MOON")[0]
-        out[i, 3:] = spice.spkpos("EARTH", float(et), FRAME, ABERRATION, "MOON")[0]
+        out[i, :3] = spice.spkpos("SUN", float(et), FRAME, aberration, "MOON")[0]
+        out[i, 3:] = spice.spkpos("EARTH", float(et), FRAME, aberration, "MOON")[0]
     return out
 
 
@@ -77,7 +86,8 @@ def site_vector_km(lat_deg: float, lon_deg: float, elev_m: float = 0.0,
 
 
 def direct_view(body: str, lat_deg: float, lon_deg: float, elev_m: float,
-                mast_m: float, t_ms: float) -> tuple[float, float, float]:
+                mast_m: float, t_ms: float,
+                aberration: str = ABERRATION) -> tuple[float, float, float]:
     """Direction and distance of a body seen from a surface point, directly from SPICE.
 
     The observer is the site itself, fixed to the Moon, so light time and
@@ -88,6 +98,7 @@ def direct_view(body: str, lat_deg: float, lon_deg: float, elev_m: float,
         lat_deg, lon_deg: the site, degrees.
         elev_m, mast_m: ground height above the sphere and eye height, metres.
         t_ms: UTC time, milliseconds since 1970.
+        aberration: SPICE correction; ``"NONE"`` exists for tests only.
 
     Returns:
         ``(azimuth_deg, elevation_deg, distance_km)`` of the body's centre.
@@ -95,7 +106,7 @@ def direct_view(body: str, lat_deg: float, lon_deg: float, elev_m: float,
     """
     et = float(et_from_utc_ms(t_ms))
     site = site_vector_km(lat_deg, lon_deg, elev_m, mast_m)
-    state, _ = spice.spkcpo(body, et, FRAME, "OBSERVER", ABERRATION, site, "MOON", FRAME)
+    state, _ = spice.spkcpo(body, et, FRAME, "OBSERVER", aberration, site, "MOON", FRAME)
     east, north, up = enu_frame(lat_deg, lon_deg)
     azimuth, elevation = az_el_in_frame(state[:3], east, north, up)
     return float(azimuth), float(elevation), float(np.linalg.norm(state[:3]))

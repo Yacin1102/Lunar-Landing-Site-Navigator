@@ -20,8 +20,9 @@ How it works, in plain words
     between them, pinned down by repeated halving to the nearest millisecond.
     At the pole the Sun can also graze the horizon without the 10-minute
     samples changing sign, so every local high and low point of the curve is
-    located precisely as well; if it turns out to poke through zero, the two
-    events either side of it are added. The smallest distance from zero of
+    located precisely as well, including in the first and last scan interval
+    of the window; if it turns out to poke through zero, the two events
+    either side of it are added. The smallest distance from zero of
     any such turning point is reported, so a window where an event would hang
     on a hair can be avoided when choosing fixtures.
 
@@ -103,6 +104,17 @@ def find_events(edge: Callable[[float], float], start_ms: int, end_ms: int,
     # Split points: the scan times plus any turning point that crosses zero.
     points = list(zip(times.tolist(), values.tolist()))
     closest = float("inf")
+    # The first and the last scan interval have no neighbour on one side, so
+    # the three-sample test below cannot see a turning point there. Search
+    # them directly; a result at least 2 s from both ends is a real one.
+    for a, b in ((0, 1), (len(times) - 2, len(times) - 1)):
+        for sign in (1.0, -1.0):
+            t_turn, v_turn = _turning_point(edge, times[a], times[b], sign)
+            if min(t_turn - times[a], times[b] - t_turn) > 2000.0:
+                if (v_turn < 0) != (values[a] < 0) and (v_turn < 0) != (values[b] < 0):
+                    points.append((t_turn, v_turn))
+                else:
+                    closest = min(closest, abs(v_turn))
     for i in range(1, len(times) - 1):
         left, mid, right = values[i - 1], values[i], values[i + 1]
         for sign in (1.0, -1.0):

@@ -144,7 +144,7 @@ Use the full vectors and subtract the site position, as above. The Earth is clos
 
 At the pole itself north is undefined; nudge the point off the pole (for example to latitude -89.9999).
 
-Angular radius of a disc: `asin(body_radius / |d|)`, with `|d|` the distance from the eye. Use these radii, which the fixtures were made with: **Sun 695,700 km, Earth 6378.1366 km**. The Sun's disc is about 0.53 degrees across and the Earth's about 1.9 degrees.
+Angular radius of a disc: `asin(body_radius / |d|)`, with `|d|` the distance from the eye. Use these radii, which the fixtures were made with: **Sun 695,700 km, Earth 6356.7519 km**. The Earth's value is its polar radius: from the south pole the upper edge of the Earth's disc is near one of the Earth's poles, so this is the closer and the cautious choice (`docs/ACCURACY.md`). The Sun's disc is about 0.53 degrees across and the Earth's about 1.9 degrees.
 
 ## Lit, blocked or uncertain
 

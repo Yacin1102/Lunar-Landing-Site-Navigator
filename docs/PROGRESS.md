@@ -20,7 +20,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 3): 92 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 3): 100 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -182,7 +182,7 @@ Each step is reported with its real output.
 - Elevation budget is about 35 GB, including the per-pixel error maps (agreed 2026-11-14). The coarse maps add about 0.9 GB.
 - DE440 is the build ephemeris and DE442 a measured comparison. This departs from the spec's suggestion of "the latest ephemeris". Measured in PR 3: the two give the same Sun and Earth directions to 0.00000005 degrees over 2026 to 2040, so the choice does not affect any result. DE440 stays, because the Moon orientation file and JPL Horizons are built on it.
 - The timetable is hourly, Float32, 115,057 rows (16 Nov 2026 00:00 to 1 Jan 2040 00:00 UTC inclusive), with `LT+S` correction. Measured in PR 3: precise to 0.0000017 degrees for the Sun; see `docs/ACCURACY.md`.
-- Disc radii: Sun 695,700 km and Earth 6378.1366 km (equatorial), from `pck00011.tpc`.
+- Disc radii: Sun 695,700 km and Earth 6356.7519 km, from `pck00011.tpc`. The Earth's is its polar radius: from the south pole the upper edge of the Earth's disc is near one of the Earth's poles. This keeps the Earth's edge within about 0.0012 degrees and never too high; the equatorial radius would be up to 0.0032 degrees too high. Raised by the contract review.
 - The web side should interpolate the timetable with a cubic through four rows; the formula is in `docs/WEB_HANDOFF.md`.
 - The download script lives at `python/scripts/download_data.py`.
 - One new Python package: `jsonschema`, for validating files against the schemas. numba will be proposed in PR 5 only if timing shows it is needed.
