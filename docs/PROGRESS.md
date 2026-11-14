@@ -4,7 +4,11 @@ Scope of this plan: the Python engine (`python/`), the files it writes to `web/p
 
 ## Status
 
-**Plan awaiting approval. Nothing is built yet.** Next after approval: PR 1 (download script), then start the download.
+**Python plan status:** awaiting approval. The Python-side plan has not started; PR 1 remains the next Python task.
+
+### Web app status
+
+The browser implementation is now present on the web-agent branch. It includes a Vite/React/Vitest shell, synthetic contract-compatible files under `web/public/data-mock/`, a configurable prepared-data loader, a tested astronomy worker, and power/battery calculations. The upstream web handoff and SPICE-generated fixtures were absent when this work started, so the web handoff document records the provisional assumptions and the UI labels all mock terrain as non-mission data.
 
 Test command (from PR 1 on): `python -m pytest python/tests -v -rs`. Last result: none yet.
 
