@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "lat": -89.2,
+  "lon": 15,
+  "elev_m": 1200,
+  "size_m": 100,
+  "n": 3,
+  "spacing_m": 50,
+  "dem": "SYNTHETIC",
+  "resolution_m": 10
+}

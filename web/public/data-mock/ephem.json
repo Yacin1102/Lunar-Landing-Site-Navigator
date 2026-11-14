@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "t0_ms": 1794787200000,
+  "step_s": 3600,
+  "count": 3,
+  "columns": ["sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z"],
+  "units": "km",
+  "frame": "MOON_ME",
+  "origin": "MOON",
+  "aberration": "synthetic"
+}
