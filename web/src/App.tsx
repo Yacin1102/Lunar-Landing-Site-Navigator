@@ -48,7 +48,6 @@ export default function App() {
         const initialDate = loaded.ephemeris.label.t0_ms + 12 * 3600000;
         const initial = saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }];
         setScenarios(initial.slice(0, 4));
-        setSelectedSiteId(loaded.sites[0]?.id ?? "");
       })
       .catch((reason: unknown) => setLoadError(reason instanceof Error ? reason.message : "Prepared data could not be loaded."));
   }, []);
@@ -117,7 +116,12 @@ export default function App() {
 
   /** Add a curated site to the comparison set without duplicating an existing scenario. */
   function addScenario(siteId: string): void {
-    if (!siteId || scenarios.some((scenario) => scenario.siteId === siteId) || scenarios.length >= 4) return;
+    if (!siteId || scenarios.length >= 4) return;
+    const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
+    if (existingIndex >= 0) {
+      setActiveIndex(existingIndex);
+      return;
+    }
     const dateMs = activeScenario?.dateMs ?? bundle?.ephemeris.label.t0_ms ?? Date.now();
     setScenarios((current) => [...current, { siteId, dateMs }]);
     setActiveIndex(scenarios.length);
