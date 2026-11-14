@@ -59,6 +59,6 @@ The four windows not rescanned (both limbs, the edge of the service region, the 
 
 ## Not yet verified
 
-- Elevation reading (projection, registration, known feature heights): with the LOLA reader.
+- Elevation reading: the projection is verified (the engine's formulas agree with the projection declared inside the four coarse map files to better than a micrometre, `test_projection_is_the_one_the_map_files_declare`). Pixel registration against known features and published heights: with the LOLA reader.
 - Skyline on synthetic terrain, the stopping rule, the error bound and the independent line-of-sight check: with the skyline pull requests.
 - Illumination against published south polar studies: with the real products.
