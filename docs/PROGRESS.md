@@ -25,7 +25,7 @@ Plan approved on 2026-11-14.
 | 6 Error bound and independent check | Merged (PR #13) |
 | 7 Record writer and live API | Merged (PR #17) |
 | 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
-| 9 Site list | Built, in review (stacked on PR #19). The 5 m site maps wait for your go-ahead (see Open questions) |
+| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps wait for your go-ahead (see Open questions) |
 | 10 Terrain patches, shade grids, manifest | **Next** |
 | 11 Real products and final proof | Not started |
 
