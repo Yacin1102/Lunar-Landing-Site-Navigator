@@ -14,23 +14,23 @@ Plan approved on 2026-11-14.
 | 4 Elevation interface and synthetic terrain | Merged (PR #7) |
 | 5 Skyline core | Built, in review (PR #12) |
 | 6 Error bound and independent check | Built, in review (PR #13) |
-| 7 Record writer and live API | Built, in review |
-| 8 LOLA reader | **Next** |
-| 9 to 11 | Not started |
+| 7 Record writer and live API | Built, in review (PR #17) |
+| 8 LOLA reader | Built, in review |
+| 9 Site list | **Next** (sites researched and checked against the map, see below) |
+| 10 to 11 | Not started |
 
 To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
 The web app (`web/`) is built separately and merged into `main` (PR #9). Engine work is done in a separate git worktree and never changes files under `web/` except the agreed data files, so the two do not conflict.
 
-Data on disk (2026-11-15): the 8 SPICE kernels, the 4 coarse maps, and the 4 full-resolution height maps. The 4 full-resolution error maps are still downloading.
+Data on disk (2026-11-15): all 20 files, downloaded and verified against their recorded checksums (`download_data.py --verify`: 20 of 20 OK); the checksums are committed. The maps are prepared for use in `python/dem/cache/` (42 GB, never committed): `python python/scripts/build_dem_cache.py`.
 
 Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip install -r python/requirements.txt`.
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 7): 212 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 8): 232 passed, 0 skipped, 0 failed: with all data on disk, all 55 real-data tests run. Skipped, all waiting for data:
 
-- `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
 ## Principle: nothing waits on the download
 
@@ -248,7 +248,7 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Open questions
 
-- **Skyline speed on the real maps (not yet measured).** On a synthetic 2000 x 2000 map with 60 cones it takes 2.9 s. The real 10 m map is about 42,000 x 42,000 pixels and skylines reach hundreds of km, so the time per site is unknown until PR 8. Reading the maps may need a cache on disk. For the live API, results are cached.
+- **Live API speed on real terrain.** Measured in PR 8 at a point 0.2° from the pole: one skyline run takes 88 s at 0.1° wedges and 8 s at 1° (search reach 127 km). An error-bounded answer is three runs: about 4.5 minutes at 0.1°, 25 s at 1°. Curated sites are built ahead of time, so this only affects custom points. Options: (a) run the three runs in parallel processes (about a third of the time); (b) default the API to 1° wedges for custom points, with 0.1° on request; (c) pre-compute skylines on a grid of points. My recommendation is (a) and (b) together.
 
 - **Site shortlist (PR 9).** Candidates inside 80°S: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).
 - Mock shade grids exist for 2 of the 10 mock sites, at a small grid size, so the web app meets sites with and without one. Say if the web side needs all 10.

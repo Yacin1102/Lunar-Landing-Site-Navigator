@@ -12,7 +12,10 @@ How it works, in plain words
       decompressed strip by strip into a plain file of 32-bit numbers in
       ``python/dem/cache/``, and so is its error map. Afterwards the files
       are opened "memory-mapped": the operating system reads from disk only
-      the pixels actually asked for. A small ``meta.json`` records which
+      the pixels actually asked for. The file is laid out in 64 x 64 pixel
+      tiles rather than rows, so pixels close together on the ground are
+      close together on disk; a line of sight crossing the map then needs
+      far fewer disk reads. A small ``meta.json`` records which
       source file (size and date) each cache came from, so a changed source
       is never read through an old cache.
     * **Highest-terrain tables from 2 x 2 cells upward** are built strip by
@@ -46,7 +49,9 @@ import numpy as np
 from .elevation import ElevationSource, GridSpec, HeightGrid
 
 #: Increase to rebuild every cache (after a change in how caches are made).
-CACHE_VERSION = 1
+CACHE_VERSION = 2
+#: Pixels per side of a tile of the decompressed copies.
+TILE = 64
 #: Pixels per side of a block of the slope table.
 BLOCK = 8
 #: Rows handled at a time when building caches.
@@ -108,27 +113,55 @@ def _source_stamp(path: Path) -> dict:
     return {"file": Path(path).name, "bytes": stat.st_size, "mtime": int(stat.st_mtime)}
 
 
-def _raw_cache(source: Path, dest: Path, label: dict, log) -> np.ndarray:
-    """Decompress a GeoTIFF into a memory-mapped array file (once), and open it."""
+class _Tiled:
+    """A map stored in TILE x TILE tiles on disk, read like an ordinary 2-D array.
+
+    Answers ``a[rows, cols]`` for arrays of pixel indices and ``a[p0:p1]``
+    for a run of whole rows, which is all the reader needs.
+    """
+
+    def __init__(self, tiles: np.ndarray, shape: tuple[int, int]):
+        self.tiles, self.shape, self.dtype = tiles, shape, np.float32
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            p0, p1, _ = key.indices(self.shape[0])
+            if p1 <= p0:
+                return np.empty((0, self.shape[1]), np.float32)
+            t0, t1 = p0 // TILE, (p1 - 1) // TILE + 1
+            block = np.asarray(self.tiles[t0:t1])
+            rows = block.transpose(0, 2, 1, 3).reshape((t1 - t0) * TILE, -1)
+            return rows[p0 - t0 * TILE:p1 - t0 * TILE, :self.shape[1]]
+        rows, cols = (np.asarray(k, dtype=np.int64) for k in key)
+        return self.tiles[rows // TILE, cols // TILE, rows % TILE, cols % TILE]
+
+
+def _raw_cache(source: Path, dest: Path, label: dict, log) -> _Tiled:
+    """Decompress a GeoTIFF into a memory-mapped tiled file (once), and open it."""
     import rasterio
     from rasterio.windows import Window
 
     meta_path = dest.with_suffix(".json")
     stamp = {**_source_stamp(source), "version": CACHE_VERSION}
-    if dest.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == stamp:
-        return np.load(dest, mmap_mode="r")
-    dest.parent.mkdir(parents=True, exist_ok=True)
     rows, cols = label["n_rows"], label["n_cols"]
-    out = np.lib.format.open_memmap(dest, mode="w+", dtype=np.float32, shape=(rows, cols))
-    with rasterio.open(source) as raster:
-        for r0 in range(0, rows, ROWS_PER_STRIP):
-            r1 = min(r0 + ROWS_PER_STRIP, rows)
-            out[r0:r1] = raster.read(1, window=Window(0, r0, cols, r1 - r0))
-            log(f"  {source.name}: decompressed rows {r1} of {rows}")
-    out.flush()
-    del out
-    meta_path.write_text(json.dumps(stamp))
-    return np.load(dest, mmap_mode="r")
+    n_tr, n_tc = -(-rows // TILE), -(-cols // TILE)
+    if not (dest.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == stamp):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out = np.lib.format.open_memmap(dest, mode="w+", dtype=np.float32, shape=(n_tr, n_tc, TILE, TILE))
+        strip = max(TILE, (ROWS_PER_STRIP // TILE) * TILE)
+        with rasterio.open(source) as raster:
+            for r0 in range(0, rows, strip):
+                r1 = min(r0 + strip, rows)
+                data = raster.read(1, window=Window(0, r0, cols, r1 - r0))
+                k = -(-(r1 - r0) // TILE)
+                padded = np.full((k * TILE, n_tc * TILE), np.nan, np.float32)
+                padded[:r1 - r0, :cols] = data
+                out[r0 // TILE:r0 // TILE + k] = padded.reshape(k, TILE, n_tc, TILE).transpose(0, 2, 1, 3)
+                log(f"  {source.name}: decompressed rows {r1} of {rows}")
+        out.flush()
+        del out
+        meta_path.write_text(json.dumps(stamp))
+    return _Tiled(np.load(dest, mmap_mode="r"), (rows, cols))
 
 
 def _float32_up(values) -> np.ndarray:

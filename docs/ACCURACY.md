@@ -132,9 +132,26 @@ Without map error, what is left is how much the skyline genuinely varies inside 
 
 **Not included in this bound:** the Sun and Earth positions themselves (up to 0.000027°, `docs/ACCURACY.md` above) and the flattening of the Earth's disc (up to 0.0012°), which belong to the browser's calculation, not to the terrain.
 
+## Elevation maps (real data)
+
+Verified in `python/tests/test_lola.py` and `test_elevation.py`.
+
+| Check | Result |
+| --- | --- |
+| The engine's projection against the projection declared inside each map file | Same position to better than a micrometre |
+| The reader against rasterio, pixel for pixel, at three windows of each coarse map | Identical |
+| Shackleton crater on the 80 m and the 10 m map, against Zuber et al. 2012 (21 km across, depth/diameter 0.195 +/- 0.025, so 4100 +/- 500 m deep) | 4104 m and 4106 m deep; deepest point inside the 7 km floor round the gazetteer centre |
+| The same measurement where a mirrored or rotated read would put the crater | 319 m, 1111 m and -136 m: no crater |
+| The 20, 30 and 60 m maps against the 10 m map at 4000 points | Median difference 0.11, 0.08 and 0.27 m; 95 % within 0.54, 0.45 and 1.22 m |
+| Small GeoTIFFs read through the file-backed reader against the same numbers in memory | Same heights, tables, slope bounds, trusted disc and a whole skyline; error allowances never smaller |
+
+The published per-pixel errors are RMS (1-sigma) values and the products' horizontal accuracy is 1 m (Barker et al. 2023), see `python/DATA.md`.
+
+**Speed** at a point 0.2° from the pole on the real maps: 88 s per skyline run at 0.1° wedges, 8 s at 1° (after storing the decompressed maps in 64 x 64 tiles; 368 s and 19 s before). The result: skyline -1.5° to 16.9°, interval half-width mean 0.011° (largest 0.029°) before the map error is added, no terrain beyond 127 km needed, and unmapped terrain proven irrelevant.
+
 ## Not yet verified
 
-- Elevation reading: the projection is verified (the engine's formulas agree with the projection declared inside the four coarse map files to better than a micrometre, `test_projection_is_the_one_the_map_files_declare`). Pixel registration against known features and published heights: with the LOLA reader.
+- (Elevation reading: now verified; see below.)
 - The error bound on the real maps, with their published per-pixel errors and horizontal accuracy (the horizontal accuracy of the LOLA product is still to be taken from its paper).
 - Skyline speed and interval width on the real maps.
 - Illumination against published south polar studies: with the real products.
