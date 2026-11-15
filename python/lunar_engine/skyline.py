@@ -147,7 +147,12 @@ class SkylineResult:
         mast_m: eye height above the ground, metres.
         az_step_deg: wedge width, degrees.
         lower_deg: per wedge, the elevation of a real terrain point in it.
+            So the highest terrain in the wedge is at least this high.
         upper_deg: per wedge, a proven ceiling for all terrain in it.
+        floor_deg: per wedge, a proven lower limit for the skyline at every
+            azimuth of the wedge (see ``_Search._profile_floor``). The
+            skyline at any single azimuth in the wedge lies between
+            ``floor_deg`` and ``upper_deg``.
         max_reach_km: distance to the farthest cell that had to be examined
             one by one (everything farther was set aside with proof), km.
         dem: names of the maps searched, finest first.
@@ -162,6 +167,7 @@ class SkylineResult:
     az_step_deg: float
     lower_deg: np.ndarray
     upper_deg: np.ndarray
+    floor_deg: np.ndarray
     max_reach_km: float
     dem: list[str]
     resolution_m: float
@@ -227,7 +233,9 @@ class _Search:
     """One skyline calculation. See the module docstring for the method."""
 
     def __init__(self, source: ElevationSource, lat: float, lon: float, mast_m: float,
-                 az_step_deg: float, tolerance_deg: float, max_depth: int):
+                 az_step_deg: float, tolerance_deg: float, max_depth: int,
+                 require_complete: bool = True):
+        self.require_complete = require_complete
         self.source = source
         self.lat, self.lon = lat, lon
         self.step = float(az_step_deg)
@@ -242,6 +250,8 @@ class _Search:
         self.theta_excl = EXCLUDE_RADIUS_M / R_MOON_M
         self.chord_excl = 2.0 * np.sin(self.theta_excl / 2.0)
         self.lower = np.full(self.n, -90.0)
+        # Angular distance of the sample that set each wedge's lower limit.
+        self.best_theta = np.full(self.n, np.nan)
         self.discs = [grid.disc() for grid in source.grids]
         self.final_el: list[np.ndarray] = []
         self.final_start: list[np.ndarray] = []
@@ -520,10 +530,14 @@ class _Search:
         u = xy_to_unit(x[ok], y[ok])
         d = (R_MOON_M + h[ok])[:, None] * u - self.eye
         de, dn, du = d @ self.east, d @ self.north, d @ self.up
-        keep = self._chord(u) >= self.chord_excl
+        chord = self._chord(u)
+        keep = chord >= self.chord_excl
         el = np.degrees(np.arctan2(du, np.hypot(de, dn)))[keep]
         az = np.degrees(np.arctan2(de, dn))[keep]
-        np.maximum.at(self.lower, self._wedge_of(az), el)
+        wedge = self._wedge_of(az)
+        np.maximum.at(self.lower, wedge, el)
+        best = el >= self.lower[wedge]
+        self.best_theta[wedge[best]] = 2.0 * np.arcsin(np.clip(chord[keep][best] / 2.0, 0.0, 1.0))
         self.stats["samples"] += int(keep.sum())
 
     def _seed(self, gi: int) -> None:
@@ -727,16 +741,111 @@ class _Search:
                 f"above the skyline in {int(risky.sum())} of {self.n} directions")
         return best
 
+    # ---- step 5: the lowest the skyline gets inside each wedge ----------------------
+
+    def _terrain_heights(self, x, y):
+        """Height at sheet points from the map responsible there, and from every map.
+
+        Returns:
+            ``(height, responsible_index, all_heights)``: the terrain height
+            (NaN outside every trusted disc), the index of the map it came
+            from (-1 if none), and an array ``(n_maps, N)`` with every map's
+            own interpolated height (NaN where that map cannot interpolate).
+        """
+        every = np.array([grid.height_xy(x, y) for grid in self.source.grids])
+        responsible = np.full(len(x), -1)
+        for gi in range(len(self.source.grids) - 1, -1, -1):     # finest wins
+            cx, cy, r = self.discs[gi]
+            responsible[np.hypot(x - cx, y - cy) <= r] = gi
+        height = np.where(responsible >= 0,
+                          every[np.maximum(responsible, 0), np.arange(len(x))], np.nan)
+        return height, responsible, every
+
+    def _profile_floor(self) -> np.ndarray:
+        """Step 5: a proven lower limit for the skyline at every azimuth of each wedge.
+
+        Why it is needed. The skyline entry of a wedge is its highest terrain.
+        So a direction above ``upper`` is certainly clear. But a direction
+        below the wedge's highest terrain may still be clear, through a dip
+        narrower than the wedge. To prove "blocked" the lowest the skyline
+        gets anywhere inside the wedge is needed too.
+
+        How it works, in plain words. Pick a distance ``D`` (the distance of
+        the terrain that set the wedge's lower limit, and two close to it).
+        Follow the arc of terrain at that distance from one edge of the wedge
+        to the other. Every azimuth of the wedge looks over some point of the
+        arc, so the skyline there is at least that point's elevation. The arc
+        is sampled every 1/8 of the finest pixel; between two samples the
+        ground cannot dip lower than the lower sample minus the steepest the
+        surface can be there times half the gap (:meth:`HeightGrid.slope_bound`).
+        The lowest height on the arc, so bounded, gives an elevation that no
+        azimuth of the wedge can fall below.
+
+        Returns:
+            Per wedge, degrees. -90 where no arc could be used.
+        """
+        floor = np.full(self.n, -90.0)
+        ds = self.source.grids[0].spec.pixel_m / 8.0
+        for factor in (1.0, 0.995, 1.005):
+            theta_all = self.best_theta * factor
+            ok = np.isfinite(theta_all) & (theta_all * R_MOON_M >= 1.5 * EXCLUDE_RADIUS_M)
+            wedges, theta = np.flatnonzero(ok), theta_all[ok]
+            if not len(wedges):
+                continue
+            arc_m = theta * R_MOON_M * np.radians(self.step)
+            samples = np.minimum(np.ceil(arc_m / ds).astype(np.int64) + 1, 4096)
+            arc = np.repeat(np.arange(len(wedges)), samples)
+            index = np.arange(samples.sum()) - np.repeat(np.cumsum(samples) - samples, samples)
+            fraction = index / np.repeat(samples - 1, samples)
+            az = np.radians((wedges[arc] - 0.5 + fraction) * self.step)
+            t = theta[arc]
+            heading = np.cos(az)[:, None] * self.north + np.sin(az)[:, None] * self.east
+            u = np.cos(t)[:, None] * self.up + np.sin(t)[:, None] * heading
+            x, y = unit_to_xy(u)
+            height, responsible, every = self._terrain_heights(x, y)
+            steep = np.full(every.shape, np.nan)
+            for gi, grid in enumerate(self.source.grids):
+                spec = grid.spec
+                col, row = spec.col_of_x(x), spec.row_of_y(y)
+                inside = (col >= 0) & (col <= spec.n_cols - 1) & (row >= 0) & (row <= spec.n_rows - 1)
+                r = np.clip(np.round(row), 0, spec.n_rows - 1).astype(np.int64)
+                c = np.clip(np.round(col), 0, spec.n_cols - 1).astype(np.int64)
+                steep[gi] = np.where(inside, grid.slope_bound(r, c), np.nan)
+
+            # Lower limit on each gap between neighbouring samples of an arc,
+            # for the surface of each map responsible at either end.
+            count = len(arc) - 1
+            same = arc[:-1] == arc[1:]
+            gap_m = arc_m[arc[:-1]] / np.maximum(samples[arc[:-1]] - 1, 1)
+            rho2 = np.maximum(x[:-1] ** 2 + y[:-1] ** 2, x[1:] ** 2 + y[1:] ** 2)
+            sheet_gap = gap_m * (1.0 + rho2 / (4.0 * R_MOON_M ** 2)) * 1.001
+            bound = np.full(count, np.inf)
+            for side in (responsible[:-1], responsible[1:]):
+                g = np.maximum(side, 0)
+                lowest = np.minimum(every[g, np.arange(count)], every[g, np.arange(1, count + 1)])
+                gradient = np.maximum(steep[g, np.arange(count)], steep[g, np.arange(1, count + 1)])
+                bound = np.minimum(bound, np.where(side >= 0, lowest - gradient * sheet_gap / 2.0,
+                                                   np.nan))
+            low = np.full(len(wedges), np.inf)
+            np.minimum.at(low, arc[:-1][same], bound[same])
+            np.minimum.at(low, arc, height)                           # NaN poisons the arc
+            usable = np.isfinite(low)
+            r = R_MOON_M + low[usable]
+            elevation = np.degrees(np.arctan2(r * np.cos(theta[usable]) - self.eye_radius,
+                                              r * np.sin(theta[usable])))
+            floor[wedges[usable]] = np.maximum(floor[wedges[usable]], elevation)
+        return floor
+
     # ---- all together ---------------------------------------------------------------
 
     def run(self) -> SkylineResult:
-        """Steps 1 to 4, then the upper limit per wedge from the final pieces."""
+        """Steps 1 to 5, with the upper limit per wedge from the final pieces."""
         started = time.perf_counter()
         for gi in range(len(self.source.grids)):
             self._seed(gi)
         for gi in range(len(self.source.grids)):
             self._search_grid(gi)
-        beyond = self._check_beyond_the_maps()
+        beyond = self._check_beyond_the_maps() if self.require_complete else np.nan
 
         upper = self.lower.copy()
         if self.final_el:
@@ -752,12 +861,14 @@ class _Search:
                 wedges = (np.repeat(first[~full], reps) + offsets) % self.n
                 np.maximum.at(upper, wedges, np.repeat(el[~full], reps))
         upper = np.maximum(upper, self.lower) + ROUNDING_MARGIN_DEG
+        floor = self._profile_floor() - ROUNDING_MARGIN_DEG
+        upper = np.maximum(upper, floor)
 
         self.stats["seconds"] = time.perf_counter() - started
         self.stats["unmapped_terrain_from_km"] = beyond * R_MOON_M / 1000.0
         return SkylineResult(
             lat=self.lat, lon=self.lon, elev_m=self.elev_m, mast_m=self.mast_m,
-            az_step_deg=self.step, lower_deg=self.lower, upper_deg=upper,
+            az_step_deg=self.step, lower_deg=self.lower, upper_deg=upper, floor_deg=floor,
             max_reach_km=self.reach_theta * R_MOON_M / 1000.0, dem=self.source.names,
             resolution_m=self.source.resolution_at(self.lat, self.lon), stats=self.stats)
 
@@ -765,7 +876,8 @@ class _Search:
 def compute_skyline(source: ElevationSource, lat_deg: float, lon_deg: float,
                     mast_m: float = 2.0, az_step_deg: float = 0.1,
                     tolerance_deg: float = TOLERANCE_DEG,
-                    max_depth: int = MAX_DEPTH) -> SkylineResult:
+                    max_depth: int = MAX_DEPTH,
+                    require_complete: bool = True) -> SkylineResult:
     """The skyline at a point, with a guaranteed interval in every wedge.
 
     Args:
@@ -779,6 +891,11 @@ def compute_skyline(source: ElevationSource, lat_deg: float, lon_deg: float,
             ceiling is within this of the lower limit of its wedges, degrees
             (``TOLERANCE_DEG``). It sets the target interval half-width.
         max_depth: the most times one cell is cut into quarters (``MAX_DEPTH``).
+        require_complete: if False, terrain beyond the maps is not checked.
+            ``upper_deg`` is then **not** proven (unmapped terrain could be
+            higher), but ``lower_deg`` and ``floor_deg`` still are: more
+            terrain can only raise a skyline. Used for the lowered-terrain
+            run of the error bound, which needs only the floor.
 
     Returns:
         A :class:`SkylineResult`.
@@ -796,5 +913,5 @@ def compute_skyline(source: ElevationSource, lat_deg: float, lon_deg: float,
         raise ValueError(f"mast_m {mast_m} must be zero or positive")
     wedge_count(az_step_deg)
     search = _Search(source, float(lat_deg), float(lon_deg), float(mast_m), az_step_deg,
-                     tolerance_deg, max_depth)
+                     tolerance_deg, max_depth, require_complete)
     return search.run()

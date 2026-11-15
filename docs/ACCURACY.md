@@ -91,9 +91,50 @@ How the slope case was fixed. The contract review found that on an 18° slope th
 
 A rounding margin of 0.000000001° is added to every ceiling, so that floating-point rounding cannot place a terrain point above it.
 
+## Error bound and independent check (synthetic terrain)
+
+Verified in `python/tests/test_uncertainty.py`.
+
+**What the interval means.** For every wedge, `skyline_deg +/- skyline_err_deg` contains the skyline at every single azimuth of the wedge, for any terrain within the error model. A direction above the interval is certainly clear; one below it is certainly blocked.
+
+This goes further than the wedge's highest terrain. A wedge's highest terrain proves "clear" above it, but not "blocked" below it: light can pass through a dip narrower than the wedge. A test builds exactly that: a 300 m wall 5 km away with a 1° gap inside a 2° wedge. The wall is the wedge's highest terrain (3.3°), yet a line of sight at 1° through the gap is clear, and the interval does not call it blocked.
+
+| Check | Result |
+| --- | --- |
+| Skyline at 1200 random single azimuths, measured independently by dense sampling along each azimuth (`lineofsight.azimuth_profile`), 25 cones, map error 0.5 m | All inside the interval; smallest margin 0.048° to the bottom, 0.030° to the top |
+| The same on terrain moved within the error model four ways (random up/down per pixel, all up, all down, waves), 400 azimuths each | All inside the interval |
+| The whole map really shifted sideways by its full horizontal error (15 m and 60 m) in 8 directions; a wall with a 3° gap on a 20 m map, and 12 cones on a 40 m map | All inside the interval |
+| Two nested maps (20 m inside 40 m) with a 40 m jump where one hands over to the other, 1000 azimuths | All inside the interval |
+| **Spec cross-check:** 3480 points on 120 Sun discs placed within 0.6° of the skyline, each tested with a direct 3D line of sight through the terrain (`lineofsight.ray_blocked`) | All 1294 points classified lit are reached by their ray; all 1239 classified blocked are stopped; 947 uncertain |
+| Smooth sphere, no map error | The exact horizon dip is inside the interval; error below ±0.0001° |
+| Error grows with the map's height error (none, 0.25 m, 1 m) and with its horizontal error (0, 5 m) | Yes, in every wedge |
+
+**The line-of-sight method.** A line of sight is followed out from the eye in steps of 1/8 of the finest pixel (closer near the eye) and compared with the terrain below or above each step. It shares no code with the skyline search, only the terrain surface. It is a sampling method, not a proof; that is why it is the referee and the skyline search is the product.
+
+Because it samples, its answer for a single azimuth is a range: the highest sample (a real terrain point, so the true skyline is at least this) and a ceiling (each sample raised by what the terrain could add within one sample gap: higher by the local slope, nearer by the gap, computed with the exact spherical formula). Each check uses the side that can expose a real error: the highest sample must not be above the interval, and the ceiling must not be below it.
+
+Found by review and fixed in this PR:
+
+- the horizontal-error term used only each pixel's own slope, which fails when the shift is longer than a pixel (the wall case above, where a clear direction was called blocked); it now uses the steepest slope within reach of the shift;
+- the referee did not allow for its own sampling at first; at the jump between two maps the true skyline was 0.0006° above every sample. Its ceiling now covers that.
+
+**Size of the error, 25 cones 1 to 6 km away, 2 m mast** (`skyline_err_deg`, degrees):
+
+| Map height error sigma | Mean | Largest |
+| --- | --- | --- |
+| none | 0.022 | 0.079 |
+| 0.5 m | 0.148 | 0.382 |
+| 1 m | 0.393 | 1.006 |
+
+(Printed by `test_error_grows_with_the_height_error_of_the_map`.)
+
+Without map error, what is left is how much the skyline genuinely varies inside one 0.1° wedge (the record has one value per wedge), plus the numerical error. With map error, the largest values come from ground a few hundred metres from the eye, which the model allows to be up to 3 sigma higher than the eye's own ground. These figures depend directly on the error model's three proposed values: 3 sigma, 6° of slope error, and no error relative to the eye within one pixel diagonal.
+
+**Not included in this bound:** the Sun and Earth positions themselves (up to 0.000027°, `docs/ACCURACY.md` above) and the flattening of the Earth's disc (up to 0.0012°), which belong to the browser's calculation, not to the terrain.
+
 ## Not yet verified
 
 - Elevation reading: the projection is verified (the engine's formulas agree with the projection declared inside the four coarse map files to better than a micrometre, `test_projection_is_the_one_the_map_files_declare`). Pixel registration against known features and published heights: with the LOLA reader.
-- The full skyline error bound (`skyline_err_deg`: map height error, horizontal error, numerical error) and the independent line-of-sight check: next pull request.
+- The error bound on the real maps, with their published per-pixel errors and horizontal accuracy (the horizontal accuracy of the LOLA product is still to be taken from its paper).
 - Skyline speed and interval width on the real maps.
 - Illumination against published south polar studies: with the real products.
