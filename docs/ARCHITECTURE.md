@@ -6,9 +6,9 @@ This page describes the code as it exists today. It grows with each pull request
 
 | Module | Job | Reads | Writes |
 | --- | --- | --- | --- |
-| `web/src/App.tsx` | Renders the mission dashboard, on-site terrain view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
-| `web/src/visual-model.ts` | Samples browser engine results into chart-ready points and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
-| `web/src/styles.css` | Provides the dark, glass-panel visual system and responsive layout for the dashboard and site view. | React class names | Browser styles |
+| `web/src/App.tsx` | Renders the mission console, on-site terrain view, curated-site map, timeline, comparison page and precision drawer. The selected card values use the exact worker evaluation; chart points remain sampled for fast rendering. | `DataBundle`, exact browser engine results, URL state | React UI state |
+| `web/src/visual-model.ts` | Samples browser engine results into chart-ready points, retains visibility bounds for sampled points, and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
+| `web/src/styles.css` | Provides the restrained mission-console visual system, uncertainty emphasis, accessible controls and responsive layout for the dashboard and site view. | React class names | Browser styles |
 | `python/scripts/download_data.py` | Downloads the NASA input files, four at a time and started in a fixed order, resumes after an interruption, and verifies size and checksum. Refuses to run twice in the same folder. Also answers "is this group of data on disk?" for the tests. | `python/data_files.json`, `python/data_checksums.json`, the NAIF and PGDA servers | `python/kernels/`, `python/dem/`, `python/data_checksums.json`, `python/dem/download.log`, `python/dem/download.lock`, and a `name.part.json` side file next to each partial download |
 | `python/tests/conftest.py` | Skips tests marked `realdata` while their data is missing and prints which ones were skipped. | What `download_data.missing_files` reports | Test report only |
 | `python/lunar_engine/geometry.py` | Exact geometry on the reference sphere: latitude/longitude to a direction, the local east/north/up frame, azimuth and elevation. | Nothing | Nothing |

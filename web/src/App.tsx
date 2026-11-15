@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
+import type { Evaluation } from "../engine/evaluate";
 import { panelPowerW } from "../engine/power";
-import type { DataBundle, Direction } from "../engine/runtime-types";
+import type { DataBundle, Direction, Visibility } from "../engine/runtime-types";
 import type { Site } from "../engine/types";
 import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
 import {
@@ -20,20 +21,9 @@ type ViewMode = "sky" | "terrain" | "map";
 type ExperienceMode = "beginner" | "expert";
 type Page = "dashboard" | "compare";
 
-interface WorkerEvents {
-  sunrise: number[];
-  sunset: number[];
-  earthrise: number[];
-  earthset: number[];
-}
-
-interface WorkerResult {
-  events?: WorkerEvents;
-}
-
 const PANEL = { type: "tracking" as const, area_m2: 4, efficiency: 0.25 };
 
-/** Render the focused mission dashboard without changing the existing astronomy engine. */
+/** Render the mission dashboard and keep the exact browser-engine result separate from chart samples. */
 export default function App() {
   const [bundle, setBundle] = useState<DataBundle>();
   const [loadError, setLoadError] = useState<string>();
@@ -45,7 +35,7 @@ export default function App() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [spanDays, setSpanDays] = useState(1);
   const [playing, setPlaying] = useState(false);
-  const [workerResult, setWorkerResult] = useState<WorkerResult>();
+  const [evaluation, setEvaluation] = useState<Evaluation>();
   const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
 
   useEffect(() => {
@@ -76,7 +66,10 @@ export default function App() {
     () => activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
     [activeDateMs, spanDays],
   );
-  const currentPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
+  const sampledPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
+  const currentPoint = evaluation && sampledPoint
+    ? pointFromEvaluation(evaluation, sampledPoint.batteryWh, activeScenario?.dateMs ?? sampledPoint.timeMs)
+    : sampledPoint;
 
   useEffect(() => {
     if (scenarios.length) saveScenariosToUrl(scenarios);
@@ -87,10 +80,10 @@ export default function App() {
     let cancelled = false;
     evaluateInWorker(bundle, activeScenario.siteId, activeScenario.dateMs, bounds.startMs, bounds.endMs)
       .then((result) => {
-        if (!cancelled) setWorkerResult(result as WorkerResult);
+        if (!cancelled) setEvaluation(result.directions && result.sunVisibility && result.earthVisibility ? result : undefined);
       })
       .catch(() => {
-        if (!cancelled) setWorkerResult(undefined);
+        if (!cancelled) setEvaluation(undefined);
       });
     return () => {
       cancelled = true;
@@ -115,11 +108,13 @@ export default function App() {
   function selectSite(siteId: string): void {
     const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
     if (existingIndex >= 0) {
+      setEvaluation(undefined);
       setActiveIndex(existingIndex);
       return;
     }
     if (!siteId) return;
     const dateMs = activeScenario?.dateMs ?? bundle?.ephemeris.label.t0_ms ?? Date.now();
+    setEvaluation(undefined);
     setScenarios((current) => [...current, { siteId, dateMs }].slice(-4));
     setActiveIndex(Math.min(scenarios.length, 3));
   }
@@ -127,7 +122,10 @@ export default function App() {
   /** Change the selected UTC instant without changing the active site. */
   function updateActiveDate(dateMs: number): void {
     if (!activeScenario || !Number.isFinite(dateMs)) return;
-    setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs } : scenario));
+    const table = bundle ? { startMs: bundle.ephemeris.label.t0_ms, endMs: bundle.ephemeris.label.t0_ms + (bundle.ephemeris.label.count - 1) * bundle.ephemeris.label.step_s * 1000 } : undefined;
+    const clamped = table ? Math.max(table.startMs, Math.min(table.endMs, dateMs)) : dateMs;
+    setEvaluation(undefined);
+    setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs: clamped } : scenario));
   }
 
   /** Remove a scenario from the comparison page's saved set. */
@@ -155,17 +153,18 @@ export default function App() {
     />;
   }
 
-  const nextSunset = workerResult?.events?.sunset.find((time) => time >= activeScenario.dateMs)
+  const nextSunset = evaluation?.events.sunset.find((time) => time >= activeScenario.dateMs)
     ?? (activeSummary.timeToSunsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToSunsetMs);
-  const nextSunrise = workerResult?.events?.sunrise.find((time) => time >= activeScenario.dateMs);
-  const nextEarthset = workerResult?.events?.earthset.find((time) => time >= activeScenario.dateMs)
+  const nextSunrise = evaluation?.events.sunrise.find((time) => time >= activeScenario.dateMs);
+  const nextEarthset = evaluation?.events.earthset.find((time) => time >= activeScenario.dateMs)
     ?? (activeSummary.timeToEarthsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToEarthsetMs);
-  const nextEarthrise = workerResult?.events?.earthrise.find((time) => time >= activeScenario.dateMs);
+  const nextEarthrise = evaluation?.events.earthrise.find((time) => time >= activeScenario.dateMs);
 
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => setPage("dashboard")}>Lunar Landing Site Navigator</button>
+        <button className="brand" type="button" onClick={() => setPage("dashboard")}><span className="brand-mark">◒</span><span>Lunar Landing Site Navigator</span></button>
+        <div className="topbar-context"><span className="eyebrow">Mission planning console</span><span>South polar visibility and power</span></div>
         <label className="top-control">Site
           <select value={activeSite.id} onChange={(event) => selectSite(event.target.value)} aria-label="Select site">
             {allSites.map((site) => <option value={site.id} key={site.id}>{site.name}</option>)}
@@ -184,7 +183,7 @@ export default function App() {
         </div>
       </header>
 
-      {bundle.manifest.data_kind === "mock" && <div className="mock-strip">Mock terrain data — not a mission verdict.</div>}
+      {bundle.manifest.data_kind === "mock" && <div className="mock-strip"><strong>Development dataset</strong><span>Mock terrain data is loaded. Astronomy is real, but terrain verdicts are not mission-ready.</span></div>}
       {introOpen && <IntroPanel onDismiss={dismissIntro} />}
 
       <div className="workspace">
@@ -202,14 +201,15 @@ export default function App() {
         </section>
 
         <aside className="status-column" aria-label="Mission status">
-          <StatusCard tone="sun" label="Sun" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={formatPercent(currentPoint.sunFraction)} exact={mode === "expert" ? `${formatDegrees(currentPoint.sun.el_deg)} elevation · ${formatDegrees(currentPoint.sun.az_deg)} azimuth` : undefined} />
+          <StatusCard tone="sun" label="Sun visibility" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={formatPercent(currentPoint.sunFraction)} range={fractionRange(currentPoint.sunVisibility, currentPoint.sunFraction)} exact={`${formatDegrees(currentPoint.sun.el_deg)} elevation · ${formatDegrees(currentPoint.sun.az_deg)} azimuth`} />
           <StatusCard label={currentPoint.sunStatus === "visible" ? "Time until sunset" : "Time until sunrise"} help="The next time the Sun changes between visible and hidden, based on the current terrain skyline." value={formatDuration(durationUntil(currentPoint.sunStatus === "visible" ? nextSunset : nextSunrise, activeScenario.dateMs))} />
-          <StatusCard tone="earth" label="Earth" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} exact={mode === "expert" ? `${formatDegrees(currentPoint.earth.el_deg)} elevation · ${formatDegrees(currentPoint.earth.az_deg)} azimuth` : undefined} />
-          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={formatPower(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} exact={mode === "expert" ? `${Math.round(currentPoint.batteryWh)} Wh battery · 120 W load` : `Battery ${formatPercent(currentPoint.batteryWh / 2400)}`} />
+          <StatusCard tone="earth" label="Earth contact" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatPercent(currentPoint.earthFraction)} range={fractionRange(currentPoint.earthVisibility, currentPoint.earthFraction)} exact={`${formatDegrees(currentPoint.earth.el_deg)} elevation · ${formatDegrees(currentPoint.earth.az_deg)} azimuth`} />
+          <StatusCard label="Next Earthset" help="The next terrain-aware Earthset found in the selected UTC window." value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} />
+          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={formatPower(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} exact={`Battery ${Math.round(currentPoint.batteryWh)} Wh · 120 W load`} />
         </aside>
       </div>
 
-      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={() => setPlaying((current) => !current)} onChange={updateActiveDate} bounds={bounds} />
+      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={() => { setEvaluation(undefined); setPlaying((current) => !current); }} onChange={updateActiveDate} bounds={bounds} />
 
       {detailsOpen && <DetailsDrawer
         summary={activeSummary}
@@ -223,6 +223,27 @@ export default function App() {
 /** Find the timeline sample closest to a selected UTC instant. */
 function nearestPoint(points: TimelinePoint[], timeMs: number): TimelinePoint | undefined {
   return points.reduce<TimelinePoint | undefined>((best, point) => !best || Math.abs(point.timeMs - timeMs) < Math.abs(best.timeMs - timeMs) ? point : best, undefined);
+}
+
+/** Convert the exact worker evaluation into the card shape without losing the chart battery sample. */
+function pointFromEvaluation(result: Evaluation, batteryWh: number, timeMs: number): TimelinePoint {
+  return {
+    timeMs,
+    sun: result.directions.sun,
+    earth: result.directions.earth,
+    sunVisibility: result.sunVisibility,
+    earthVisibility: result.earthVisibility,
+    sunFraction: result.sunVisibility.fraction,
+    earthFraction: result.earthVisibility.fraction,
+    sunStatus: result.sunVisibility.status,
+    earthStatus: result.earthVisibility.status,
+    batteryWh,
+  };
+}
+
+/** Format the proven lower and upper visibility bounds shown beside a nominal fraction. */
+function fractionRange(visibility: Visibility | undefined, nominal: number): string {
+  return visibility ? `${formatPercent(visibility.fraction_low)}–${formatPercent(visibility.fraction_high)} proven range` : `${formatPercent(nominal)} sampled estimate`;
 }
 
 /** Convert an event timestamp into a non-negative countdown. */
@@ -246,8 +267,8 @@ function IntroPanel({ onDismiss }: { onDismiss: () => void }) {
 }
 
 /** Render one compact status card with optional exact values for expert mode. */
-function StatusCard({ tone, label, status, value, exact, help }: { tone?: "sun" | "earth"; label: string; status?: string; value: string; exact?: string; help: string }) {
-  return <article className={`status-card ${tone ?? ""}`}><div className="status-card-heading"><span>{label}</span><Tooltip text={help} /></div>{status && <strong className="status-word">{status}</strong>}<strong className="status-value">{value}</strong>{exact && <small>{exact}</small>}</article>;
+function StatusCard({ tone, label, status, value, range, exact, help }: { tone?: "sun" | "earth"; label: string; status?: string; value: string; range?: string; exact?: string; help: string }) {
+  return <article className={`status-card ${tone ?? ""}`}><div className="status-card-heading"><span>{label}</span><Tooltip text={help} /></div>{status && <strong className="status-word">{status}</strong>}<strong className="status-value">{value}</strong>{range && <small className="status-range">{range}</small>}{exact && <small>{exact}</small>}</article>;
 }
 
 /** Render the primary sky view with terrain, body paths, and current body positions. */
@@ -265,7 +286,7 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
   const sunScreen = skyPoint(currentPoint.sun.az_deg, currentPoint.sun.el_deg, width, height, range.min, range.max);
   const earthScreen = skyPoint(currentPoint.earth.az_deg, currentPoint.earth.el_deg, width, height, range.min, range.max);
   return <section className="view-panel sky-panel">
-    <div className="view-title"><div><p className="eyebrow">Current sky · curated site</p><h1>{summary.site.name}</h1><p className="coordinate-line">{summary.site.lat.toFixed(3)}° latitude <span>·</span> {summary.site.lon.toFixed(3)}° longitude</p></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
+    <div className="view-title"><div><p className="eyebrow">Current sky · curated site</p><h1>{summary.site.name}</h1>    <p className="coordinate-line"><span>{summary.site.lat.toFixed(3)}° latitude</span><span>·</span><span>{summary.site.lon.toFixed(3)}° longitude</span></p></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
     <svg className="sky-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Skyline with Sun and Earth paths">
       <line x1="0" y1={height - ((0 - range.min) / (range.max - range.min)) * height} x2={width} y2={height - ((0 - range.min) / (range.max - range.min)) * height} className="horizon" />
       <polyline points={skylinePoints.map((point) => `${point.x},${point.y}`).join(" ")} className="skyline-line" />
@@ -281,7 +302,7 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
 /** Render a lightweight terrain view from the prepared display-only patch. */
 function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: Site }) {
   const patch = bundle?.terrain.get(site.id);
-  if (!patch) return <section className="view-panel unavailable"><p className="eyebrow">On-site view · curated site</p><h1>Site view</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p><p>Terrain patch unavailable for this point.</p></section>;
+  if (!patch) return <section className="view-panel unavailable"><p className="eyebrow">On-site view · curated site</p><h1>Site view</h1><p className="coordinate-line"><span>{site.lat.toFixed(3)}° latitude</span><span>·</span><span>{site.lon.toFixed(3)}° longitude</span></p><p>Terrain patch unavailable for this point.</p></section>;
   const size = patch.label.n;
   const samples = Array.from({ length: 11 }, (_, row) => Array.from({ length: 11 }, (_, column) => {
     const sourceRow = Math.round((row / 10) * (size - 1));

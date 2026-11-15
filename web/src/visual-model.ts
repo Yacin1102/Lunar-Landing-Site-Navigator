@@ -2,13 +2,15 @@ import { classifyVisibility } from "../engine/visibility";
 import { directionsAt, discRadiusDeg, skylineAt, timetableSpan } from "../engine/astro";
 import { evaluateSite } from "../engine/evaluate";
 import { panelPowerW, simulateBattery } from "../engine/power";
-import type { DataBundle, Direction, MissionMetrics } from "../engine/runtime-types";
+import type { DataBundle, Direction, MissionMetrics, Visibility } from "../engine/runtime-types";
 import type { Site, Skyline } from "../engine/types";
 
 export interface TimelinePoint {
   timeMs: number;
   sun: Direction;
   earth: Direction;
+  sunVisibility?: Visibility;
+  earthVisibility?: Visibility;
   sunFraction: number;
   earthFraction: number;
   sunStatus: "visible" | "blocked" | "uncertain";
@@ -58,6 +60,8 @@ export function buildTimeline(
       timeMs,
       sun: directions.sun,
       earth: directions.earth,
+      sunVisibility: sun,
+      earthVisibility: earth,
       sunFraction: sun.fraction,
       earthFraction: earth.fraction,
       sunStatus: sun.status,
