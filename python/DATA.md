@@ -128,8 +128,40 @@ The decompressed copies and tables take about 42 GB in `python/dem/cache/` (neve
 
 ## Group 4: 5 m site maps (`python/dem/`)
 
-Source: PGDA product 78, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/` (Barker et al. 2021). No files are listed yet. When the 10 sites are chosen, the surface and total-error maps of each site that lies inside one of the product's 27 regions are added to `data_files.json` and to this section.
+Source: PGDA product 78, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/` (Barker et al. 2021, *Planet. Space Sci.* 203, 105119). Files go to `python/dem/sites5m/`, keeping the server's folders. Chosen on 2026-11-15 (option B in `docs/PROGRESS.md`): 65 files, 3.05 GB. Sizes and dates were read from the server on 2026-11-15.
+
+**Why.** The ground close to a site decides its skyline most, and there a small height error moves the skyline most. These maps are twice as fine as the 10 m map and come with a measured slope error, which can replace the general 6° of the error bound.
+
+The 10 error clones per site are not part of the bound. A bound must be a proven worst case, and clones are samples, so they are used to check it: the skyline of every clone must lie inside the bound. Ten per site are enough to catch a bound that is too narrow. The other 90 published clones are not downloaded.
+
+**Which sites.** The server has six site folders. Five of them hold curated sites:
+
+- Barker et al. 2021 state that Sites 1, 4, 7 and 11 are De Rosa's CR1, SR1, SV1 and GR1, and that Sites 1 and 4 are Gläser's C1 and S.
+- Site23 is the Malapert massif.
+- Site20, the Leibnitz beta plateau, is about 20 km from the IM-2 point, so it is not used.
+
+Each map's header was read on 2026-11-15 without downloading the file. All five use the projection `+proj=stere +lat_0=-90 +lat_ts=-90 +lon_0=0 +x_0=0 +y_0=0 +R=1737400 +units=m`, the same as the main maps, with 5 m pixels, float32 values and NaN as no-data. Each contains its site, at least 6.4 km from the map edge:
+
+- Site01, 04, 07 and 11 are 3200 x 3200 pixels (16 km).
+- Site23 is 4200 x 4200 pixels (21 km).
+
+The PGDA README says:
+
+- `_surf` is "surface height Z (meters)";
+- `_toterr` is "Total Z uncertainty in meters (formally, the RMS error)";
+- `_slperr` is "Slope uncertainty in degrees (formally, the RMS error)";
+- `Clones/` is "100 clones of LDEM".
+
+These maps are in the Mean Earth frame of DE421, like the main maps.
+
+| Folder | Site | Maps | Clones used | Size |
+| --- | --- | --- | --- | --- |
+| Site01 | `connecting_ridge` | `Site01_final_adj_5mpp_surf.tif`, `Site01_final_adj_5mpp_toterr.tif`, `Site01_final_adj_5mpp_slperr.tif` | `Site01_final_adj_5mpp_0001_err.tif`, `Site01_final_adj_5mpp_0002_err.tif`, `Site01_final_adj_5mpp_0003_err.tif`, `Site01_final_adj_5mpp_0004_err.tif`, `Site01_final_adj_5mpp_0005_err.tif`, `Site01_final_adj_5mpp_0006_err.tif`, `Site01_final_adj_5mpp_0007_err.tif`, `Site01_final_adj_5mpp_0008_err.tif`, `Site01_final_adj_5mpp_0009_err.tif`, `Site01_final_adj_5mpp_0010_err.tif` | 533 MB |
+| Site04 | `shackleton_rim` | `Site04_final_adj_5mpp_surf.tif`, `Site04_final_adj_5mpp_toterr.tif`, `Site04_final_adj_5mpp_slperr.tif` | `Site04_final_adj_5mpp_0001_err.tif`, `Site04_final_adj_5mpp_0002_err.tif`, `Site04_final_adj_5mpp_0003_err.tif`, `Site04_final_adj_5mpp_0004_err.tif`, `Site04_final_adj_5mpp_0005_err.tif`, `Site04_final_adj_5mpp_0006_err.tif`, `Site04_final_adj_5mpp_0007_err.tif`, `Site04_final_adj_5mpp_0008_err.tif`, `Site04_final_adj_5mpp_0009_err.tif`, `Site04_final_adj_5mpp_0010_err.tif` | 533 MB |
+| Site07 | `peak_near_shackleton` | `Site07_final_adj_5mpp_surf.tif`, `Site07_final_adj_5mpp_toterr.tif`, `Site07_final_adj_5mpp_slperr.tif` | `Site07_final_adj_5mpp_0001_err.tif`, `Site07_final_adj_5mpp_0002_err.tif`, `Site07_final_adj_5mpp_0003_err.tif`, `Site07_final_adj_5mpp_0004_err.tif`, `Site07_final_adj_5mpp_0005_err.tif`, `Site07_final_adj_5mpp_0006_err.tif`, `Site07_final_adj_5mpp_0007_err.tif`, `Site07_final_adj_5mpp_0008_err.tif`, `Site07_final_adj_5mpp_0009_err.tif`, `Site07_final_adj_5mpp_0010_err.tif` | 533 MB |
+| Site11 | `de_gerlache_rim` | `Site11_final_adj_5mpp_surf.tif`, `Site11_final_adj_5mpp_toterr.tif`, `Site11_final_adj_5mpp_slperr.tif` | `Site11_final_adj_5mpp_0001_err.tif`, `Site11_final_adj_5mpp_0002_err.tif`, `Site11_final_adj_5mpp_0003_err.tif`, `Site11_final_adj_5mpp_0004_err.tif`, `Site11_final_adj_5mpp_0005_err.tif`, `Site11_final_adj_5mpp_0006_err.tif`, `Site11_final_adj_5mpp_0007_err.tif`, `Site11_final_adj_5mpp_0008_err.tif`, `Site11_final_adj_5mpp_0009_err.tif`, `Site11_final_adj_5mpp_0010_err.tif` | 533 MB |
+| Site23 | `malapert_massif` | `Site23_final_adj_5mpp_surf.tif`, `Site23_final_adj_5mpp_toterr.tif`, `Site23_final_adj_5mpp_slperr.tif` | `Site23_final_adj_5mpp_0001_err.tif`, `Site23_final_adj_5mpp_0002_err.tif`, `Site23_final_adj_5mpp_0003_err.tif`, `Site23_final_adj_5mpp_0004_err.tif`, `Site23_final_adj_5mpp_0005_err.tif`, `Site23_final_adj_5mpp_0006_err.tif`, `Site23_final_adj_5mpp_0007_err.tif`, `Site23_final_adj_5mpp_0008_err.tif`, `Site23_final_adj_5mpp_0009_err.tif`, `Site23_final_adj_5mpp_0010_err.tif` | 918 MB |
 
 ## Not downloaded
 
-Effective-resolution maps (disk budget), hillshades, roughness products, point clouds and PSR products.
+Effective-resolution maps (disk budget), hillshades, roughness products, point clouds and PSR products. From the 5 m product: the slope maps (`_slp`, computed here from the heights), the count maps (`_ldec`), the point clouds (`.xyzi`), clones 11 to 100, and the Site20 folder.
