@@ -192,7 +192,7 @@ export default function App() {
           <div className="view-tabs" role="tablist" aria-label="Mission views">
             {(["sky", "terrain", "map"] as ViewMode[]).map((tab) => (
               <button type="button" role="tab" aria-selected={view === tab} className={view === tab ? "view-tab active" : "view-tab"} onClick={() => setView(tab)} key={tab}>
-                {tab === "sky" ? "Sky view" : tab === "terrain" ? "3D view" : "Map"}
+                {tab === "sky" ? "Dashboard" : tab === "terrain" ? "Site view" : "Site map"}
               </button>
             ))}
           </div>
@@ -265,7 +265,7 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
   const sunScreen = skyPoint(currentPoint.sun.az_deg, currentPoint.sun.el_deg, width, height, range.min, range.max);
   const earthScreen = skyPoint(currentPoint.earth.az_deg, currentPoint.earth.el_deg, width, height, range.min, range.max);
   return <section className="view-panel sky-panel">
-    <div className="view-title"><div><p className="eyebrow">Current sky</p><h1>{summary.site.name}</h1></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
+    <div className="view-title"><div><p className="eyebrow">Current sky · curated site</p><h1>{summary.site.name}</h1><p className="coordinate-line">{summary.site.lat.toFixed(3)}° latitude <span>·</span> {summary.site.lon.toFixed(3)}° longitude</p></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
     <svg className="sky-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Skyline with Sun and Earth paths">
       <line x1="0" y1={height - ((0 - range.min) / (range.max - range.min)) * height} x2={width} y2={height - ((0 - range.min) / (range.max - range.min)) * height} className="horizon" />
       <polyline points={skylinePoints.map((point) => `${point.x},${point.y}`).join(" ")} className="skyline-line" />
@@ -281,7 +281,7 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
 /** Render a lightweight terrain view from the prepared display-only patch. */
 function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: Site }) {
   const patch = bundle?.terrain.get(site.id);
-  if (!patch) return <section className="view-panel unavailable"><h1>3D view</h1><p>Terrain patch unavailable for this point.</p></section>;
+  if (!patch) return <section className="view-panel unavailable"><p className="eyebrow">On-site view · curated site</p><h1>Site view</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p><p>Terrain patch unavailable for this point.</p></section>;
   const size = patch.label.n;
   const samples = Array.from({ length: 11 }, (_, row) => Array.from({ length: 11 }, (_, column) => {
     const sourceRow = Math.round((row / 10) * (size - 1));
@@ -289,7 +289,7 @@ function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: S
     return patch.values[sourceRow * size + sourceColumn] ?? 0;
   }));
   const max = Math.max(...samples.flat(), 1);
-  return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch</p><h1>3D view</h1></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><p className="view-caption">{patch.label.size_m.toFixed(0)} m patch · {patch.label.spacing_m.toFixed(0)} m spacing</p></section>;
+  return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch · on-site view</p><h1>Site view</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="site-view-frame"><div className="site-view-sky" /><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><span className="site-view-pin" aria-hidden="true" /></div><div className="site-view-labels"><span>North</span><span>Observer position</span><span>South pole region</span></div><p className="view-caption">{patch.label.size_m.toFixed(0)} m prepared patch · {patch.label.spacing_m.toFixed(0)} m sample spacing</p></section>;
 }
 
 /** Render the data-driven south-polar map for selecting one of the curated sites. */

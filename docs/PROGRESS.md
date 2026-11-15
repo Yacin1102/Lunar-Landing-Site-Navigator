@@ -4,6 +4,8 @@
 
 **Next:** review and merge PR #22 (cleanup), then PR B (the web engine audit, stacked on it). After that: bring the 3D view from `yacin1102-lunar-web-3d` into `main`.
 
+**Web UI:** the browser app now presents a dashboard view for the skyline and mission timeline plus a separate on-site view for the prepared terrain patch. Coordinates are displayed from the curated `sites.json` records; custom coordinate evaluation remains intentionally removed.
+
 **Done in PR B (web engine audit):** 13 findings, each shown with the engine's real output before the fix and asserted by a test after it (`docs/WEB_AUDIT.md`). The most serious:
 - The worker's site height was NaN, so it produced no events or metrics.
 - The skyline was interpolated, which could call a blocked Sun clear.
