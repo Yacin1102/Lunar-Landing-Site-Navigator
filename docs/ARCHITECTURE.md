@@ -15,6 +15,9 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/skyline.py` | The skyline: for every azimuth wedge, a guaranteed interval for the highest elevation angle of any terrain, found by proving which areas cannot matter. | An `ElevationSource` | Nothing (returns a `SkylineResult`) |
 | `python/lunar_engine/uncertainty.py` | The error bound `skyline_err_deg`: runs the skyline on the map raised and lowered by the error allowed at each point, and combines the results. | An `ElevationSource` with its error maps | Nothing (returns `SkylineBounds`) |
 | `python/lunar_engine/lineofsight.py` | The independent check: lines of sight traced through the terrain, and the skyline at single exact azimuths by dense sampling. Shares no code with the skyline search. | An `ElevationSource` | Nothing |
+| `python/lunar_engine/records.py` | The one place a Contract 3 skyline record is made (rounded so its interval never shrinks, checked against the contract) and written. Shared by the Builder and the live API. | `uncertainty` | `skylines/{id}.json` |
+| `python/lunar_engine/server.py` | The live API (Contract 7): `/api/health` and `/api/skyline`, input checks, rounding, cache, CORS. | An `ElevationSource` | HTTP responses |
+| `python/scripts/serve.py` | Starts the live API on port 8000; `--synthetic` serves an invented landscape. | `server` | Nothing |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -142,6 +145,32 @@ The interval of a wedge contains the skyline at every single azimuth in it, for 
 So a direction above the interval is certainly clear, and one below it is certainly blocked.
 
 The allowed error at a point is `min(E(x) + E(site), max(0, D - r0) * tan(6°))`, with `E = 3 * sigma + horizontal error * local slope`, `D` the distance from the site and `r0` one pixel diagonal. The reasons for each part are in the docstring of `uncertainty.py`; the values are proposals awaiting approval (`docs/PROGRESS.md`).
+
+## A live API request
+
+```mermaid
+sequenceDiagram
+    participant Web as Web app (browser)
+    participant API as server.py
+    participant Cache as Cache
+    participant Rec as records.skyline_record
+    participant Eng as skyline + uncertainty
+    Web->>API: GET /api/skyline?lat&lon&mast_m
+    API->>API: check every parameter (400 / 422 if bad)<br/>round the point, nudge off the pole
+    API->>Cache: seen this point and settings?
+    alt in the cache
+        Cache-->>API: record
+    else new
+        API->>Rec: point, mast, wedge width
+        Rec->>Eng: nominal, raised and lowered skylines
+        Eng-->>Rec: interval per wedge (or CoverageError)
+        Rec-->>API: Contract 3 record, checked against its schema
+        API->>Cache: store
+    end
+    API-->>Web: record (same as skylines/{id}.json would be)
+```
+
+The Builder will write `skylines/{id}.json` with the same `records.skyline_record` (it comes with the real products), so a live answer and a file for the same point and settings are identical; a test writes a file with it and compares it with the live answer byte for byte.
 
 ## Timetable and fixtures
 

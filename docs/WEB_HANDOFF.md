@@ -11,7 +11,7 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | Mock data, contract-exact | `web/public/data-mock/` | Ready: sites, skylines, terrain patches, shade grids, manifest |
 | Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
 | Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
-| Live API | `http://localhost:8000/api/...` | Coming (engine PR 7), with a synthetic-terrain mode first. Response types are final now |
+| Live API | `http://localhost:8000/api/...` | Running on synthetic terrain: `python python/scripts/serve.py --synthetic`. Real terrain comes with the map reader |
 | Real data | `web/public/data/` | Built after the NASA maps finish downloading |
 
 To start in a separate working copy:
@@ -163,15 +163,18 @@ The disc spans several skyline entries (about five at a step of 0.1 degrees). Us
 
 ## The live API
 
-Types: `Skyline`, `ApiHealth`, `ApiError`. Not running yet; it arrives with engine PR 7.
+Types: `Skyline`, `ApiHealth`, `ApiError`.
+
+Start it from the repository root with `.venv\Scripts\python python/scripts/serve.py --synthetic`. It listens on `http://localhost:8000` (the default `VITE_API_BASE_URL` of the web app) and allows requests from `http://localhost:5173`, the Vite dev server. On synthetic terrain it covers only about 0.8 degrees round the pole (`/api/health` gives the exact limit). A new point takes several seconds to compute (three skyline runs, for the error bound); the same point again is answered from a cache at once.
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
 | `GET /api/health` | none | `ApiHealth`: `ok`, `real_terrain`, `service_region`, and the accepted and default values of `az_step_deg` and `mast_m` |
 | `GET /api/skyline` | `lat`, `lon`, optional `mast_m`, optional `az_step_deg` | `Skyline`, identical in structure to `skylines/{id}.json` |
 
-- Refused requests return `ApiError` with HTTP 400 (bad or missing value) or 422 (point outside the service region). Show `error.message`.
-- The response's `lat` and `lon` are the point actually used, after rounding. Use those, not the ones you sent.
+- Accepted values: `mast_m` from 0 to 100 m (default 2); `az_step_deg` one of 0.05, 0.1, 0.2, 0.25, 0.5, 1 (default 0.1). Any other parameter is refused.
+- Refused requests return `ApiError` with HTTP 400 (bad or missing value), 422 (point outside the service region, or so close to the edge of the data that terrain beyond it could matter) or 500 (a bug). Show `error.message`.
+- The response's `lat` and `lon` are the point actually used: rounded to 5 decimals, and a point closer to the pole than latitude -89.99999 is moved there so that north is defined. Use those, not the ones you sent.
 - If `real_terrain` is false the server is running on synthetic terrain: treat its answers like mock data.
 - Custom points get every number and 2D chart, but no 3D view: there is no terrain or shade endpoint.
 

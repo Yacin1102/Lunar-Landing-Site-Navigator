@@ -13,9 +13,12 @@ Plan approved on 2026-11-14.
 | 3 Timetable and fixtures | Merged (PRs #6 and #10) |
 | 4 Elevation interface and synthetic terrain | Merged (PR #7) |
 | 5 Skyline core | Built, in review (PR #12) |
-| 6 Error bound and independent check | Built, in review |
-| 7 Record writer and live API | **Next** |
-| 8 to 11 | Not started |
+| 6 Error bound and independent check | Built, in review (PR #13) |
+| 7 Record writer and live API | Built, in review |
+| 8 LOLA reader | **Next** |
+| 9 to 11 | Not started |
+
+To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
 The web app (`web/`) is built separately and merged into `main` (PR #9). Engine work is done in a separate git worktree and never changes files under `web/` except the agreed data files, so the two do not conflict.
 
@@ -25,7 +28,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 6): 185 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 7): 212 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -202,6 +205,7 @@ Decided on 2026-11-15 (you asked me to follow my recommendations):
 - **Eye at ground level:** the live API accepts `mast_m = 0`. The answer stays proven; on steep ground it is more often "uncertain".
 - **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the 100 published error clones per site to measure the spread of the skyline (PRs 8 and 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
 - **All contract interpretations below are in force.**
+- **Live API values (PR 7):** wedge width default 0.1°, accepted 0.05, 0.1, 0.2, 0.25, 0.5 and 1°; mast default 2 m, accepted 0 to 100 m; custom points rounded to 5 decimals of a degree (at most about 0.6 m along a meridian) and moved no closer to the pole than latitude -89.99999; unknown parameters refused; CORS allows the Vite dev server (`http://localhost:5173`).
 
 ## Contract interpretations awaiting approval
 
@@ -223,7 +227,7 @@ PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where th
 14. **Limits the schemas enforce beyond the spec's wording**: exactly 10 sites; `t0_ms` exactly 1794787200000 and the last row at or after 1 Jan 2040; `service_region.lat_max` south of the equator; `category` made of lowercase letters, digits, `_` and `-`; `date_utc` in ISO 8601 form; no NaN or Infinity anywhere.
 15. **What `skyline_deg +/- skyline_err_deg` covers.** The spec says each entry is "the true maximum over its whole wedge" and "blocked" is "below skyline - error". A wedge's maximum alone cannot prove "blocked": light can pass through a dip narrower than the wedge (a test shows it). So the interval is made to contain the skyline at every azimuth of the wedge. It still contains the wedge's maximum, as the spec requires, and "lit" and "blocked" both become provable. The reported `skyline_deg` is the middle of that interval, not the maximum itself.
 
-Still to be fixed, with the PR that needs them: the default and accepted `az_step_deg` and the default `mast_m` (PR 7; the mock uses 0.1 degrees and 2 m), the rounding of custom points (PR 7), the category names (PR 9), and the Sun and Earth radii used for disc edges (PR 3).
+Still to be fixed, with the PR that needs them: the category names (PR 9). (The API values and rounding were fixed in PR 7, the disc radii in PR 3.)
 
 ## Error model for `skyline_err_deg` (decided 2026-11-15)
 
