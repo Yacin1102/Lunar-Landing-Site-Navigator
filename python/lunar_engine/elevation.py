@@ -212,6 +212,7 @@ class HeightGrid:
         self._disc: tuple[float, float, float] | None = None
         self._slopes: np.ndarray | None = None
         self._slope_bounds: np.ndarray | None = None
+        self._shift_allowances: dict = {}
 
     @property
     def has_errors(self) -> bool:
@@ -333,6 +334,46 @@ class HeightGrid:
                     block = np.fmax(block, padded[1 + dr:1 + dr + rows_n, 1 + dc:1 + dc + cols_n])
             self._slope_bounds = np.sqrt(2.0) * block
         return self._slope_bounds[rows, cols]
+
+    def shift_allowance(self, shift_m: float) -> np.ndarray:
+        """How much a sideways shift of the whole map can change each pixel's height (cached).
+
+        If the map is really ``s`` metres off sideways (``|s| <= shift_m``),
+        the true height at a point ``x`` is the map's height at ``x - s``.
+        Along the straight line between the two the height changes by at
+        most ``shift_m`` times the steepest gradient on that line. For a pixel
+        ``p`` this takes the steepest bound (:meth:`slope_bound`) among all
+        pixels within ``shift_m + 2 * sqrt(2) * pixel`` of it. The margin of
+        two pixel diagonals makes the bound hold also for the blended surface
+        between pixel centres: any point is within one diagonal of each
+        corner of its cell, and any gradient is bounded at a pixel within one
+        diagonal of where it occurs. (Found by review: using only the pixel's
+        own slope fails when the shift is longer than a pixel.)
+
+        Args:
+            shift_m: the map's horizontal accuracy, metres.
+
+        Returns:
+            Metres, per pixel (an array like the heights).
+        """
+        key = float(shift_m)
+        if key not in self._shift_allowances:
+            if key <= 0.0:
+                self._shift_allowances[key] = np.zeros(self._heights.shape)
+            else:
+                rows, cols = np.indices(self._heights.shape)
+                bound = np.nan_to_num(self.slope_bound(rows, cols))
+                reach = int(np.ceil((key + 2.0 * np.sqrt(2.0) * self.spec.pixel_m) / self.spec.pixel_m))
+                padded = np.pad(bound, reach, constant_values=0.0)
+                steepest = np.zeros(bound.shape)
+                n_rows, n_cols = bound.shape
+                for dr in range(-reach, reach + 1):
+                    for dc in range(-reach, reach + 1):
+                        if np.hypot(dr, dc) <= reach:
+                            steepest = np.maximum(steepest, padded[reach + dr:reach + dr + n_rows,
+                                                                   reach + dc:reach + dc + n_cols])
+                self._shift_allowances[key] = key * steepest
+        return self._shift_allowances[key]
 
     def disc(self) -> tuple[float, float, float]:
         """The disc on the sheet inside which this map is trusted (cached).

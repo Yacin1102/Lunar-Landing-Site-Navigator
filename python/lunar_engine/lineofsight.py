@@ -22,9 +22,11 @@ How it works, in plain words
     A line is also given up as clear once it is higher above the reference
     sphere than any terrain could be and still climbing.
 
-    This is a sampling method, not a proof: a feature narrower than a step
-    could slip between two steps. Steps of 1/8 pixel on a surface that is
-    smooth between pixel centres make that a matter of millimetres.
+    This is a sampling method, not a proof: between two steps the terrain
+    can rise a little above both. :func:`azimuth_profile` therefore also
+    returns how much higher the true skyline could be than the samples show
+    (the steepest slope near each sample times half a step, seen from that
+    distance), so a test can tell a real disagreement from sampling.
 
 Units: degrees and metres.
 """
@@ -131,22 +133,40 @@ def ray_blocked(source: ElevationSource, lat_deg: float, lon_deg: float, mast_m:
 
 
 def azimuth_profile(source: ElevationSource, lat_deg: float, lon_deg: float, mast_m: float,
-                    az_deg, max_distance_m: float | None = None) -> np.ndarray:
+                    az_deg, max_distance_m: float | None = None, with_bound: bool = False):
     """The skyline at exact azimuths, by dense sampling along each azimuth, degrees.
 
-    For each azimuth, the terrain is sampled every 1/8 of the finest pixel
-    along the ground, out to the edge of the data, and the highest elevation
-    angle seen from the eye is returned. This equals the lowest elevation at
-    which a line of sight in that azimuth clears the terrain.
+    For each azimuth, the terrain is sampled along the ground out to the edge
+    of the data, and the highest elevation angle seen from the eye is
+    returned. This equals the lowest elevation at which a line of sight in
+    that azimuth clears the terrain. Samples are 1/8 of the finest pixel
+    apart, and closer near the eye (at most 1/500 of the distance), where a
+    step is a large angle.
+
+    Args:
+        with_bound: also return, per azimuth, a value the true skyline cannot
+            exceed. Within one gap of a sample the terrain can be higher by
+            the steepest slope near it times the gap, and nearer by the gap;
+            each sample's elevation is raised by what both together can add.
+            The true skyline lies between the two returned values.
+
+    Returns:
+        The sampled skyline, or ``(sampled, ceiling)`` with ``with_bound``.
     """
     east, north, up = enu_frame(lat_deg, lon_deg)
     elev = source.height(lat_deg, lon_deg)
     eye = (R_MOON_M + elev + mast_m) * up
     step = source.grids[0].spec.pixel_m / 8.0
     reach = max_distance_m if max_distance_m is not None else _reach_m(source, up)
-    t = np.arange(EXCLUDE_RADIUS_M, reach, step) / R_MOON_M
+    near = [EXCLUDE_RADIUS_M]
+    while near[-1] * 0.002 < step and near[-1] < reach:
+        near.append(near[-1] * 1.002)
+    s = np.concatenate([near, np.arange(near[-1] + step, reach, step)])
+    gap = np.maximum(np.diff(s, prepend=s[0]), np.diff(s, append=s[-1]))     # to either neighbour
+    t = s / R_MOON_M
     az = np.radians(np.atleast_1d(np.asarray(az_deg, dtype=float)))
     out = np.empty(len(az))
+    ceiling = np.empty(len(az))
     for start in range(0, len(az), 16):
         a = az[start:start + 16]
         heading = np.cos(a)[:, None] * north + np.sin(a)[:, None] * east
@@ -156,4 +176,37 @@ def azimuth_profile(source: ElevationSource, lat_deg: float, lon_deg: float, mas
         d = (R_MOON_M + h)[..., None] * u - eye
         el = np.degrees(np.arctan2(d @ up, np.hypot(d @ east, d @ north)))
         out[start:start + 16] = np.nanmax(el, axis=1)
-    return out
+        if with_bound:
+            # Within one gap of a sample the terrain can be higher by the slope
+            # times the gap and nearer by the gap; nearer terrain at the same
+            # height looks higher by tan(el) times the gap over the distance.
+            # (Found by test: at the edge between two maps the terrain jumps,
+            # and the highest point can be up to a gap nearer than any sample.)
+            # Exactly: terrain no higher than h + slope * gap, between s - gap and
+            # s + gap away, seen from the eye at radius re. For terrain at radius
+            # r and angle t at the Moon's centre, tan(el) = (r cos t - re) /
+            # (r sin t), which rises until cos t = r / re and falls after.
+            slope = _slope_near(source, x.ravel(), y.ravel()).reshape(x.shape)
+            r = R_MOON_M + h + slope * gap[None, :]
+            re = float(np.linalg.norm(eye))
+            t_lo = (np.maximum(s - gap, 0.5 * s) / R_MOON_M)[None, :]
+            t_hi = ((s + gap) / R_MOON_M)[None, :]
+            t_star = np.arccos(np.clip(r / re, -1.0, 1.0))
+            tt = np.minimum(np.maximum(t_star, t_lo), t_hi)
+            highest = np.degrees(np.arctan2(r * np.cos(tt) - re, r * np.sin(tt)))
+            ceiling[start:start + 16] = np.nanmax(highest, axis=1) + 1e-9
+    return (out, ceiling) if with_bound else out
+
+
+def _slope_near(source: ElevationSource, x, y) -> np.ndarray:
+    """Steepest slope of the surface near sheet points, from every map that covers them."""
+    steepest = np.zeros(len(x))
+    for grid in source.grids:
+        spec = grid.spec
+        col, row = spec.col_of_x(x), spec.row_of_y(y)
+        inside = (col >= 0) & (col <= spec.n_cols - 1) & (row >= 0) & (row <= spec.n_rows - 1)
+        r = np.clip(np.round(row), 0, spec.n_rows - 1).astype(np.int64)
+        c = np.clip(np.round(col), 0, spec.n_cols - 1).astype(np.int64)
+        steepest = np.fmax(steepest, np.where(inside, grid.slope_bound(r, c), 0.0))
+    # A map boundary can also make the surface jump between neighbouring samples.
+    return steepest

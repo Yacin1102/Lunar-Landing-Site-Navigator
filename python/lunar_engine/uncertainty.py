@@ -33,13 +33,15 @@ The error model (proposed; see ``docs/PROGRESS.md``)
 
         allowed(x) = min( E(x) + E(site),  max(0, D(x) - r0) * tan(SLOPE_ERROR_DEG) )
 
-    where ``E = K_SIGMA * sigma + horizontal_error * slope``:
+    where ``E = K_SIGMA * sigma + shift``:
 
     * ``sigma`` is the map's published height error at the pixel (the error
       maps that come with the LOLA products);
     * ``K_SIGMA`` turns it into a bound (3: three standard deviations);
-    * a sideways shift of the whole map by ``horizontal_error`` metres moves
-      the height at a fixed point by at most that times the local slope;
+    * ``shift`` is how much a sideways shift of the whole map by up to its
+      horizontal accuracy can change the height at the point: the shift
+      times the steepest slope within reach of it
+      (:meth:`lunar_engine.elevation.HeightGrid.shift_allowance`);
     * ``D`` is the distance from the site. Nearby terrain comes from the
       same measurements as the site, so its error relative to the eye cannot
       grow faster than an error in slope allows (``SLOPE_ERROR_DEG``).
@@ -134,11 +136,11 @@ class _ShiftedGrid(HeightGrid):
         self._max_allowance = None
 
     def _own_allowance(self, rows, cols) -> np.ndarray:
-        """``E`` at pixels: K * sigma + horizontal error * local slope, metres."""
+        """``E`` at pixels: K * sigma + what a sideways shift can change, metres."""
         sigma = self.base.error_values(rows, cols)
         sigma = np.zeros(np.shape(rows)) if sigma is None else np.nan_to_num(sigma.astype(float))
-        slope = np.nan_to_num(self.base.local_slopes()[rows, cols])
-        return self.k_sigma * sigma + self.base.horizontal_error_m * slope
+        shift = self.base.shift_allowance(self.base.horizontal_error_m)[rows, cols]
+        return self.k_sigma * sigma + shift
 
     def values(self, rows, cols) -> np.ndarray:
         """Heights moved by the allowed error, metres."""
@@ -211,16 +213,15 @@ class _ShiftedSource(ElevationSource):
                        0, spec.n_cols - 1)
         sigma = site_grid.error_values(rows, cols)
         sigma = 0.0 if sigma is None else float(np.nanmax(sigma))
-        slope = float(np.nanmax(site_grid.local_slopes()[rows, cols]))
-        site_allowance = k_sigma * sigma + site_grid.horizontal_error_m * slope
+        shift = float(np.max(site_grid.shift_allowance(site_grid.horizontal_error_m)[rows, cols]))
+        site_allowance = k_sigma * sigma + shift
         near_m = np.sqrt(2.0) * spec.pixel_m
         super().__init__([_ShiftedGrid(g, sign, site_unit, site_allowance, near_m, k_sigma,
                                        slope_error_deg) for g in source.grids])
         self.is_real = source.is_real
-        # Raised: unmapped terrain may be raised too. (Lowered: not needed,
-        # because only the floor of the lowered run is used.)
-        raise_by = max(g.max_allowance() for g in self.grids) if sign > 0 else 0.0
-        self.unknown_height_m = source.unknown_height_m + raise_by
+        # The height assumed for unmapped terrain is already a ceiling for any
+        # terrain there, true or shifted, so it is not moved.
+        self.unknown_height_m = source.unknown_height_m
         self.site_allowance_m = site_allowance
         self._elev_m = source.height(lat, lon)
 
