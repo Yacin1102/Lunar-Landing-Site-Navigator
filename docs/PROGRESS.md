@@ -194,6 +194,15 @@ Each step is reported with its real output.
 - The download script lives at `python/scripts/download_data.py`.
 - One new Python package: `jsonschema`, for validating files against the schemas. numba will be proposed in PR 5 only if timing shows it is needed.
 
+Decided on 2026-11-15 (you asked me to follow my recommendations):
+
+- **Lit, blocked, uncertain:** **lit** when some of the Sun's disc is certainly visible, **blocked** when none of it can be, **uncertain** otherwise; the visible fraction is reported as a range (interpretation 11 below, now approved).
+- **Timetable length:** 115,057 hourly rows, so the last row is 1 Jan 2040 00:00 UTC.
+- **Service region:** 80°S to the pole. Sites farther north, such as Chandrayaan-3 (about 69°S), are out of scope.
+- **Eye at ground level:** the live API accepts `mast_m = 0`. The answer stays proven; on steep ground it is more often "uncertain".
+- **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the 100 published error clones per site to measure the spread of the skyline (PRs 8 and 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
+- **All contract interpretations below are in force.**
+
 ## Contract interpretations awaiting approval
 
 PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where the spec left a choice open, I made one so the web side has something exact to build on. None changes a field the spec names; each is a place where the spec was silent or said two things. They are in force in the schemas, the types and the mock data until you say otherwise.
@@ -208,17 +217,17 @@ PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where th
 8. **API shapes**: `/api/health` returns `ok`, `real_terrain`, `service_region` and the default and accepted `az_step_deg` and `mast_m`. A refused request returns `{"version": 1, "ok": false, "error": {"code", "param", "message"}}` with HTTP 400 or 422. API responses carry `version` like files do.
 9. **Fixture cases may carry an optional `name`** saying what the case is meant to expose.
 10. **No extra fields**: the schemas reject any field the contract does not list.
-11. **Lit, blocked, uncertain (needs your decision).** The spec says lit is when "the whole relevant part of the disc is above skyline + error". `docs/WEB_HANDOFF.md` proposes: compute the visible fraction of the disc against skyline + error (`f_low`) and against skyline - error (`f_high`); **lit** if `f_low > 0` (some of the disc is certainly visible), **blocked** if `f_high == 0`, **uncertain** otherwise, and report the fraction as the range `f_low` to `f_high`. The stricter reading would call a site lit only when the entire disc is certainly clear, and everything partial "uncertain". This decides what the app says during the hours the Sun is half hidden, so it should be your call.
+11. **Lit, blocked, uncertain (decided 2026-11-15: as proposed here).** The spec says lit is when "the whole relevant part of the disc is above skyline + error". `docs/WEB_HANDOFF.md` proposes: compute the visible fraction of the disc against skyline + error (`f_low`) and against skyline - error (`f_high`); **lit** if `f_low > 0` (some of the disc is certainly visible), **blocked** if `f_high == 0`, **uncertain** otherwise, and report the fraction as the range `f_low` to `f_high`. The stricter reading would call a site lit only when the entire disc is certainly clear, and everything partial "uncertain". This decides what the app says during the hours the Sun is half hidden, so it should be your call.
 12. **A curated site's skyline is computed at exactly its `sites.json` coordinates**, with no rounding. Rounding applies only to custom points sent to the API.
 13. **Azimuths in the fixtures are in 0 (included) to 360 (excluded).**
-15. **What `skyline_deg +/- skyline_err_deg` covers.** The spec says each entry is "the true maximum over its whole wedge" and "blocked" is "below skyline - error". A wedge's maximum alone cannot prove "blocked": light can pass through a dip narrower than the wedge (a test shows it). So the interval is made to contain the skyline at every azimuth of the wedge. It still contains the wedge's maximum, as the spec requires, and "lit" and "blocked" both become provable. The reported `skyline_deg` is the middle of that interval, not the maximum itself.
 14. **Limits the schemas enforce beyond the spec's wording**: exactly 10 sites; `t0_ms` exactly 1794787200000 and the last row at or after 1 Jan 2040; `service_region.lat_max` south of the equator; `category` made of lowercase letters, digits, `_` and `-`; `date_utc` in ISO 8601 form; no NaN or Infinity anywhere.
+15. **What `skyline_deg +/- skyline_err_deg` covers.** The spec says each entry is "the true maximum over its whole wedge" and "blocked" is "below skyline - error". A wedge's maximum alone cannot prove "blocked": light can pass through a dip narrower than the wedge (a test shows it). So the interval is made to contain the skyline at every azimuth of the wedge. It still contains the wedge's maximum, as the spec requires, and "lit" and "blocked" both become provable. The reported `skyline_deg` is the middle of that interval, not the maximum itself.
 
 Still to be fixed, with the PR that needs them: the default and accepted `az_step_deg` and the default `mast_m` (PR 7; the mock uses 0.1 degrees and 2 m), the rounding of custom points (PR 7), the category names (PR 9), and the Sun and Earth radii used for disc edges (PR 3).
 
-## Error model for `skyline_err_deg`: needs your decision
+## Error model for `skyline_err_deg` (decided 2026-11-15)
 
-PR 6 combines the map's published errors into the bound with three values that are scientific choices, not facts. They decide how often the app says "uncertain".
+PR 6 combines the map's published errors into the bound with three values that are scientific choices, not facts. They decide how often the app says "uncertain". Decision: keep these as the general bound; use measured slope errors and the 100 error clones where NASA publishes them (see "Decisions taken").
 
 | Value | Proposed | What it means |
 | --- | --- | --- |
@@ -235,9 +244,7 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Open questions
 
-- **Should the live API accept `mast_m = 0`?** With the eye exactly on the ground of a steep slope, the skyline interval widens to ±0.08° (±0.005° with a 2 m mast). It is still proven. Options for PR 7: allow it and let the wider interval show as "uncertain", or require a small minimum mast such as 0.5 m.
 - **Skyline speed on the real maps (not yet measured).** On a synthetic 2000 x 2000 map with 60 cones it takes 2.9 s. The real 10 m map is about 42,000 x 42,000 pixels and skylines reach hundreds of km, so the time per site is unknown until PR 8. Reading the maps may need a cache on disk. For the live API, results are cached.
 
-1. Contract 1 gives 115,056 hourly rows, which ends one hour before 1 Jan 2040 00:00. To reach "at least 1 Jan 2040" the timetable was built with 115,057 rows. Say if the count must be exactly 115,056.
-2. Sites outside 80°S (for example Chandrayaan-3 at about 69°S) cannot be included under the proposed service region. Candidates: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).
-3. Mock shade grids are large (one skyline per cell). I plan to commit them for 2 of the 10 mock sites at a small grid size, with `has_shade_grid` false for the rest, which also exercises both paths in the web app. Say if the web side needs all 10.
+- **Site shortlist (PR 9).** Candidates inside 80°S: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).
+- Mock shade grids exist for 2 of the 10 mock sites, at a small grid size, so the web app meets sites with and without one. Say if the web side needs all 10.
