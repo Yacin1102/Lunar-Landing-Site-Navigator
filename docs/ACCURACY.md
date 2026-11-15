@@ -205,3 +205,18 @@ From `python python/scripts/check_illumination.py web/public/data`, on the built
   - The floors almost never.
   - This follows the sites' facing, as expected.
 
+
+## The browser side (web engine audit, 2026-11-15)
+
+Measured by `web/engine/tests/audit/` (`cd web; npm test`); details in `docs/WEB_AUDIT.md`.
+
+| Step | Reference | Worst difference |
+| --- | --- | --- |
+| Timetable interpolation (4-point Lagrange) | Python `interpolate_rows`, 27 cases including the first and last interval | 1.8e-12 km |
+| Sun and Earth azimuth and elevation | SPICE direct (`altaz.json`, 61 cases) | 2.6e-5° (pass mark 0.01°) |
+| Sun and Earth azimuth and elevation | JPL Horizons, 60 saved rows | 2.6e-5° |
+| Rise and set times, smooth Moon | SPICE (`events.json`, 8 windows up to 400 days) | 2.7 s (pass mark 60 s) |
+| Visible fraction of the disc, flat skyline | Circle-segment formula | below 1e-9 |
+| Visible fraction, peaks inside the disc, across north | Brute-force area count | below 2e-3 (the count's own resolution) |
+
+The visible fraction is exact for the step skyline. The only approximation is the flat tangent plane across the disc, about ρ² tan(el) / 2: below 0.00001° at the elevations reached from the south pole.

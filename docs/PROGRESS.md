@@ -2,7 +2,14 @@
 
 ## Now (2026-11-15)
 
-**Next:** PR B, the audit of the web engine (`web/engine/`): scientific and mathematical correctness, and its link to the engine's files. Plan: findings 1 to 13 (wrong Earth radius, Catmull-Rom instead of the handoff's cubic, skyline interpolated instead of read as steps, the verdict rule, the worker's NaN site height, events missing short grazes, metrics, panel tilt, battery run-out, loader checks), each proven by a failing test with values from SPICE, Horizons or a closed form, then fixed.
+**Next:** review and merge PR #22 (cleanup), then PR B (the web engine audit, stacked on it). After that: bring the 3D view from `yacin1102-lunar-web-3d` into `main`.
+
+**Done in PR B (web engine audit):** 13 findings, each shown with the engine's real output before the fix and asserted by a test after it (`docs/WEB_AUDIT.md`). The most serious:
+- The worker's site height was NaN, so it produced no events or metrics.
+- The skyline was interpolated, which could call a blocked Sun clear.
+- The Earth's radius was equatorial, which put Earth events 3 to 6 minutes off.
+
+The disc fraction is now exact per wedge. The event search is a port of the Python reference. The verdict follows the approved rule. New: `web/engine/evaluate.ts`, `web/engine/tests/audit/` (7 test files), `python/scripts/build_audit_fixtures.py` with `python/tests/test_audit_fixtures.py`, and `ajv` as a web dev dependency. `altaz.json` and `events.json` were not regenerated: nothing that makes them has changed since 2026-11-14.
 
 **Done in PR A (cleanup):**
 
@@ -20,7 +27,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR A, 2026-11-15, no data on disk): 187 passed, 66 skipped, 0 failed. Every skipped test is a real-data test waiting for the kernels, coarse or full maps. Web: `cd web; npm test`: 14 passed; `npm run build` OK.
+Last result (PR B, 2026-11-15, no maps on disk): Python 187 passed, 66 skipped (real-data tests waiting for kernels or maps), 0 failed, plus the 2 new audit-fixture tests passed. Web: `cd web; npm test`: 62 passed; `npm run build` OK.
 
 
 ## Principle: nothing waits on the download

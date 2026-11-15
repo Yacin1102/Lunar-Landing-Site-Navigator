@@ -21,9 +21,12 @@ describe("astro core", () => {
     expect(result.x).toBeCloseTo(15, 5);
   });
 
-  it("returns a finite solar disc radius and wraps skyline seams", () => {
+  it("returns a finite solar disc radius and reads the skyline as steps across the seam", () => {
     expect(discRadiusDeg("sun", 149_600_000)).toBeGreaterThan(0.25);
-    expect(skylineAt([1, 2, 3, 4], 90, 359)).toBeCloseTo(1.033, 2);
+    // Step function, wrapping at north: 359 degrees is in the wedge of entry 0 (315 to 45).
+    expect(skylineAt([1, 2, 3, 4], 90, 359)).toBe(1);
+    expect(skylineAt([1, 2, 3, 4], 90, 44.9)).toBe(1);
+    expect(skylineAt([1, 2, 3, 4], 90, 45.1)).toBe(2);
   });
 
   it("gives a full visible fraction when the disc is well above a flat skyline", () => {
