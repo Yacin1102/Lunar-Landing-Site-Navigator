@@ -94,12 +94,14 @@ The web app offers two primary experiences over the same prepared data:
 flowchart LR
     data[manifest, sites, skylines, terrain] --> bundle[loadDataBundle]
     bundle --> dashboard[Dashboard view<br/>skyline, Sun/Earth paths,<br/>status cards, timeline]
-    bundle -->     siteview[Site view<br/>interactive Moon scene,<br/>site markers, coordinates]
+    bundle -->     siteview[Site view<br/>Three.js satellite scene,<br/>orbit controls, site markers]
     bundle --> map[Site map<br/>curated site selection]
     dashboard --> compare[Comparison page]
 ```
 
 Coordinates shown in the interface are read-only metadata from `sites.json`. The removed custom-coordinate workflow is intentionally not exposed by the UI.
+
+The Site view keeps the supplied `Moon_Site_Viewer` experience as a separate browser scene. `web/src/SpaceScene.tsx` loads the prototype's Three.js 0.128 runtime and OrbitControls, creates the Moon, lighting, Sun, Earth, atmosphere, stars, and site markers, then disposes them when the React view changes. Site coordinates and the current Sun/Earth directions still come from the normal TypeScript data bundle; the scene does not open NASA files or run a second astronomy engine.
 
 Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Moon's centre, "north" is along the meridian toward the north pole (away from the south pole at these sites), "east" completes the right-handed set, and azimuth runs from north through east.
 

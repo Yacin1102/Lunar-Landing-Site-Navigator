@@ -102,8 +102,8 @@ describe("mission dashboard", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("tab", { name: "Site view" }));
     });
-    expect(screen.getByRole("heading", { name: "Site view" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mock site" })).toBeTruthy();
     expect(screen.getByText("-89.000° latitude")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Interactive Moon scene centered on Mock site" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "3D lunar satellite view centered on Mock site" })).toBeTruthy();
   });
 });

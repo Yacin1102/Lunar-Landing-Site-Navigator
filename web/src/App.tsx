@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
 import { panelPowerW } from "../engine/power";
-import type { DataBundle, Direction } from "../engine/runtime-types";
+import type { DataBundle } from "../engine/runtime-types";
 import type { Site } from "../engine/types";
 import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
 import {
@@ -15,6 +15,7 @@ import {
   type TimelinePoint,
 } from "./visual-model";
 import { readSavedScenarios, saveScenariosToUrl, type SavedScenario } from "./url-state";
+import { SpaceScene } from "./SpaceScene";
 
 type ViewMode = "sky" | "terrain" | "map";
 type ExperienceMode = "beginner" | "expert";
@@ -197,7 +198,7 @@ export default function App() {
             ))}
           </div>
           {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
-          {view === "terrain" && <SiteView site={activeSite} sites={allSites} />}
+          {view === "terrain" && <SiteView site={activeSite} sites={allSites} currentPoint={currentPoint} onSelect={selectSite} />}
           {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} />}
         </section>
 
@@ -279,133 +280,15 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
 }
 
 /** Render the interactive Moon scene that lets a visitor inspect the selected curated site. */
-function SiteView({ site, sites }: { site: Site; sites: Site[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dragRef = useRef<{ x: number; rotation: number } | undefined>(undefined);
-  const [rotation, setRotation] = useState(0);
-  const [zoom, setZoom] = useState(1);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    const pixelRatio = window.devicePixelRatio || 1;
-    canvas.width = width * pixelRatio;
-    canvas.height = height * pixelRatio;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    drawMoonScene(context, width, height, site, sites, rotation, zoom);
-  }, [rotation, site, sites, zoom]);
-
+function SiteView({ site, sites, currentPoint, onSelect }: { site: Site; sites: Site[]; currentPoint: TimelinePoint; onSelect: (siteId: string) => void }) {
   return <section className="view-panel site-panel">
     <div className="view-title">
-      <div><p className="eyebrow">On-site view · interactive lunar scene</p><h1>{site.name}</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p></div>
-      <Tooltip text="Drag the Moon to rotate it. Scroll over the scene to zoom. The gold marker is the selected site." />
+      <div><p className="eyebrow">Satellite view · Three.js scene</p><h1>{site.name}</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p></div>
+      <Tooltip text="This is the immersive view from the prototype: orbit around the Moon, zoom toward the surface, and click a curated site marker." />
     </div>
-    <div className="moon-scene">
-      <canvas
-        ref={canvasRef}
-        className="moon-canvas"
-        role="img"
-        aria-label={`Interactive Moon scene centered on ${site.name}`}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          dragRef.current = { x: event.clientX, rotation };
-        }}
-        onPointerMove={(event) => {
-          if (!dragRef.current) return;
-          setRotation(dragRef.current.rotation + (event.clientX - dragRef.current.x) * 0.45);
-        }}
-        onPointerUp={() => { dragRef.current = undefined; }}
-        onPointerCancel={() => { dragRef.current = undefined; }}
-        onWheel={(event) => {
-          event.preventDefault();
-          setZoom((current) => Math.max(0.82, Math.min(1.45, current - event.deltaY * 0.001)));
-        }}
-      />
-      <div className="moon-scene-hint">Drag to rotate · scroll to zoom</div>
-      <button className="moon-reset" type="button" onClick={() => { setRotation(0); setZoom(1); }}>Reset view</button>
-    </div>
-    <div className="site-view-labels"><span>South pole region</span><span>Gold marker: selected site</span><span>Blue markers: curated sites</span></div>
+    <SpaceScene site={site} sites={sites} sun={currentPoint.sun} earth={currentPoint.earth} onSelectSite={onSelect} />
+    <div className="site-view-labels"><span>South pole region</span><span>Red marker: selected site</span><span>Gold markers: curated sites</span></div>
   </section>;
-}
-
-/** Draw a data-driven Moon globe, its curated site markers, and a simple mission-scene horizon. */
-function drawMoonScene(context: CanvasRenderingContext2D, width: number, height: number, site: Site, sites: Site[], rotation: number, zoom: number): void {
-  const centerX = width / 2;
-  const centerY = height * 0.54;
-  const radius = Math.min(width, height) * 0.34 * zoom;
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = "#080d18";
-  context.fillRect(0, 0, width, height);
-
-  for (let index = 0; index < 70; index += 1) {
-    const x = (index * 83) % width;
-    const y = (index * 47) % (height * 0.58);
-    context.fillStyle = index % 7 === 0 ? "rgba(246,198,103,.8)" : "rgba(255,255,255,.45)";
-    context.fillRect(x, y, index % 5 === 0 ? 2 : 1, index % 5 === 0 ? 2 : 1);
-  }
-
-  const moonGradient = context.createRadialGradient(centerX - radius * 0.3, centerY - radius * 0.35, radius * 0.1, centerX, centerY, radius);
-  moonGradient.addColorStop(0, "#c8c0ae");
-  moonGradient.addColorStop(0.58, "#817b73");
-  moonGradient.addColorStop(1, "#34343a");
-  context.beginPath();
-  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  context.fillStyle = moonGradient;
-  context.fill();
-  context.save();
-  context.beginPath();
-  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  context.clip();
-  for (let index = 0; index < 34; index += 1) {
-    const craterX = centerX + (((index * 97) % 200) / 100 - 1) * radius * 0.88;
-    const craterY = centerY + (((index * 61) % 200) / 100 - 1) * radius * 0.88;
-    const craterRadius = 3 + (index % 6) * 3;
-    context.fillStyle = "rgba(24,25,29,.18)";
-    context.beginPath();
-    context.arc(craterX, craterY, craterRadius, 0, Math.PI * 2);
-    context.fill();
-    context.strokeStyle = "rgba(245,239,222,.12)";
-    context.stroke();
-  }
-  context.restore();
-  context.strokeStyle = "rgba(255,255,255,.16)";
-  context.lineWidth = 2;
-  context.stroke();
-
-  for (const candidate of sites) {
-    const point = projectSite(candidate, site, rotation, centerX, centerY, radius);
-    if (point.depth < -0.05) continue;
-    context.beginPath();
-    context.arc(point.x, point.y, candidate.id === site.id ? 7 : 4, 0, Math.PI * 2);
-    context.fillStyle = candidate.id === site.id ? "#f6c667" : "#70a7ff";
-    context.shadowColor = candidate.id === site.id ? "#f6c667" : "#70a7ff";
-    context.shadowBlur = candidate.id === site.id ? 18 : 6;
-    context.fill();
-    context.shadowBlur = 0;
-  }
-
-  context.fillStyle = "rgba(246,198,103,.12)";
-  context.fillRect(0, height * 0.82, width, height * 0.18);
-  context.fillStyle = "#a9a092";
-  context.font = "12px system-ui";
-  context.fillText("Observer horizon", 18, height - 20);
-}
-
-/** Project a curated site's latitude and longitude onto the currently rotated Moon disc. */
-function projectSite(candidate: Site, selected: Site, rotation: number, centerX: number, centerY: number, radius: number): { x: number; y: number; depth: number } {
-  const longitude = ((candidate.lon - selected.lon + rotation + 540) % 360) - 180;
-  const longitudeRadians = longitude * Math.PI / 180;
-  const latitudeRadians = candidate.lat * Math.PI / 180;
-  const depth = Math.cos(longitudeRadians) * Math.cos(latitudeRadians);
-  return {
-    x: centerX + Math.sin(longitudeRadians) * Math.cos(latitudeRadians) * radius,
-    y: centerY - Math.sin(latitudeRadians) * radius,
-    depth,
-  };
 }
 
 /** Render the data-driven south-polar map for selecting one of the curated sites. */

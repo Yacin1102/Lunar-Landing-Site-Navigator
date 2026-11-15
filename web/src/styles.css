@@ -441,33 +441,67 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   letter-spacing: 0.08em;
 }
 
-.moon-scene {
+.space-scene {
   position: relative;
-  min-height: 31rem;
+  min-height: 38rem;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 0.7rem;
-  background: #080d18;
-  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(52, 70, 111, 0.22), transparent 22rem),
+    #050811;
   touch-action: none;
 }
 
-.moon-scene:active { cursor: grabbing; }
-
-.moon-canvas {
+.space-scene canvas {
   display: block;
   width: 100%;
-  height: 31rem;
+  height: 38rem;
+  cursor: grab;
 }
 
-.moon-scene-hint {
+.space-scene canvas:active { cursor: grabbing; }
+
+.space-scene-status,
+.space-scene-legend {
   position: absolute;
-  top: 0.85rem;
-  left: 1rem;
   color: rgba(255, 255, 255, 0.65);
   font-size: 0.72rem;
   pointer-events: none;
 }
+
+.space-scene-status {
+  top: 0.85rem;
+  left: 1rem;
+}
+
+.space-scene-legend {
+  right: 1rem;
+  bottom: 0.85rem;
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.45rem;
+  background: rgba(8, 13, 24, 0.72);
+}
+
+.space-scene-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.space-scene-legend i {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+
+.legend-sun { background: var(--gold); box-shadow: 0 0 0.6rem var(--gold); }
+.legend-earth { background: #4185d7; box-shadow: 0 0 0.6rem #4185d7; }
+.legend-site { background: #ef4444; box-shadow: 0 0 0.6rem #ef4444; }
 
 .moon-reset {
   position: absolute;
