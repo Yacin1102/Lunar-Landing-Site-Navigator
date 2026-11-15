@@ -63,4 +63,4 @@ sequenceDiagram
 
 ## 3D view boundary
 
-The 3D view is loaded lazily from `web/src/three/` and consumes only the display terrain patch, shade grid, and directions already produced for the selected time. Its coordinate conversion and brightness helpers are tested independently; the astronomy engine remains unchanged.
+The 3D view is loaded lazily from `web/src/terrain3d.tsx` and consumes only the display terrain patch, shade grid, and directions already produced for the selected time. `directionToThree`, `gridToEastNorth`, and `shadeBrightness` keep the shared east/north/up contract visible and are tested independently; the astronomy engine remains unchanged. The view provides a vertical-exaggeration control, orbit/stand-at-site toggle, reset control, site-light dimming, and a featured-site fallback.

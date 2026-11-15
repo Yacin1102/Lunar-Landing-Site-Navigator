@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
 import { panelPowerW } from "../engine/power";
@@ -16,6 +16,7 @@ import {
   type TimelinePoint,
 } from "./visual-model";
 import { readSavedScenarios, saveScenariosToUrl, type SavedScenario } from "./url-state";
+const Terrain3DView = lazy(() => import("./terrain3d").then((module) => ({ default: module.Terrain3DView })));
 
 type ViewMode = "sky" | "terrain" | "map";
 type ExperienceMode = "beginner" | "expert";
@@ -238,7 +239,7 @@ export default function App() {
             ))}
           </div>
           {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
-          {view === "terrain" && <TerrainView bundle={effectiveBundle} site={activeSite} />}
+          {view === "terrain" && <TerrainView bundle={effectiveBundle} site={activeSite} currentPoint={currentPoint} />}
           {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} onPickCustom={pickCustomCoordinate} />}
         </section>
 
@@ -326,17 +327,10 @@ function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentP
 }
 
 /** Render a lightweight terrain view from the prepared display-only patch. */
-function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: Site }) {
+function TerrainView({ bundle, site, currentPoint }: { bundle: DataBundle | undefined; site: Site; currentPoint: TimelinePoint }) {
   const patch = bundle?.terrain.get(site.id);
-  if (!patch) return <section className="view-panel unavailable"><h1>3D view</h1><p>Terrain patch unavailable for this point.</p></section>;
-  const size = patch.label.n;
-  const samples = Array.from({ length: 11 }, (_, row) => Array.from({ length: 11 }, (_, column) => {
-    const sourceRow = Math.round((row / 10) * (size - 1));
-    const sourceColumn = Math.round((column / 10) * (size - 1));
-    return patch.values[sourceRow * size + sourceColumn] ?? 0;
-  }));
-  const max = Math.max(...samples.flat(), 1);
-  return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch</p><h1>3D view</h1></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><p className="view-caption">{patch.label.size_m.toFixed(0)} m patch · {patch.label.spacing_m.toFixed(0)} m spacing</p></section>;
+  if (!patch) return <section className="view-panel unavailable"><h1>3D view</h1><p>3D view is available for featured sites.</p></section>;
+  return <Suspense fallback={<section className="view-panel loading">Loading 3D view…</section>}><Terrain3DView patch={patch} shade={bundle?.shade.get(site.id)} skyline={bundle?.skylines.get(site.id)} sun={currentPoint.sun} earth={currentPoint.earth} sunFraction={currentPoint.sunFraction} /></Suspense>;
 }
 
 /** Render the data-driven south-polar map and allow selecting sites or a custom point. */

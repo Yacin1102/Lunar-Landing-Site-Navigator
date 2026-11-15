@@ -6,7 +6,8 @@ The web application is being rebuilt independently from the Python engine. The c
 
 - Stage 1 dashboard: focused top bar, Sky/3D/Map tabs, four status cards, compact timeline, first-visit intro, Beginner/Expert mode, Details drawer, data-driven polar map, and separate comparison page.
 - Display formatting: centralized in `web/src/formatting.ts` with Vitest coverage for UTC/local time, durations, watts, degrees, and percentages.
-- Stage 2 3D view: planned as a lazy-loaded module using terrain and shade-grid products; it must not change `web/engine/`.
+- Stage 2 3D view: implemented as a lazy-loaded Three.js module using terrain and shade-grid products; it does not change `web/engine/`.
+- Stage 2 validation: `cd web; npm test -- --run` passes 18 tests across 9 files; `cd web; npm run build` passes with the 3D code split into its own chunk.
 - Web validation currently passes with `npm test -- --run` and `npm run build`.
 
 Scope of this plan: the Python engine (`python/`), the files it writes to `web/public/data/`, the fixtures in `web/engine/tests/fixtures/`, the web handoff, and `docs/`. The web app (`web/`) is built by a second agent or teammates from the handoff.

@@ -357,6 +357,30 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   background: #777;
 }
 
+.terrain-canvas {
+  display: block;
+  width: 100%;
+  height: min(58vh, 520px);
+  min-height: 320px;
+  border: 1px solid #555;
+  background: #050607;
+}
+
+.terrain-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.terrain-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #aaa;
+}
+
 .polar-map {
   position: relative;
   width: min(34rem, 100%);
