@@ -95,4 +95,14 @@ describe("mission dashboard", () => {
     });
     expect(screen.getByText("Additional information")).toBeTruthy();
   });
+
+  it("switches from the analytical dashboard to the on-site view", async () => {
+    render(<App />);
+    await waitFor(() => expect((screen.getByRole("combobox", { name: "Select site" }) as HTMLSelectElement).value).toBe("mock_site"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Site view" }));
+    });
+    expect(screen.getByRole("heading", { name: "Site view" })).toBeTruthy();
+    expect(screen.getByText("-89.000° latitude")).toBeTruthy();
+  });
 });

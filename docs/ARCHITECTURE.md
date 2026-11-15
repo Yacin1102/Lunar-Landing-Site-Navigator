@@ -6,6 +6,9 @@ This page describes the code as it exists today. It grows with each pull request
 
 | Module | Job | Reads | Writes |
 | --- | --- | --- | --- |
+| `web/src/App.tsx` | Renders the mission dashboard, on-site terrain view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
+| `web/src/visual-model.ts` | Samples browser engine results into chart-ready points and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
+| `web/src/styles.css` | Provides the dark, glass-panel visual system and responsive layout for the dashboard and site view. | React class names | Browser styles |
 | `python/scripts/download_data.py` | Downloads the NASA input files, four at a time and started in a fixed order, resumes after an interruption, and verifies size and checksum. Refuses to run twice in the same folder. Also answers "is this group of data on disk?" for the tests. | `python/data_files.json`, `python/data_checksums.json`, the NAIF and PGDA servers | `python/kernels/`, `python/dem/`, `python/data_checksums.json`, `python/dem/download.log`, `python/dem/download.lock`, and a `name.part.json` side file next to each partial download |
 | `python/tests/conftest.py` | Skips tests marked `realdata` while their data is missing and prints which ones were skipped. | What `download_data.missing_files` reports | Test report only |
 | `python/lunar_engine/geometry.py` | Exact geometry on the reference sphere: latitude/longitude to a direction, the local east/north/up frame, azimuth and elevation. | Nothing | Nothing |
@@ -84,6 +87,19 @@ flowchart LR
 ```
 
 A test fails if `types.ts` differs from what the schemas generate, or if the committed mock folder breaks any contract.
+
+The web app offers two primary experiences over the same prepared data:
+
+```mermaid
+flowchart LR
+    data[manifest, sites, skylines, terrain] --> bundle[loadDataBundle]
+    bundle --> dashboard[Dashboard view<br/>skyline, Sun/Earth paths,<br/>status cards, timeline]
+    bundle --> siteview[Site view<br/>prepared terrain patch,<br/>observer marker, coordinates]
+    bundle --> map[Site map<br/>curated site selection]
+    dashboard --> compare[Comparison page]
+```
+
+Coordinates shown in the interface are read-only metadata from `sites.json`. The removed custom-coordinate workflow is intentionally not exposed by the UI.
 
 Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Moon's centre, "north" is along the meridian toward the north pole (away from the south pole at these sites), "east" completes the right-handed set, and azimuth runs from north through east.
 
