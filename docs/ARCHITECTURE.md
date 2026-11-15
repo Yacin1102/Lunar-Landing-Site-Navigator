@@ -20,6 +20,9 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/scripts/serve.py` | Starts the live API on port 8000; `--synthetic` serves an invented landscape. | `server` | Nothing |
 | `python/lunar_engine/lola.py` | The real-data backend: reads the LOLA GeoTIFFs (checking their labels), decompresses each once into a memory-mapped file, and builds the highest-terrain tables strip by strip on disk; slopes and error allowances are computed on demand. | `python/dem/*.TIF` | `python/dem/cache/` |
 | `python/scripts/build_dem_cache.py` | Prepares the caches of the four full-resolution maps up front, with progress. | `lola` | `python/dem/cache/` |
+| `python/lunar_engine/sites.py` | The curated site list (Contract 2): checks it (schema, unique ids, service region, documented categories), sets its `has_terrain` / `has_shade_grid` flags from the files present, and describes the ground around a site for the map cross-check. | `web/public/data/sites.json`, an `ElevationSource` | `sites.json` (flags only) |
+| `python/scripts/check_sites.py` | Prints the ground around each site on the real maps (the table in `python/sites_sources.md`). | `sites`, `lola` | Report on screen |
+| `python/scripts/update_site_flags.py` | Sets the site flags after terrain patches or shade grids are built. | `sites` | `sites.json` |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -39,6 +42,8 @@ Data files that are not code:
 | `python/data_files.json` | The list of input files: URL, destination, size, group. Its order is the download order. |
 | `python/data_checksums.json` | The SHA-256 of each file, recorded at its first download. |
 | `python/DATA.md` | Why each file was chosen and what its label says. |
+| `web/public/data/sites.json` | The 10 curated sites, written by hand: the only place site coordinates exist. |
+| `python/sites_sources.md` | The source, exact words and map check of every site coordinate, and the category set. |
 
 ## Structure
 
@@ -68,7 +73,10 @@ flowchart LR
     world[mock_world.py<br/>invented landscape] --> mock[make_mock_data.py] --> mockdata[web/public/data-mock/]
     geometry[geometry.py] --> world
     contracts -- checks --> mockdata
-    contracts -. will check .-> realdata[web/public/data/]
+    sources[sites_sources.md<br/>papers, LROC, Gazetteer] -. copied by hand .-> sitelist[web/public/data/sites.json]
+    sitelist --> sites[sites.py] -- flags --> sitelist
+    contracts -- checks --> sitelist
+    contracts -. will check .-> realdata[web/public/data/ products]
     types --> web[web app]
     mockdata --> web
 ```

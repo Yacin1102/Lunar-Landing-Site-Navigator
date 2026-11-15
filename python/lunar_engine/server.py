@@ -43,6 +43,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .contracts import SERVICE_REGION
 from .elevation import CoverageError, ElevationSource
 from .records import RecordContractError, skyline_record
 
@@ -55,8 +56,6 @@ MAX_MAST_M = 100.0
 COORD_DECIMALS = 5
 #: Points closer to the pole are moved to this latitude.
 POLE_NUDGE_LAT = -89.99999
-#: The service region of the real data (80 S to the pole).
-SERVICE_REGION = {"lat_min": -90.0, "lat_max": -80.0}
 #: Web origins allowed to call the API from a browser (the Vite dev server).
 DEFAULT_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
 ALLOWED_PARAMS = {"lat", "lon", "mast_m", "az_step_deg"}

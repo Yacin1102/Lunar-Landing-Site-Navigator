@@ -35,8 +35,8 @@ from lunar_engine import contracts, mock_world, products  # noqa: E402
 
 OUTPUT = contracts.REPO_DIR / "web" / "public" / "data-mock"
 
-#: Service region of the mock (and the proposed real one): 80 S to the pole.
-SERVICE_REGION = {"lat_min": -90.0, "lat_max": -80.0}
+#: Service region of the mock: the same as the real one, 80 S to the pole.
+SERVICE_REGION = contracts.SERVICE_REGION
 
 MAST_M = 2.0
 SKYLINE_AZ_STEP_DEG = 0.1

@@ -21,12 +21,13 @@ Plan approved on 2026-11-14.
 | 2 Web handoff | Merged (PR #5) |
 | 3 Timetable and fixtures | Merged (PRs #6 and #10) |
 | 4 Elevation interface and synthetic terrain | Merged (PR #7) |
-| 5 Skyline core | Built, in review (PR #12) |
-| 6 Error bound and independent check | Built, in review (PR #13) |
-| 7 Record writer and live API | Built, in review (PR #17) |
-| 8 LOLA reader | Built, in review |
-| 9 Site list | **Next** (sites researched and checked against the map, see below) |
-| 10 to 11 | Not started |
+| 5 Skyline core | Merged (PR #12) |
+| 6 Error bound and independent check | Merged (PR #13) |
+| 7 Record writer and live API | Merged (PR #17) |
+| 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
+| 9 Site list | Built, in review (stacked on PR #19). The 5 m site maps wait for your go-ahead (see Open questions) |
+| 10 Terrain patches, shade grids, manifest | **Next** |
+| 11 Real products and final proof | Not started |
 
 To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
@@ -38,7 +39,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 8): 238 passed, 0 skipped, 0 failed: with all data on disk, all 55 real-data tests run.
+Last result (PR 9): 263 passed, 0 skipped, 0 failed: with all data on disk, all 66 real-data tests run.
 
 
 ## Principle: nothing waits on the download
@@ -93,7 +94,7 @@ Coarse versions of the same product family, same projection and frame, covering 
 | `LDEM_60S_60MPP_ADJ.TIF` | 60 m | to 60°S (910 km) | 2.9 GB | Outer guard, so the search never leaves the data |
 | The matching four `..._ADJ_ERR.TIF`, same order | same | same | 19 GB | Published per-pixel height error, feeding `skyline_err_deg` |
 
-**Group 4, `sites5m`** (PGDA product 78, Barker et al. 2021, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/`). For each curated site inside one of its 27 regions: `{Site}_final_adj_5mpp_surf.tif` and `{Site}_final_adj_5mpp_toterr.tif` (5 m pixels). This group is empty until the site list is chosen (PR 9), which adds the files to the list. The running script picks them up when it reaches this group; if it has already finished, the same command fetches only the new files.
+**Group 4, `sites5m`** (PGDA product 78, Barker et al. 2021, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/`). Not yet in the download list: it waits for your go-ahead (see Open questions). The directory holds six site folders (Site01, 04, 07, 11, 20, 23). Five of them match curated sites: Site01 is `connecting_ridge`, Site04 `shackleton_rim`, Site07 `peak_near_shackleton` and Site11 `de_gerlache_rim` (stated by Barker et al. 2021), and Site23 is the Malapert massif, whose map must be shown to contain the `malapert_massif` point. Each folder has, at 5 m pixels, the heights (`_surf`), the total height error (`_toterr`), the slope error (`_slperr`) and 100 error clones (`Clones/`). File sizes were read from the server on 2026-11-15 without downloading: 41 MB each (71 MB for Site23).
 
 **Why four nested maps.** A peak 8 km high is geometrically visible from about 170 km away at ground level, and from over 300 km when the observer also stands on high ground. A site at 85°S can therefore be shadowed by terrain 450 km from the pole.
 
@@ -214,6 +215,14 @@ Decided on 2026-11-15 (you asked me to follow my recommendations):
 - **Eye at ground level:** the live API accepts `mast_m = 0`. The answer stays proven; on steep ground it is more often "uncertain".
 - **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the 100 published error clones per site to measure the spread of the skyline (PRs 8 and 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
 - **All contract interpretations below are in force.**
+
+Taken in PR 9 (2026-11-15), the site list. You asked me to follow my recommendations.
+
+- **Sites.** The 10 are the connecting ridge, the Shackleton rim, the peak near Shackleton, the de Gerlache rim, the Malapert massif, the IM-2 Athena landing site on Mons Mouton, and the floors of Shackleton, Haworth and Faustini, plus the LCROSS impact point in Cabeus.
+  - They contrast five sunlit tops with four shadowed floors, and near-side, limb and far-side longitudes.
+  - Every coordinate, its exact source words, and the map check are in `python/sites_sources.md`.
+  - The left-out candidates and the reasons are listed there too.
+- **Categories:** `high_illumination`, `landing_site` and `psr`. A category is what the source says. Whether a site is actually lit is answered by the engine, and is compared with published studies in PR 11.
 - **Live API values (PR 7):** wedge width default 0.1°, accepted 0.05, 0.1, 0.2, 0.25, 0.5 and 1°; mast default 2 m, accepted 0 to 100 m; custom points rounded to 5 decimals of a degree (at most about 0.6 m along a meridian) and moved no closer to the pole than latitude -89.99999; unknown parameters refused; CORS allows the Vite dev server (`http://localhost:5173`).
 
 ## Contract interpretations awaiting approval
@@ -236,7 +245,7 @@ PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where th
 14. **Limits the schemas enforce beyond the spec's wording**: exactly 10 sites; `t0_ms` exactly 1794787200000 and the last row at or after 1 Jan 2040; `service_region.lat_max` south of the equator; `category` made of lowercase letters, digits, `_` and `-`; `date_utc` in ISO 8601 form; no NaN or Infinity anywhere.
 15. **What `skyline_deg +/- skyline_err_deg` covers.** The spec says each entry is "the true maximum over its whole wedge" and "blocked" is "below skyline - error". A wedge's maximum alone cannot prove "blocked": light can pass through a dip narrower than the wedge (a test shows it). So the interval is made to contain the skyline at every azimuth of the wedge. It still contains the wedge's maximum, as the spec requires, and "lit" and "blocked" both become provable. The reported `skyline_deg` is the middle of that interval, not the maximum itself.
 
-Still to be fixed, with the PR that needs them: the category names (PR 9). (The API values and rounding were fixed in PR 7, the disc radii in PR 3.)
+All open choices are now fixed: the category names in PR 9 (`high_illumination`, `landing_site`, `psr`, documented in `python/sites_sources.md`), the API values and rounding in PR 7, the disc radii in PR 3.
 
 ## Error model for `skyline_err_deg` (decided 2026-11-15)
 
@@ -259,5 +268,13 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 - **Live API speed on real terrain.** Measured in PR 8 at a point 0.2° from the pole: one skyline run takes 88 s at 0.1° wedges and 8 s at 1° (search reach 127 km). An error-bounded answer is three runs: about 4.5 minutes at 0.1°, 25 s at 1°. Curated sites are built ahead of time, so this only affects custom points. Options: (a) run the three runs in parallel processes (about a third of the time); (b) default the API to 1° wedges for custom points, with 0.1° on request; (c) pre-compute skylines on a grid of points. My recommendation is (a) and (b) together.
 
-- **Site shortlist (PR 9).** Candidates inside 80°S: Shackleton rim and the connecting ridge, de Gerlache rim, Malapert massif, Leibnitz beta plateau, Nobile rim, Mons Mouton (IM-2), Malapert A (IM-1, near the region edge), de Gerlache-Kocher massif (far-side facing), and permanently shadowed floors such as Shackleton, Haworth and Cabeus (LCROSS).
+- **5 m site maps: which files to download (needs your go-ahead).** The five matching sites (see Group 4):
+
+  | Choice | Files | Size | Gives |
+  | --- | --- | --- | --- |
+  | A | heights, height error, slope error | 15 files, 0.70 GB | The near terrain at 5 m instead of 10 m, and the measured slope error in place of the general 6° |
+  | B | A plus 10 clones per site | 65 files, 3.1 GB | Also an independent check: the skyline of each clone must lie inside the bound |
+  | C | A plus all 100 clones | 515 files, 24 GB | The full spread; about 3 hours at the measured server speed |
+
+  My recommendation is B. This narrows the earlier decision ("use the 100 clones to measure the spread"), so it needs your yes. The bound itself must stay a proven worst case, which the clones cannot give (they are samples), so their job is to check the bound. Ten per site is enough to catch a bound that is too narrow.
 - Mock shade grids exist for 2 of the 10 mock sites, at a small grid size, so the web app meets sites with and without one. Say if the web side needs all 10.
