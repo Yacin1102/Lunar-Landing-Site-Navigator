@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
 import { panelPowerW } from "../engine/power";
 import type { DataBundle, Direction } from "../engine/runtime-types";
 import type { Site, Skyline } from "../engine/types";
 import { fetchCustomSkyline } from "./api";
+import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
 import {
   buildTimeline,
   elevationRange,
-  formatDuration,
   skyBodySize,
   skyPoint,
   timelineBounds,
-  toDateTimeInputValue,
-  fromDateTimeInputValue,
   type ScenarioSummary,
   type TimelinePoint,
 } from "./visual-model";
@@ -59,6 +57,7 @@ export default function App() {
   const [customLat, setCustomLat] = useState("-89");
   const [customLon, setCustomLon] = useState("0");
   const [customMessage, setCustomMessage] = useState<string>();
+  const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
 
   useEffect(() => {
     loadDataBundle()
@@ -171,6 +170,19 @@ export default function App() {
     setActiveIndex((current) => Math.max(0, Math.min(current, scenarios.length - 2)));
   }
 
+  /** Store the first-visit explanation dismissal so returning visitors see the focused dashboard. */
+  function dismissIntro(): void {
+    window.localStorage.setItem("lunar-intro-dismissed", "1");
+    setIntroOpen(false);
+  }
+
+  /** Put a map-picked coordinate into the custom point controls and open Details. */
+  function pickCustomCoordinate(lat: number, lon: number): void {
+    setCustomLat(lat.toFixed(4));
+    setCustomLon(lon.toFixed(4));
+    setDetailsOpen(true);
+  }
+
   if (loadError) return <main className="app-shell"><aside className="error-panel" role="alert">{loadError}</aside></main>;
   if (!bundle || !activeScenario || !activeSite || !activeSummary || !currentPoint) return <main className="app-shell"><p className="loading">Loading mission data…</p></main>;
 
@@ -202,6 +214,7 @@ export default function App() {
         </label>
         <label className="top-control">UTC
           <input type="datetime-local" value={toDateTimeInputValue(activeScenario.dateMs)} onChange={(event) => updateActiveDate(fromDateTimeInputValue(event.target.value))} aria-label="Select UTC date and time" />
+          <small className="local-time">{formatLocalTime(activeScenario.dateMs)} local</small>
         </label>
         <div className="top-actions">
           <button type="button" onClick={() => setPage("compare")}>Compare</button>
@@ -213,6 +226,7 @@ export default function App() {
       </header>
 
       {bundle.manifest.data_kind === "mock" && <div className="mock-strip">Mock terrain data — not a mission verdict.</div>}
+      {introOpen && <IntroPanel onDismiss={dismissIntro} />}
 
       <div className="workspace">
         <section className="main-column" aria-label="Main mission view">
@@ -225,14 +239,14 @@ export default function App() {
           </div>
           {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
           {view === "terrain" && <TerrainView bundle={effectiveBundle} site={activeSite} />}
-          {view === "map" && <MapView site={activeSite} />}
+          {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} onPickCustom={pickCustomCoordinate} />}
         </section>
 
         <aside className="status-column" aria-label="Mission status">
-          <StatusCard tone="sun" label="Sun" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={`${Math.round(currentPoint.sunFraction * 100)}%`} exact={mode === "expert" ? `${currentPoint.sun.el_deg.toFixed(2)}° elevation · ${currentPoint.sun.az_deg.toFixed(2)}° azimuth` : undefined} />
+          <StatusCard tone="sun" label="Sun" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={formatPercent(currentPoint.sunFraction)} exact={mode === "expert" ? `${formatDegrees(currentPoint.sun.el_deg)} elevation · ${formatDegrees(currentPoint.sun.az_deg)} azimuth` : undefined} />
           <StatusCard label={currentPoint.sunStatus === "visible" ? "Time until sunset" : "Time until sunrise"} help="The next time the Sun changes between visible and hidden, based on the current terrain skyline." value={formatDuration(durationUntil(currentPoint.sunStatus === "visible" ? nextSunset : nextSunrise, activeScenario.dateMs))} />
-          <StatusCard tone="earth" label="Earth" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} exact={mode === "expert" ? `${currentPoint.earth.el_deg.toFixed(2)}° elevation · ${currentPoint.earth.az_deg.toFixed(2)}° azimuth` : undefined} />
-          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={`${Math.round(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} W`} exact={mode === "expert" ? `${Math.round(currentPoint.batteryWh)} Wh battery · 120 W load` : `Battery ${Math.round((currentPoint.batteryWh / 2400) * 100)}%`} />
+          <StatusCard tone="earth" label="Earth" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} exact={mode === "expert" ? `${formatDegrees(currentPoint.earth.el_deg)} elevation · ${formatDegrees(currentPoint.earth.az_deg)} azimuth` : undefined} />
+          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={formatPower(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} exact={mode === "expert" ? `${Math.round(currentPoint.batteryWh)} Wh battery · 120 W load` : `Battery ${formatPercent(currentPoint.batteryWh / 2400)}`} />
         </aside>
       </div>
 
@@ -271,6 +285,11 @@ function sunStatusLabel(status: TimelinePoint["sunStatus"]): string {
 /** Describe the three-state Earth result in words for a first-time visitor. */
 function earthStatusLabel(status: TimelinePoint["earthStatus"]): string {
   return status === "visible" ? "In view" : status === "blocked" ? "Out of view" : "Uncertain";
+}
+
+/** Explain the south-pole planning problem once, then let the visitor focus on the answer. */
+function IntroPanel({ onDismiss }: { onDismiss: () => void }) {
+  return <section className="intro-panel"><div><p className="eyebrow">First visit</p><h2>Why the lunar south pole is difficult</h2><p>The Sun and Earth skim the horizon, so small terrain changes can decide whether a landing site has power and contact.</p></div><button type="button" onClick={onDismiss}>Got it</button></section>;
 }
 
 /** Render one compact status card with optional exact values for expert mode. */
@@ -320,11 +339,17 @@ function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: S
   return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch</p><h1>3D view</h1></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><p className="view-caption">{patch.label.size_m.toFixed(0)} m patch · {patch.label.spacing_m.toFixed(0)} m spacing</p></section>;
 }
 
-/** Render a minimal polar map showing the selected site's coordinates. */
-function MapView({ site }: { site: Site }) {
+/** Render the data-driven south-polar map and allow selecting sites or a custom point. */
+function MapView({ site, sites, onSelect, onPickCustom }: { site: Site; sites: Site[]; onSelect: (siteId: string) => void; onPickCustom: (lat: number, lon: number) => void }) {
   const x = 50 + (site.lon / 180) * 36;
   const y = 50 + ((site.lat + 90) / 10) * 36;
-  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="The map places the selected coordinates within the supported lunar south-polar service region." /></div><div className="polar-map"><div className="polar-grid" /><span className="site-marker" style={{ left: `${x}%`, top: `${y}%` }} title={`${site.lat.toFixed(3)}°, ${site.lon.toFixed(3)}°`} /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
+  function handleMapClick(event: MouseEvent<HTMLDivElement>): void {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const lon = Math.max(-180, Math.min(180, ((event.clientX - bounds.left) / bounds.width - 0.5) / 0.36 * 180));
+    const lat = Math.max(-90, Math.min(-80, -90 + ((event.clientY - bounds.top) / bounds.height - 0.5) / 0.36 * 10));
+    onPickCustom(lat, lon);
+  }
+  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="Select a curated site marker or click anywhere on the polar map to prepare a custom coordinate." /></div><div className="polar-map" onClick={handleMapClick}><div className="polar-grid" />{sites.map((candidate) => <button type="button" className={candidate.id === site.id ? "site-marker selected" : "site-marker"} style={{ left: `${50 + (candidate.lon / 180) * 36}%`, top: `${50 + ((candidate.lat + 90) / 10) * 36}%` }} onClick={(event) => { event.stopPropagation(); onSelect(candidate.id); }} title={candidate.name} aria-label={`Select ${candidate.name}`} key={candidate.id} />)}<span className="site-marker custom-marker" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden="true" /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
 }
 
 /** Render the single compact timeline and its draggable UTC cursor. */
