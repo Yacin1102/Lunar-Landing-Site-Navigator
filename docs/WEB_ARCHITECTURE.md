@@ -1,15 +1,66 @@
-# Web architecture
+# Web application architecture
 
-The browser reads prepared products from one folder and performs all user-time calculations locally.
+The web application is a thin presentation layer over prepared products and the existing browser engine. It does not open NASA files or duplicate astronomy formulas.
+
+| Module | Job | Reads | Writes |
+| --- | --- | --- | --- |
+| `web/engine/data.ts` | Load and decode the configured data folder | `manifest.json`, labels, binary products | `DataBundle` |
+| `web/engine/client.ts` | Run event evaluation away from the UI thread | `DataBundle`, UTC window | Worker result |
+| `web/src/visual-model.ts` | Sample the existing engine for display windows | `DataBundle`, site, skyline, UTC window | `ScenarioSummary` |
+| `web/src/formatting.ts` | Format every user-facing number and time | Numeric values, UTC milliseconds | Display strings |
+| `web/src/App.tsx` | Compose dashboard, tabs, cards, drawer, map, and compare page | Loader, visual model, API client, URL state | React view state |
+| `web/src/api.ts` | Request custom-coordinate skylines | `/api/skyline` response | Skyline or explicit unavailable message |
+| `web/src/url-state.ts` | Preserve up to four scenarios in the page URL | Query string, scenarios | Query string |
+
+## Main data flow
 
 ```mermaid
 flowchart LR
-  Data[manifest/sites/ephemeris/skylines] --> Loader[Prepared-data loader]
-  Loader --> UI[React site menu]
-  Loader --> Worker[Astro Web Worker]
-  Worker --> Verdict[Visibility and events]
-  Verdict --> Power[Power and battery]
-  Power --> UI
+  Files[Configured prepared data folder] --> Loader[loadDataBundle]
+  Loader --> Model[buildTimeline]
+  Model --> Cards[Sun, transition, Earth, power cards]
+  Model --> Views[Sky, terrain, map views]
+  Model --> Timeline[Timeline cursor and chart]
+  Loader --> Worker[Event worker client]
+  Worker --> Cards
+  API[GET /api/skyline] --> Model
+  URL[scenarios query parameter] --> App[React App]
+  App --> URL
 ```
 
-The web engine uses degrees at its public boundaries, UTC milliseconds for time, and kilometres for Sun/Earth vectors. The mock files are synthetic and are always labelled in the UI.
+## Component structure
+
+```mermaid
+flowchart TB
+  App --> TopBar
+  App --> MainArea
+  App --> StatusColumn
+  App --> Timeline
+  App --> DetailsDrawer
+  App --> ComparePage
+  MainArea --> SkyView
+  MainArea --> TerrainView
+  MainArea --> MapView
+  StatusColumn --> StatusCard
+```
+
+The beginner screen intentionally exposes only the site/time controls, one main view, four status cards, and the timeline. Expert mode adds exact values and opens the Details drawer. Comparison is a separate page so it cannot compete with the first answer.
+
+## Live custom-coordinate request
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Details as Details drawer / Map
+  participant API as Skyline API
+  participant Model as Browser visual model
+  User->>Details: Pick or enter latitude and longitude
+  Details->>API: GET /api/skyline?lat=...&lon=...
+  API-->>Details: Skyline or structured error
+  Details->>Model: Add skyline to runtime bundle
+  Model-->>User: Status cards and timeline, or unavailable message
+```
+
+## 3D view boundary
+
+The 3D view is loaded lazily from `web/src/three/` and consumes only the display terrain patch, shade grid, and directions already produced for the selected time. Its coordinate conversion and brightness helpers are tested independently; the astronomy engine remains unchanged.
