@@ -87,7 +87,7 @@ How the slope case was fixed. The contract review found that on an 18° slope th
 - the first ceiling pairs a piece's highest point with its nearest distance, which is loose on a slope facing the eye; pieces of cells now also get a ceiling from their four corner points;
 - a piece covering several wedges raised all of their ceilings with its highest part, which matters most along the slope's contour; such pieces now get a separate ceiling per wedge.
 
-**Limit that remains: an eye at ground level on a steep slope.** With `mast_m = 0` on the same slope, the interval averages ±0.016° and reaches ±0.08°. With the eye exactly on the ground, the ground at the observer's feet rises at the skyline's own angle in every direction, all the way in to the 1 m excluded circle. Pieces there are too close to resolve to 0.1° wedges. The result is still proven, only wider. Whether the live API should accept `mast_m = 0` is an open question for PR 7.
+**Limit that remains: an eye at ground level on a steep slope.** With `mast_m = 0` on the same slope, the interval averages ±0.016° and reaches ±0.08°. With the eye exactly on the ground, the ground at the observer's feet rises at the skyline's own angle in every direction, all the way in to the 1 m excluded circle. Pieces there are too close to resolve to 0.1° wedges. The result is still proven, only wider.
 
 A rounding margin of 0.000000001° is added to every ceiling, so that floating-point rounding cannot place a terrain point above it.
 

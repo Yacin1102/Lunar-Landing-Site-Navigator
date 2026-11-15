@@ -335,8 +335,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .detail-list dt { color: #999; font-size: 0.8rem; }
 .detail-list dd { margin: 0.25rem 0 0; color: #fff; }
 .drawer-section { margin-top: 1.5rem; }
-.custom-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 0.75rem 0; }
-.custom-fields label { display: grid; gap: 0.35rem; color: #aaa; font-size: 0.8rem; }
 .drawer-message { color: #bbb; font-size: 0.8rem; }
 
 .terrain-grid {

@@ -3,7 +3,7 @@
 Role
     The second backend of :class:`lunar_engine.elevation.ElevationSource`.
     It lets the skyline engine, its stopping rule, its error bound, the
-    line-of-sight check, the record writer and the live API be built and
+    line-of-sight check and the record writer be built and
     tested without the real maps, and against answers that can be worked out
     by hand (spec section 13: "the skyline is right on synthetic terrain with
     hand-calculated answers").

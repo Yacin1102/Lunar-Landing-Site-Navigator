@@ -83,9 +83,9 @@ export interface SiteList {
 
 /**
  * A skyline (Contract 3): for each azimuth, the highest elevation angle at which terrain
- * appears from the eye of the observer. Used for skylines/{id}.json and for the
- * /api/skyline response. Entry k of both arrays belongs to azimuth k * az_step_deg and
- * covers the wedge of azimuths within half a step either side of it.
+ * appears from the eye of the observer. Used for skylines/{id}.json. Entry k of both
+ * arrays belongs to azimuth k * az_step_deg and covers the wedge of azimuths within half a
+ * step either side of it.
  */
 export interface Skyline {
   /** Format version of this file. Increased on any format change. */
@@ -311,52 +311,6 @@ export interface EventsFixture {
   version: 1;
   /** The test cases. */
   cases: EventsCase[];
-}
-
-/** Response of GET /api/health (Contract 7). */
-export interface ApiHealth {
-  /** Format version of this file. Increased on any format change. */
-  version: 1;
-  /** The server is running. */
-  ok: true;
-  /**
-   * True if the server reads the real NASA elevation maps. False means synthetic terrain for
-   * development: do not show its skylines as real verdicts.
-   */
-  real_terrain: boolean;
-  /** The part of the Moon the app covers: all longitudes between two latitudes. */
-  service_region: ServiceRegion;
-  /** az_step_deg used when the request gives none, degrees. */
-  az_step_deg_default: number;
-  /** Accepted az_step_deg values, degrees. */
-  az_step_deg_allowed: number[];
-  /** mast_m used when the request gives none, metres. */
-  mast_m_default: number;
-  /** Largest accepted mast_m, metres. */
-  mast_m_max: number;
-}
-
-/** What was wrong. */
-export interface ApiErrorDetail {
-  /** Machine-readable reason. */
-  code: "missing_parameter" | "invalid_value" | "out_of_region" | "not_found" | "internal";
-  /** The request parameter at fault, if one is. */
-  param?: string;
-  /** Explanation for a person. */
-  message: string;
-}
-
-/**
- * Body of every refused request (HTTP status 400 for a bad or missing value, 422 for a
- * point outside the service region).
- */
-export interface ApiError {
-  /** Format version of this file. Increased on any format change. */
-  version: 1;
-  /** Always false. */
-  ok: false;
-  /** What was wrong. */
-  error: ApiErrorDetail;
 }
 
 /** Radius of the height reference sphere, metres. */

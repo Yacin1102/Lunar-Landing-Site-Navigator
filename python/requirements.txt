@@ -1,10 +1,7 @@
 spiceypy
 numpy
 rasterio
-fastapi
-uvicorn
 requests
 pytest
 matplotlib
 jsonschema
-httpx

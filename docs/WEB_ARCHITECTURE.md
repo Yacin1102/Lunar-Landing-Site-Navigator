@@ -8,8 +8,7 @@ The web application is a thin presentation layer over prepared products and the 
 | `web/engine/client.ts` | Run event evaluation away from the UI thread | `DataBundle`, UTC window | Worker result |
 | `web/src/visual-model.ts` | Sample the existing engine for display windows | `DataBundle`, site, skyline, UTC window | `ScenarioSummary` |
 | `web/src/formatting.ts` | Format every user-facing number and time | Numeric values, UTC milliseconds | Display strings |
-| `web/src/App.tsx` | Compose dashboard, tabs, cards, drawer, map, and compare page | Loader, visual model, API client, URL state | React view state |
-| `web/src/api.ts` | Request custom-coordinate skylines | `/api/skyline` response | Skyline or explicit unavailable message |
+| `web/src/App.tsx` | Compose dashboard, tabs, cards, drawer, map, and compare page | Loader, visual model, URL state | React view state |
 | `web/src/url-state.ts` | Preserve up to four scenarios in the page URL | Query string, scenarios | Query string |
 
 ## Main data flow
@@ -23,7 +22,6 @@ flowchart LR
   Model --> Timeline[Timeline cursor and chart]
   Loader --> Worker[Event worker client]
   Worker --> Cards
-  API[GET /api/skyline] --> Model
   URL[scenarios query parameter] --> App[React App]
   App --> URL
 ```
@@ -45,21 +43,6 @@ flowchart TB
 ```
 
 The beginner screen intentionally exposes only the site/time controls, one main view, four status cards, and the timeline. Expert mode adds exact values and opens the Details drawer. Comparison is a separate page so it cannot compete with the first answer.
-
-## Live custom-coordinate request
-
-```mermaid
-sequenceDiagram
-  participant User
-  participant Details as Details drawer / Map
-  participant API as Skyline API
-  participant Model as Browser visual model
-  User->>Details: Pick or enter latitude and longitude
-  Details->>API: GET /api/skyline?lat=...&lon=...
-  API-->>Details: Skyline or structured error
-  Details->>Model: Add skyline to runtime bundle
-  Model-->>User: Status cards and timeline, or unavailable message
-```
 
 ## 3D view boundary
 

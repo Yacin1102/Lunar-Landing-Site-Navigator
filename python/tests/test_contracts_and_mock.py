@@ -46,7 +46,7 @@ def test_types_ts_is_exactly_what_the_schemas_generate():
 def test_types_ts_declares_every_contract():
     text = gen_types.OUTPUT.read_text(encoding="utf-8")
     for name in ("EphemLabel", "SiteList", "Site", "Skyline", "TerrainLabel", "ShadeLabel",
-                 "Manifest", "AltAzFixture", "EventsFixture", "ApiHealth", "ApiError"):
+                 "Manifest", "AltAzFixture", "EventsFixture"):
         assert f"export interface {name} {{" in text
     assert "sunAz: number;" in text and "mission?: string;" in text
 

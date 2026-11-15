@@ -3,7 +3,7 @@
   "$id": "https://github.com/Yacin1102/Lunar-Landing-Site-Navigator/docs/schemas/skyline.schema.json",
   "type": "object",
   "title": "Skyline",
-  "description": "A skyline (Contract 3): for each azimuth, the highest elevation angle at which terrain appears from the eye of the observer. Used for skylines/{id}.json and for the /api/skyline response. Entry k of both arrays belongs to azimuth k * az_step_deg and covers the wedge of azimuths within half a step either side of it.",
+  "description": "A skyline (Contract 3): for each azimuth, the highest elevation angle at which terrain appears from the eye of the observer. Used for skylines/{id}.json. Entry k of both arrays belongs to azimuth k * az_step_deg and covers the wedge of azimuths within half a step either side of it.",
   "properties": {
     "version": {
       "type": "integer",

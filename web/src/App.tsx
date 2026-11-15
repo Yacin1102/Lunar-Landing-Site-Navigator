@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
 import { panelPowerW } from "../engine/power";
 import type { DataBundle, Direction } from "../engine/runtime-types";
-import type { Site, Skyline } from "../engine/types";
-import { fetchCustomSkyline } from "./api";
+import type { Site } from "../engine/types";
 import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
 import {
   buildTimeline,
@@ -32,19 +31,12 @@ interface WorkerResult {
   events?: WorkerEvents;
 }
 
-interface ExtraSite {
-  site: Site;
-  skyline: Skyline;
-}
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000";
 const PANEL = { type: "tracking" as const, area_m2: 4, efficiency: 0.25 };
 
 /** Render the focused mission dashboard without changing the existing astronomy engine. */
 export default function App() {
   const [bundle, setBundle] = useState<DataBundle>();
   const [loadError, setLoadError] = useState<string>();
-  const [extraSites, setExtraSites] = useState<ExtraSite[]>([]);
   const [scenarios, setScenarios] = useState<SavedScenario[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [view, setView] = useState<ViewMode>("sky");
@@ -54,9 +46,6 @@ export default function App() {
   const [spanDays, setSpanDays] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [workerResult, setWorkerResult] = useState<WorkerResult>();
-  const [customLat, setCustomLat] = useState("-89");
-  const [customLon, setCustomLon] = useState("0");
-  const [customMessage, setCustomMessage] = useState<string>();
   const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
 
   useEffect(() => {
@@ -70,24 +59,23 @@ export default function App() {
       .catch((reason: unknown) => setLoadError(reason instanceof Error ? reason.message : "Prepared data could not be loaded."));
   }, []);
 
-  const allSites = useMemo(() => [...(bundle?.sites ?? []), ...extraSites.map((entry) => entry.site)], [bundle, extraSites]);
-  const extraSkylineMap = useMemo(() => new Map(extraSites.map((entry) => [entry.site.id, entry.skyline])), [extraSites]);
+  const allSites = bundle?.sites ?? [];
   const activeScenario = scenarios[activeIndex] ?? scenarios[0];
   const activeSite = allSites.find((site) => site.id === activeScenario?.siteId);
-  const activeSkyline = activeScenario
-    ? extraSkylineMap.get(activeScenario.siteId) ?? bundle?.skylines.get(activeScenario.siteId)
-    : undefined;
-  const effectiveBundle = useMemo(() => {
-    if (!bundle) return undefined;
-    return { ...bundle, sites: allSites, skylines: new Map([...bundle.skylines, ...extraSkylineMap]) };
-  }, [allSites, bundle, extraSkylineMap]);
+  const activeSkyline = activeScenario ? bundle?.skylines.get(activeScenario.siteId) : undefined;
   const activeSummary = useMemo(
-    () => effectiveBundle && activeSite && activeScenario
-      ? buildTimeline(effectiveBundle, activeSite, activeSkyline, activeScenario.dateMs, spanDays)
+    () => bundle && activeSite && activeScenario
+      ? buildTimeline(bundle, activeSite, activeSkyline, activeScenario.dateMs, spanDays)
       : undefined,
-    [activeScenario, activeSite, activeSkyline, effectiveBundle, spanDays],
+    [activeScenario, activeSite, activeSkyline, bundle, spanDays],
   );
-  const bounds = activeScenario ? timelineBounds(activeScenario.dateMs, spanDays) : undefined;
+  // Memoised on the instant and span: a fresh object on every render would re-run the worker effect
+  // below after each result, an endless loop of worker evaluations.
+  const activeDateMs = activeScenario?.dateMs;
+  const bounds = useMemo(
+    () => activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
+    [activeDateMs, spanDays],
+  );
   const currentPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
 
   useEffect(() => {
@@ -95,9 +83,9 @@ export default function App() {
   }, [scenarios]);
 
   useEffect(() => {
-    if (playing || !effectiveBundle || !activeScenario || !activeSkyline || !bounds) return;
+    if (playing || !bundle || !activeScenario || !activeSkyline || !bounds) return;
     let cancelled = false;
-    evaluateInWorker(effectiveBundle, activeScenario.siteId, activeScenario.dateMs, bounds.startMs, bounds.endMs)
+    evaluateInWorker(bundle, activeScenario.siteId, activeScenario.dateMs, bounds.startMs, bounds.endMs)
       .then((result) => {
         if (!cancelled) setWorkerResult(result as WorkerResult);
       })
@@ -107,7 +95,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeScenario, activeSkyline, bounds, effectiveBundle, playing]);
+  }, [activeScenario, activeSkyline, bounds, bundle, playing]);
 
   useEffect(() => {
     if (!playing || !activeScenario || !bounds) return;
@@ -142,28 +130,6 @@ export default function App() {
     setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs } : scenario));
   }
 
-  /** Request a terrain skyline for a custom south-polar coordinate. */
-  async function addCustomSite(): Promise<void> {
-    const lat = Number(customLat);
-    const lon = Number(customLon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > -80 || lon < -180 || lon > 180) {
-      setCustomMessage("Latitude must be -90° to -80° and longitude -180° to 180°.");
-      return;
-    }
-    setCustomMessage("Requesting terrain…");
-    const result = await fetchCustomSkyline(API_BASE, lat, lon);
-    if (!result.ok) {
-      setCustomMessage(result.message);
-      return;
-    }
-    const id = `custom_${lat.toFixed(4)}_${lon.toFixed(4)}`.replaceAll("-", "m").replaceAll(".", "p");
-    const site: Site = { id, name: `Custom ${lat.toFixed(3)}°, ${lon.toFixed(3)}°`, lat, lon, category: "custom", has_terrain: false, has_shade_grid: false };
-    setExtraSites((current) => [...current.filter((entry) => entry.site.id !== id), { site, skyline: result.skyline }]);
-    setScenarios((current) => [...current.filter((scenario) => scenario.siteId !== id), { siteId: id, dateMs: activeScenario?.dateMs ?? Date.now() }].slice(-4));
-    setActiveIndex(Math.min(scenarios.length, 3));
-    setCustomMessage("Terrain loaded.");
-  }
-
   /** Remove a scenario from the comparison page's saved set. */
   function removeScenario(index: number): void {
     setScenarios((current) => current.filter((_, candidateIndex) => candidateIndex !== index));
@@ -176,20 +142,13 @@ export default function App() {
     setIntroOpen(false);
   }
 
-  /** Put a map-picked coordinate into the custom point controls and open Details. */
-  function pickCustomCoordinate(lat: number, lon: number): void {
-    setCustomLat(lat.toFixed(4));
-    setCustomLon(lon.toFixed(4));
-    setDetailsOpen(true);
-  }
-
   if (loadError) return <main className="app-shell"><aside className="error-panel" role="alert">{loadError}</aside></main>;
   if (!bundle || !activeScenario || !activeSite || !activeSummary || !currentPoint) return <main className="app-shell"><p className="loading">Loading mission data…</p></main>;
 
   if (page === "compare") {
     return <ComparePage
       scenarios={scenarios}
-      summaries={buildComparisonSummaries(effectiveBundle, scenarios, allSites, extraSkylineMap, spanDays)}
+      summaries={buildComparisonSummaries(bundle, scenarios, allSites, spanDays)}
       activeIndex={activeIndex}
       onBack={() => setPage("dashboard")}
       onSelect={setActiveIndex}
@@ -238,8 +197,8 @@ export default function App() {
             ))}
           </div>
           {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
-          {view === "terrain" && <TerrainView bundle={effectiveBundle} site={activeSite} />}
-          {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} onPickCustom={pickCustomCoordinate} />}
+          {view === "terrain" && <TerrainView bundle={bundle} site={activeSite} />}
+          {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} />}
         </section>
 
         <aside className="status-column" aria-label="Mission status">
@@ -255,13 +214,7 @@ export default function App() {
       {detailsOpen && <DetailsDrawer
         summary={activeSummary}
         mode={mode}
-        customLat={customLat}
-        customLon={customLon}
-        customMessage={customMessage}
         onClose={() => setDetailsOpen(false)}
-        onLatChange={setCustomLat}
-        onLonChange={setCustomLon}
-        onLoadCustom={addCustomSite}
       />}
     </main>
   );
@@ -339,17 +292,11 @@ function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: S
   return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch</p><h1>3D view</h1></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><p className="view-caption">{patch.label.size_m.toFixed(0)} m patch · {patch.label.spacing_m.toFixed(0)} m spacing</p></section>;
 }
 
-/** Render the data-driven south-polar map and allow selecting sites or a custom point. */
-function MapView({ site, sites, onSelect, onPickCustom }: { site: Site; sites: Site[]; onSelect: (siteId: string) => void; onPickCustom: (lat: number, lon: number) => void }) {
+/** Render the data-driven south-polar map for selecting one of the curated sites. */
+function MapView({ site, sites, onSelect }: { site: Site; sites: Site[]; onSelect: (siteId: string) => void }) {
   const x = 50 + (site.lon / 180) * 36;
   const y = 50 + ((site.lat + 90) / 10) * 36;
-  function handleMapClick(event: MouseEvent<HTMLDivElement>): void {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const lon = Math.max(-180, Math.min(180, ((event.clientX - bounds.left) / bounds.width - 0.5) / 0.36 * 180));
-    const lat = Math.max(-90, Math.min(-80, -90 + ((event.clientY - bounds.top) / bounds.height - 0.5) / 0.36 * 10));
-    onPickCustom(lat, lon);
-  }
-  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="Select a curated site marker or click anywhere on the polar map to prepare a custom coordinate." /></div><div className="polar-map" onClick={handleMapClick}><div className="polar-grid" />{sites.map((candidate) => <button type="button" className={candidate.id === site.id ? "site-marker selected" : "site-marker"} style={{ left: `${50 + (candidate.lon / 180) * 36}%`, top: `${50 + ((candidate.lat + 90) / 10) * 36}%` }} onClick={(event) => { event.stopPropagation(); onSelect(candidate.id); }} title={candidate.name} aria-label={`Select ${candidate.name}`} key={candidate.id} />)}<span className="site-marker custom-marker" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden="true" /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
+  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="Select a curated site marker to evaluate it." /></div><div className="polar-map"><div className="polar-grid" />{sites.map((candidate) => <button type="button" className={candidate.id === site.id ? "site-marker selected" : "site-marker"} style={{ left: `${50 + (candidate.lon / 180) * 36}%`, top: `${50 + ((candidate.lat + 90) / 10) * 36}%` }} onClick={(event) => { event.stopPropagation(); onSelect(candidate.id); }} title={candidate.name} aria-label={`Select ${candidate.name}`} key={candidate.id} />)}<span className="site-marker custom-marker" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden="true" /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
 }
 
 /** Render the single compact timeline and its draggable UTC cursor. */
@@ -366,9 +313,9 @@ function Timeline({ summary, selectedMs, playing, onPlay, onChange, bounds }: { 
   return <section className="timeline-panel"><div className="timeline-heading"><div><p className="eyebrow">Mission timeline</p><h2>Sunlight and Earth contact</h2></div><Tooltip text="Drag the cursor or press play to move through the selected UTC window." /></div><div className="timeline-plot"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Sun and Earth elevation over time"><line x1="0" y1={y(0)} x2={width} y2={y(0)} className="horizon" /><polyline points={line("sun")} className="sun-path" /><polyline points={line("earth")} className="earth-path" /><line x1={ratio * width} y1="0" x2={ratio * width} y2={height} className="time-cursor" /></svg><div className="timeline-controls"><button type="button" onClick={onPlay}>{playing ? "Pause" : "Play"}</button><input type="range" min="0" max="1000" value={Math.round(ratio * 1000)} onChange={(event) => onChange((bounds?.startMs ?? selectedMs) + (Number(event.target.value) / 1000) * (bounds ? bounds.endMs - bounds.startMs : 0))} aria-label="Timeline cursor" /><time>{new Date(selectedMs).toISOString().replace(".000Z", "Z")}</time></div></div></section>;
 }
 
-/** Render a right-side drawer with precision, metrics, and custom coordinate controls. */
-function DetailsDrawer({ summary, mode, customLat, customLon, customMessage, onClose, onLatChange, onLonChange, onLoadCustom }: { summary: ScenarioSummary; mode: ExperienceMode; customLat: string; customLon: string; customMessage?: string; onClose: () => void; onLatChange: (value: string) => void; onLonChange: (value: string) => void; onLoadCustom: () => void }) {
-  return <aside className="details-drawer" aria-label="Mission details"><div className="drawer-heading"><div><p className="eyebrow">Mission details</p><h2>{mode === "expert" ? "Expert readout" : "Additional information"}</h2></div><button type="button" onClick={onClose} aria-label="Close details">×</button></div><dl className="detail-list"><div><dt>Sunlight in selected window</dt><dd>{summary.sunlightHours.toFixed(1)} h</dd></div><div><dt>Lowest battery</dt><dd>{summary.lowestBatteryWh.toFixed(0)} Wh</dd></div><div><dt>Skyline DEM</dt><dd>{summary.skyline?.dem.join(", ") ?? "Unavailable"}</dd></div><div><dt>Resolution</dt><dd>{summary.skyline?.resolution_m.toFixed(0) ?? "—"} m</dd></div><div><dt>Skyline uncertainty</dt><dd>{summary.skyline ? `${Math.max(...summary.skyline.skyline_err_deg).toFixed(2)}° max` : "—"}</dd></div></dl><div className="drawer-section"><p className="eyebrow">Custom point</p><div className="custom-fields"><label>Latitude<input value={customLat} onChange={(event) => onLatChange(event.target.value)} /></label><label>Longitude<input value={customLon} onChange={(event) => onLonChange(event.target.value)} /></label></div><button type="button" onClick={onLoadCustom}>Load skyline</button>{customMessage && <p className="drawer-message" role="status">{customMessage}</p>}</div></aside>;
+/** Render a right-side drawer with precision and metric details. */
+function DetailsDrawer({ summary, mode, onClose }: { summary: ScenarioSummary; mode: ExperienceMode; onClose: () => void }) {
+  return <aside className="details-drawer" aria-label="Mission details"><div className="drawer-heading"><div><p className="eyebrow">Mission details</p><h2>{mode === "expert" ? "Expert readout" : "Additional information"}</h2></div><button type="button" onClick={onClose} aria-label="Close details">×</button></div><dl className="detail-list"><div><dt>Sunlight in selected window</dt><dd>{summary.sunlightHours.toFixed(1)} h</dd></div><div><dt>Lowest battery</dt><dd>{summary.lowestBatteryWh.toFixed(0)} Wh</dd></div><div><dt>Skyline DEM</dt><dd>{summary.skyline?.dem.join(", ") ?? "Unavailable"}</dd></div><div><dt>Resolution</dt><dd>{summary.skyline?.resolution_m.toFixed(0) ?? "—"} m</dd></div><div><dt>Skyline uncertainty</dt><dd>{summary.skyline ? `${Math.max(...summary.skyline.skyline_err_deg).toFixed(2)}° max` : "—"}</dd></div></dl></aside>;
 }
 
 /** Render the separate scenario comparison page without crowding the dashboard. */
@@ -379,12 +326,12 @@ function ComparePage({ scenarios, summaries, activeIndex, onBack, onSelect }: { 
 }
 
 /** Build summaries for the separate comparison page from the same browser engine calls. */
-function buildComparisonSummaries(bundle: DataBundle | undefined, scenarios: SavedScenario[], sites: Site[], extraSkylines: Map<string, Skyline>, spanDays: number): ScenarioSummary[] {
+function buildComparisonSummaries(bundle: DataBundle | undefined, scenarios: SavedScenario[], sites: Site[], spanDays: number): ScenarioSummary[] {
   if (!bundle) return [];
   return scenarios.flatMap((scenario) => {
     const site = sites.find((candidate) => candidate.id === scenario.siteId);
     if (!site) return [];
-    return [buildTimeline(bundle, site, extraSkylines.get(site.id) ?? bundle.skylines.get(site.id), scenario.dateMs, spanDays)];
+    return [buildTimeline(bundle, site, bundle.skylines.get(site.id), scenario.dateMs, spanDays)];
   });
 }
 

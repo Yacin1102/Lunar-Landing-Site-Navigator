@@ -45,7 +45,7 @@ from lunar_engine import contracts, lola, patches, products, records, sites  # n
 
 DEM_DIR = Path(__file__).resolve().parents[1] / "dem"
 ROWS_DIR = lola.DEFAULT_CACHE / "shade_rows"
-#: Curated skylines and shade cells: eye 2 m above the ground (the API default).
+#: Curated skylines and shade cells: eye 2 m above the ground (the default eye height).
 MAST_M = 2.0
 #: Curated skylines: 0.1 degree wedges.
 AZ_STEP_DEG = 0.1
