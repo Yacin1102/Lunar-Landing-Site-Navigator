@@ -11,7 +11,7 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | Mock data, contract-exact | `web/public/data-mock/` | Ready: sites, skylines, terrain patches, shade grids, manifest |
 | Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
 | Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
-| Live API | `http://localhost:8000/api/...` | Running on synthetic terrain: `python python/scripts/serve.py --synthetic`. Real terrain comes with the map reader |
+| Live API | none | Removed on 2026-11-15 by decision: the app covers the 10 curated sites only, with no custom coordinates |
 | Real data, complete | `web/public/data/` | Ready: the 10 real sites (sources in `python/sites_sources.md`; categories `high_illumination`, `landing_site`, `psr`), their skylines with error bounds, terrain patches, shade grids (17 x 17 cells, 300 m apart, 1° wedges), the timetable and the manifest (`data_kind: "real"`). To use it, set `VITE_DATA_FOLDER=/data` (the default is still `/data-mock`) |
 
 To start in a separate working copy:
@@ -22,11 +22,11 @@ git worktree add ..\Lunar-web -b web/app feat/timetable
 
 ## The rules for the web side
 
-1. **Never open a NASA file.** The web app reads only `web/public/data/` (or `data-mock/`) and the live API.
+1. **Never open a NASA file.** The web app reads only `web/public/data/` (or `data-mock/`).
 2. **Everything that depends on the chosen time or settings is computed in the browser**: Sun and Earth direction, lit or blocked, events, countdowns, power, battery.
 3. **Read the folder's `manifest.json` first.** If `data_kind` is `"mock"`, show a visible "mock data" banner and never present a result as a real verdict.
 4. **Never present an uncertain case as yes or no.** See "Lit, blocked or uncertain" below.
-5. **If the live API is unreachable, do not fall back to a smooth-Moon verdict.** Show "terrain not included, verdict unavailable".
+5. **Never give a smooth-Moon verdict.** Every answer comes from a site's precomputed skyline; there are no custom coordinates.
 6. **Show `dem`, `resolution_m` and the uncertainty with every result.**
 7. **Read sizes and steps from the labels.** `step_s`, `count`, `az_step_deg`, `n`, `n_az`, `spacing_m` and `skyline_scale` may differ between mock and real data. Do not hard-code them. Do not hard-code site ids or categories either: mock ids all start with `mock_`.
 
@@ -93,7 +93,7 @@ The same steps are written out in Python as `interpolate_rows` and `view_from_ro
 
 `{ "version": 1, "sites": [ ... ] }`. Each site has `id`, `name`, `lat`, `lon`, `category`, `has_terrain`, `has_shade_grid`, and optionally `mission`, `date_utc`, `country`, `notes`. This is the only place site coordinates exist.
 
-### skylines/{id}.json and the API response (type `Skyline`)
+### skylines/{id}.json (type `Skyline`)
 
 For each azimuth, the highest elevation angle at which terrain appears from the eye.
 
@@ -161,22 +161,9 @@ Report the visible fraction as the range `f_low` to `f_high` too. The same test 
 
 The disc spans several skyline entries (about five at a step of 0.1 degrees). Use every entry whose wedge overlaps the disc's azimuth range, remembering that near elevation `el` a disc of radius `rho` covers `rho / cos(el)` in azimuth.
 
-## The live API
+## The live API (removed)
 
-Types: `Skyline`, `ApiHealth`, `ApiError`.
-
-Start it from the repository root with `.venv\Scripts\python python/scripts/serve.py --synthetic`. It listens on `http://localhost:8000` (the default `VITE_API_BASE_URL` of the web app) and allows requests from `http://localhost:5173`, the Vite dev server. On synthetic terrain it covers only about 0.8 degrees round the pole (`/api/health` gives the exact limit). A new point takes several seconds to compute (three skyline runs, for the error bound); the same point again is answered from a cache at once.
-
-| Endpoint | Request | Response |
-| --- | --- | --- |
-| `GET /api/health` | none | `ApiHealth`: `ok`, `real_terrain`, `service_region`, and the accepted and default values of `az_step_deg` and `mast_m` |
-| `GET /api/skyline` | `lat`, `lon`, optional `mast_m`, optional `az_step_deg` | `Skyline`, identical in structure to `skylines/{id}.json` |
-
-- Accepted values: `mast_m` from 0 to 100 m (default 2); `az_step_deg` one of 0.05, 0.1, 0.2, 0.25, 0.5, 1 (default 0.1). On the real maps a 0.1 degree answer takes about 4.5 minutes and a 1 degree one about 25 s, so show progress, or ask for 1 as a quick first look. Always read the step from the response. Any other parameter is refused.
-- Refused requests return `ApiError` with HTTP 400 (bad or missing value), 422 (point outside the service region, or so close to the edge of the data that terrain beyond it could matter) or 500 (a bug). Show `error.message`.
-- The response's `lat` and `lon` are the point actually used: rounded to 5 decimals, and a point closer to the pole than latitude -89.99999 is moved there so that north is defined. Use those, not the ones you sent.
-- If `real_terrain` is false the server is running on synthetic terrain: treat its answers like mock data.
-- Custom points get every number and 2D chart, but no 3D view: there is no terrain or shade endpoint.
+The spec's live skyline API (Contract 7) and custom coordinates were removed on 2026-11-15 by decision, so the app needs no server and never touches the NASA maps. The app evaluates only the sites in `sites.json`, whose skylines are precomputed with their error bounds.
 
 ## The test fixtures
 
@@ -228,7 +215,7 @@ These are interpretations of the spec, made so the web side has something exact 
 4. `size_m = (n - 1) * spacing_m`, with `n` odd so the site is a sample.
 5. Shade grid angles and normals are in the patch centre's frame.
 6. The manifest's fields, including `data_kind`.
-7. The shape of `/api/health` and of error responses.
+7. ~~The shape of `/api/health` and of error responses~~ (the API was removed on 2026-11-15).
 8. Fixture cases may carry an optional `name`.
 9. The reading of lit, blocked and uncertain given above.
 10. A curated site's skyline is computed at exactly its `sites.json` coordinates, with no rounding.

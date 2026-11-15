@@ -2,7 +2,7 @@
 
 Role
     Everything that needs the shape of the ground (skylines, terrain patches,
-    shade grids, the live API) asks an :class:`ElevationSource`. It does not
+    shade grids) asks an :class:`ElevationSource`. It does not
     know or care whether the heights came from NASA's LOLA maps or from
     shapes given by formulas. This is what lets the skyline engine be built
     and proven on synthetic terrain while the real maps are still downloading

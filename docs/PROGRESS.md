@@ -1,44 +1,26 @@
 # Progress
 
-## Web application
+## Now (2026-11-15)
 
-The web application is being rebuilt independently from the Python engine. The current interface work is on the web branch and is limited to `web/src/` plus web documentation.
+**Next:** PR B, the audit of the web engine (`web/engine/`): scientific and mathematical correctness, and its link to the engine's files. Plan: findings 1 to 13 (wrong Earth radius, Catmull-Rom instead of the handoff's cubic, skyline interpolated instead of read as steps, the verdict rule, the worker's NaN site height, events missing short grazes, metrics, panel tilt, battery run-out, loader checks), each proven by a failing test with values from SPICE, Horizons or a closed form, then fixed.
 
-- Stage 1 dashboard: focused top bar, Sky/3D/Map tabs, four status cards, compact timeline, first-visit intro, Beginner/Expert mode, Details drawer, data-driven polar map, and separate comparison page.
-- Display formatting: centralized in `web/src/formatting.ts` with Vitest coverage for UTC/local time, durations, watts, degrees, and percentages.
-- Stage 2 3D view: planned as a lazy-loaded module using terrain and shade-grid products; it must not change `web/engine/`.
-- Web validation currently passes with `npm test -- --run` and `npm run build`.
+**Done in PR A (cleanup):**
 
-Scope of this plan: the Python engine (`python/`), the files it writes to `web/public/data/`, the fixtures in `web/engine/tests/fixtures/`, the web handoff, and `docs/`. The web app (`web/`) is built by a second agent or teammates from the handoff.
+- **Live API and custom coordinates removed (your decision, 2026-11-15).** The app covers the 10 curated sites only and needs no server and no NASA maps. This departs from the spec (Contract 7, `/api/skyline`, and custom points): see "Proposed spec changes". Removed: `server.py`, `serve.py`, `test_api.py`, the `api_health` and `api_error` schemas (and their types in the regenerated `types.ts`), `fastapi`, `uvicorn` and `httpx`, `web/src/api.ts` and the app's custom-point controls.
+- vitest raised to 5.1.0. An endless loop in `App.tsx` showed up with it: the timeline window was a new object on every render and an effect dependency, so every worker result started another worker. Fixed by memoising it.
+- Merged branches deleted locally and on GitHub. **Not deleted:** `yacin1102-lunar-web-3d`, `-evaluator`, `-stage1`. The 3D view (PR #16, commits `209c7f9`, `2a985b1`) was merged into the stage-1 branch after that branch had gone to `main`, so it never reached `main`. It is kept on those branches to be brought in.
 
-## Status
+**Data on disk: none.** On 2026-11-15 the removal of the old engine worktree also emptied `python/kernels/` and `python/dem/` in this checkout (most likely through folder links inside the worktree). Nothing committed was affected: `web/public/data/` holds every product the app needs, and `python/data_checksums.json` records all 85 files. The app is independent of the maps. To rebuild products later: `python python/scripts/download_data.py` (verified against the recorded checksums), then `python python/scripts/build_dem_cache.py`. The audit needs only the kernels group: `--group kernels`.
 
-Plan approved on 2026-11-14.
+## Status of the engine plan
 
-| PR | State |
-| --- | --- |
-| 1 Download script | Merged (PR #4) |
-| 2 Web handoff | Merged (PR #5) |
-| 3 Timetable and fixtures | Merged (PRs #6 and #10) |
-| 4 Elevation interface and synthetic terrain | Merged (PR #7) |
-| 5 Skyline core | Merged (PR #12) |
-| 6 Error bound and independent check | Merged (PR #13) |
-| 7 Record writer and live API | Merged (PR #17) |
-| 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
-| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps (option B, 3.05 GB) are downloaded and verified |
-| 10 and 11 Terrain patches, shade grids, real products, final proof | Built, in review (PR #21): skylines, terrain patches, shade grids, timetable, manifest and proof |
-
-To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
-
-The web app (`web/`) is built separately and merged into `main` (PR #9). Engine work is done in a separate git worktree and never changes files under `web/` except the agreed data files, so the two do not conflict.
-
-Data on disk (2026-11-15): all 20 files, downloaded and verified against their recorded checksums (`download_data.py --verify`: 20 of 20 OK); the checksums are committed. The maps are prepared for use in `python/dem/cache/` (42 GB, never committed): `python python/scripts/build_dem_cache.py`.
+All engine PRs are merged into `main`: 1 (#4), 2 (#5), 3 (#6, #10), 4 (#7), 5 (#12), 6 (#13), 7 (#17, its API since removed), 8 (#18, #19), 9 (#20), 10 and 11 (#21).
 
 Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip install -r python/requirements.txt`.
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 9): 263 passed, 0 skipped, 0 failed: with all data on disk, all 66 real-data tests run.
+Last result (PR A, 2026-11-15, no data on disk): 187 passed, 66 skipped, 0 failed. Every skipped test is a real-data test waiting for the kernels, coarse or full maps. Web: `cd web; npm test`: 14 passed; `npm run build` OK.
 
 
 ## Principle: nothing waits on the download
@@ -190,7 +172,7 @@ Each step is reported with its real output.
 6. **Build the real products**, in order: skylines for the 10 sites, terrain patches, shade grids, manifest. `python python/scripts/build_products.py` (resumable; the shade grids take longest).
 7. **Validate against the schemas.** `python python/scripts/validate_data.py web/public/data`. JSON against `docs/schemas/`, binary sizes against their labels.
 8. **Compare with the mocks.** `python python/scripts/compare_with_mock.py`. Same file names, fields, types and layout rules in `data/` and `data-mock/`; values differ by design. Any structural difference is a bug in one of the two.
-9. **Check the live API on real terrain.** Its answer equals the built file for all 10 sites.
+9. ~~Check the live API on real terrain~~ (API removed 2026-11-15).
 10. **Hand over.** Tell the web agent to switch from `data-mock/` to `data/`, update this file, open PR 11.
 
 ## Decisions taken
@@ -211,8 +193,8 @@ Decided on 2026-11-15 (you asked me to follow my recommendations):
 - **Lit, blocked, uncertain:** **lit** when some of the Sun's disc is certainly visible, **blocked** when none of it can be, **uncertain** otherwise; the visible fraction is reported as a range (interpretation 11 below, now approved).
 - **Timetable length:** 115,057 hourly rows, so the last row is 1 Jan 2040 00:00 UTC.
 - **Service region:** 80°S to the pole. Sites farther north, such as Chandrayaan-3 (about 69°S), are out of scope.
-- **Eye at ground level:** the live API accepts `mast_m = 0`. The answer stays proven; on steep ground it is more often "uncertain".
-- **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the published error clones to check the bound (10 per site, option B of PR 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
+- **Eye at ground level:** `mast_m = 0` is accepted (it was an API setting; the API has since been removed). The answer stays proven; on steep ground it is more often "uncertain".
+- **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the published error clones to check the bound (10 per site, option B of PR 9). Elsewhere the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
 - **All contract interpretations below are in force.**
 
 Taken in PRs 10 and 11 (2026-11-15), within your 3-hour budget:
@@ -267,6 +249,8 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Proposed spec changes
 
+00. **Remove the live API (Contract 7) and custom coordinates (your decision, 2026-11-15).** The app evaluates only the 10 curated sites. Reason: a real-terrain API needs about 32 to 80 GB of maps on a server and minutes of computing per point; without it the app is a static site with no dependence on the maps. `spec/ENGINE_GUIDE.md` is input and is left unchanged; this entry records the departure.
+
 0. **API default `az_step_deg` of 1° for custom points: declined on 2026-11-15** (you asked for the option that balances accuracy and usage). The default stays 0.1°, which is spec-compliant and needs no further work. The web app can ask for 1° as a quick first look. The reasoning, kept for reference: On the real maps an error-bounded answer at 0.1° takes about 4.5 minutes, and at 1° about 25 s. Spec section 7 asks for "a step fine enough that the disc spans several entries", and at 1° the Sun's 0.53° disc spans only one or two. So the default stays 0.1 (reverted after the contract review), and the web app can ask for 1 as a quick first look. If you accept 1° as the default for custom points, the spec sentence should apply to curated sites only. Either way the answer is proven; coarser wedges only mean more "uncertain" hours.
 
 1. **Manifest `data_kind` field** (`"mock"` or `"real"`). The spec lists what the manifest must contain but does not fix its fields, so this is an addition, not a change. It lets the web app refuse to show mock data as a real verdict.
@@ -275,11 +259,10 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 ## Future work
 
 - Use the 5 m site maps near their five sites: as the finest map, with their measured slope error in the bound, and with the 10 clones per site checking that each clone's skyline lies inside the bound.
-- Run the three passes of an error-bounded API answer in parallel processes, about a third of the time.
+- Run the three passes of an error-bounded skyline in parallel processes, about a third of the time.
 - A full-resolution shade grid. Each cell is a full search, so a finer grid costs proportionally more computer time. The current one took about 40 minutes on 8 to 13 cores.
 - **GPU** (the machine has an NVIDIA RTX 3050 with 6 GB). The proven skyline search branches irregularly and suits the processor. A GPU would pay off for two jobs:
   - a brute-force ray cast for much finer shade grids, checked against the proven search on sample cells;
-  - faster live API answers.
 - Building with fewer workers than cores. 27 processes at once ran out of memory: 48 of 50 GB committed, and heavy paging. 8 workers on 15 GB of RAM was the right setting.
 
 ## Open questions

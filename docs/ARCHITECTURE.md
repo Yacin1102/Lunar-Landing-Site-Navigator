@@ -9,15 +9,13 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/scripts/download_data.py` | Downloads the NASA input files, four at a time and started in a fixed order, resumes after an interruption, and verifies size and checksum. Refuses to run twice in the same folder. Also answers "is this group of data on disk?" for the tests. | `python/data_files.json`, `python/data_checksums.json`, the NAIF and PGDA servers | `python/kernels/`, `python/dem/`, `python/data_checksums.json`, `python/dem/download.log`, `python/dem/download.lock`, and a `name.part.json` side file next to each partial download |
 | `python/tests/conftest.py` | Skips tests marked `realdata` while their data is missing and prints which ones were skipped. | What `download_data.missing_files` reports | Test report only |
 | `python/lunar_engine/geometry.py` | Exact geometry on the reference sphere: latitude/longitude to a direction, the local east/north/up frame, azimuth and elevation. | Nothing | Nothing |
-| `python/lunar_engine/contracts.py` | Decides whether a file, an API response or a whole data folder matches the contracts. | `docs/schemas/*.schema.json`, the files being checked | Nothing (returns a list of problems) |
+| `python/lunar_engine/contracts.py` | Decides whether a file or a whole data folder matches the contracts. | `docs/schemas/*.schema.json`, the files being checked | Nothing (returns a list of problems) |
 | `python/lunar_engine/mock_world.py` | An invented landscape given by formulas, with a brute-force skyline, terrain patch and shade grid. Used only for mock data. | Nothing | Nothing |
 | `python/lunar_engine/elevation.py` | Terrain heights behind one interface (`ElevationSource`): the polar projection, a map grid with interpolation between pixel centres, nested maps answered from the finest, and "highest terrain in a block" tables. | Map grids | Nothing |
 | `python/lunar_engine/skyline.py` | The skyline: for every azimuth wedge, a guaranteed interval for the highest elevation angle of any terrain, found by proving which areas cannot matter. | An `ElevationSource` | Nothing (returns a `SkylineResult`) |
 | `python/lunar_engine/uncertainty.py` | The error bound `skyline_err_deg`: runs the skyline on the map raised and lowered by the error allowed at each point, and combines the results. | An `ElevationSource` with its error maps | Nothing (returns `SkylineBounds`) |
 | `python/lunar_engine/lineofsight.py` | The independent check: lines of sight traced through the terrain, and the skyline at single exact azimuths by dense sampling. Shares no code with the skyline search. | An `ElevationSource` | Nothing |
-| `python/lunar_engine/records.py` | The one place a Contract 3 skyline record is made (rounded so its interval never shrinks, checked against the contract) and written. Shared by the Builder and the live API. | `uncertainty` | `skylines/{id}.json` |
-| `python/lunar_engine/server.py` | The live API (Contract 7): `/api/health` and `/api/skyline`, input checks, rounding, cache, CORS. | An `ElevationSource` | HTTP responses |
-| `python/scripts/serve.py` | Starts the live API on port 8000; `--synthetic` serves an invented landscape. | `server` | Nothing |
+| `python/lunar_engine/records.py` | The one place a Contract 3 skyline record is made (rounded so its interval never shrinks, checked against the contract) and written. Used by the Builder. | `uncertainty` | `skylines/{id}.json` |
 | `python/lunar_engine/lola.py` | The real-data backend: reads the LOLA GeoTIFFs (checking their labels), decompresses each once into a memory-mapped file, and builds the highest-terrain tables strip by strip on disk; slopes and error allowances are computed on demand. | `python/dem/*.TIF` | `python/dem/cache/` |
 | `python/scripts/build_dem_cache.py` | Prepares the caches of the four full-resolution maps up front, with progress. | `lola` | `python/dem/cache/` |
 | `python/lunar_engine/sites.py` | The curated site list (Contract 2): checks it (schema, unique ids, service region, documented categories), sets its `has_terrain` / `has_shade_grid` flags from the files present, and describes the ground around a site for the map cross-check. | `web/public/data/sites.json`, an `ElevationSource` | `sites.json` (flags only) |
@@ -93,7 +91,7 @@ Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Mo
 
 ```mermaid
 flowchart TD
-    users["skyline engine, terrain patches,<br/>shade grids, live API<br/>(coming)"] --> source[ElevationSource<br/>height, height error, pixel size,<br/>finest map covering a point]
+    users["skyline engine, terrain patches,<br/>shade grids"] --> source[ElevationSource<br/>height, height error, pixel size,<br/>finest map covering a point]
     source --> grid[HeightGrid<br/>one map on the projected sheet,<br/>bilinear between pixel centres]
     grid --> synth[SyntheticElevation<br/>cones, domes, walls from formulas,<br/>is_real = False]
     grid --> lola["LolaGrid (lola.py)<br/>GeoTIFF decompressed once to disk,<br/>read memory-mapped; is_real = True"]
@@ -159,32 +157,6 @@ The interval of a wedge contains the skyline at every single azimuth in it, for 
 So a direction above the interval is certainly clear, and one below it is certainly blocked.
 
 The allowed error at a point is `min(E(x) + E(site), max(0, D - r0) * tan(6°))`, with `E = 3 * sigma + horizontal error * local slope`, `D` the distance from the site and `r0` one pixel diagonal. The reasons for each part are in the docstring of `uncertainty.py`; the values are proposals awaiting approval (`docs/PROGRESS.md`).
-
-## A live API request
-
-```mermaid
-sequenceDiagram
-    participant Web as Web app (browser)
-    participant API as server.py
-    participant Cache as Cache
-    participant Rec as records.skyline_record
-    participant Eng as skyline + uncertainty
-    Web->>API: GET /api/skyline?lat&lon&mast_m
-    API->>API: check every parameter (400 / 422 if bad)<br/>round the point, nudge off the pole
-    API->>Cache: seen this point and settings?
-    alt in the cache
-        Cache-->>API: record
-    else new
-        API->>Rec: point, mast, wedge width
-        Rec->>Eng: nominal, raised and lowered skylines
-        Eng-->>Rec: interval per wedge (or CoverageError)
-        Rec-->>API: Contract 3 record, checked against its schema
-        API->>Cache: store
-    end
-    API-->>Web: record (same as skylines/{id}.json would be)
-```
-
-The Builder will write `skylines/{id}.json` with the same `records.skyline_record` (it comes with the real products), so a live answer and a file for the same point and settings are identical; a test writes a file with it and compares it with the live answer byte for byte.
 
 ## Timetable and fixtures
 

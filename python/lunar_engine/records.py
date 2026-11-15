@@ -1,7 +1,7 @@
 """Skyline records: the one place a Contract 3 skyline is made and written.
 
 Role
-    The Builder (``skylines/{id}.json``) and the live API (``/api/skyline``)
+    The Builder (``skylines/{id}.json``)
     must give identical answers for the same point and parameters (spec
     section 11). Both call :func:`skyline_record`, so there is only one way a
     skyline record can be produced.
@@ -82,7 +82,7 @@ def skyline_record(source: ElevationSource, lat_deg: float, lon_deg: float,
                    mast_m: float, az_step_deg: float) -> dict:
     """Compute the skyline at a point and return its Contract 3 record.
 
-    The single function behind both the Builder and the live API.
+    The single function behind the Builder's skyline files.
 
     Args:
         source: the terrain.

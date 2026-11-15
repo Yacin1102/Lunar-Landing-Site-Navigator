@@ -8,7 +8,7 @@ NASA Space Apps Challenge entry. A web app that tells mission planners, for any 
 
 ## The one rule
 
-If something depends on the time or settings the user chooses, the **TypeScript app** (`web/`) does it in the browser. If it depends only on NASA data, the **Python engine** (`python/`) does it once, ahead of time. The two meet only through `web/public/data/` and the live API.
+If something depends on the time or settings the user chooses, the **TypeScript app** (`web/`) does it in the browser. If it depends only on NASA data, the **Python engine** (`python/`) does it once, ahead of time. The two meet only through `web/public/data/`. (The live API of the spec was removed on 2026-11-15 by decision; see `docs/PROGRESS.md`.)
 
 ## Data
 

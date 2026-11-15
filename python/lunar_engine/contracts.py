@@ -33,7 +33,7 @@ SCHEMA_DIR = REPO_DIR / "docs" / "schemas"
 
 #: Schema names, in the order they are documented and turned into types.
 SCHEMA_NAMES = ("ephem", "sites", "skyline", "terrain", "shade", "manifest",
-                "altaz", "events", "api_health", "api_error")
+                "altaz", "events")
 
 #: Order and names of the six values in each timetable row (Contract 1).
 EPHEM_COLUMNS = ("sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z")
@@ -99,7 +99,7 @@ def az_count(az_step_deg: float) -> int | None:
 
 
 def skyline_problems(record) -> list[str]:
-    """Check a skyline record (Contract 3), from a file or from the API.
+    """Check a skyline record (Contract 3), as written to a file.
 
     Beyond the schema: both arrays must have exactly ``360 / az_step_deg``
     entries, and that count must be a whole number.

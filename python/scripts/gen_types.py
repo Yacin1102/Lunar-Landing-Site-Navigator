@@ -29,7 +29,7 @@ OUTPUT = REPO_DIR / "web" / "engine" / "types.ts"
 
 #: Order of the schemas in the output.
 SCHEMA_NAMES = ("ephem", "sites", "skyline", "terrain", "shade", "manifest",
-                "altaz", "events", "api_health", "api_error")
+                "altaz", "events")
 
 HEADER = """\
 // GENERATED FILE - do not edit by hand.

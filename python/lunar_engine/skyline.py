@@ -7,7 +7,7 @@ Role
     hidden in a direction when it is below the skyline there.
 
     It works on any :class:`lunar_engine.elevation.ElevationSource`, real or
-    synthetic, and is shared by the Builder and the live API.
+    synthetic, and is used by the Builder.
 
 What exactly is computed
     * Wedges: entry ``k`` covers azimuths from ``(k - 1/2) * step`` up to

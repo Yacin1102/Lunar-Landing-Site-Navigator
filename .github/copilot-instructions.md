@@ -15,7 +15,7 @@ Rules:
 - Never hard-code site names or coordinates. Everything about sites comes from sites.json and manifest.json; the current sites are placeholders.
 - Load data from one configurable folder: web/public/data-mock/ for now, web/public/data/ when real data arrives.
 - While manifest.json says data_kind is "mock", show a clear "mock terrain data" banner.
-- The live API (/api/skyline) does not exist yet. Build the client against the final types, and handle "server unreachable" with a clear message.
+- There is no live API and no custom coordinates (removed 2026-11-15). The app works only on the 10 curated sites in `web/public/data/`.
 - The lit / blocked / uncertain definition is provisional (docs/PROGRESS.md item 11). Keep it in ONE module so it is easy to change.
 - Every calculation module has unit tests (Vitest). The astro core must pass web/engine/tests/fixtures/altaz.json (within 0.01 degrees) and events.json (within 60 seconds).
 - Every function has a comment explaining its role and, in plain words, how it works. The reviewer has no astronomy background.
