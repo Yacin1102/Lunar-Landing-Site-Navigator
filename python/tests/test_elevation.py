@@ -208,9 +208,37 @@ def test_no_height_is_ever_guessed_outside_the_data_or_in_a_hole():
     with pytest.raises(CoverageError, match="no elevation data"):
         source.height(*to_lat_lon(50_000.0, 0.0))
     hole_x, hole_y = float(grid.spec.x_of_col(100.3)), float(grid.spec.y_of_row(100.3))
-    with pytest.raises(CoverageError, match="missing"):
+    with pytest.raises(CoverageError, match="no elevation data"):
         source.height(*to_lat_lon(hole_x, hole_y))
+    assert source.height(*to_lat_lon(0.0, 0.0)) == 1.0, "nearer the centre than the hole: trusted"
     assert source.height_error(*to_lat_lon(0.0, 0.0)) is None
+
+
+def test_a_hole_shrinks_the_trusted_disc_to_stop_a_pixel_diagonal_short_of_it():
+    grid = _flat("holed", 20.0, 4_000.0, 1.0)
+    full_radius = grid.disc()[2]
+    assert full_radius == pytest.approx(399 * 10.0), "half the span of the pixel centres"
+    grid = _flat("holed", 20.0, 4_000.0, 1.0)
+    grid._heights[100, 200] = np.nan
+    hole = np.hypot(float(grid.spec.x_of_col(200)), float(grid.spec.y_of_row(100)))
+    assert grid.disc()[2] == pytest.approx(hole - 20.0 * np.sqrt(2.0), abs=1e-3)
+
+
+def test_a_coarser_map_answers_where_the_finer_map_has_a_hole():
+    fine = _flat("fine", 20.0, 4_000.0, 200.0)
+    fine._heights[100, 100] = np.nan
+    source = ElevationSource([fine, _flat("coarse", 240.0, 48_000.0, 100.0)])
+    hole_x, hole_y = float(fine.spec.x_of_col(100.3)), float(fine.spec.y_of_row(100.3))
+    assert source.height(*to_lat_lon(hole_x, hole_y)) == 100.0
+    assert source.height(*to_lat_lon(0.0, 0.0)) == 200.0
+
+
+def test_unit_to_xy_inverts_xy_to_unit():
+    rng = np.random.default_rng(12)
+    x = rng.uniform(-900_000, 900_000, 1000)
+    y = rng.uniform(-900_000, 900_000, 1000)
+    back_x, back_y = elevation.unit_to_xy(xy_to_unit(x, y))
+    assert back_x == pytest.approx(x, abs=1e-6) and back_y == pytest.approx(y, abs=1e-6)
 
 
 def test_service_region_limit_follows_from_the_widest_map():

@@ -129,12 +129,20 @@ class SyntheticElevation(ElevationSource):
         base_height_m: height of the ground where there is no shape, metres.
         error_m: height error written into every pixel of the error maps,
             metres, or ``None`` for grids without an error map.
+        beyond_maps_height_m: the most terrain outside the grids could rise,
+            metres. ``None`` keeps the real-data assumption (unknown terrain
+            up to 11,000 m), so a search that needs to look past the grids
+            fails. Giving ``base_height_m`` declares that beyond the grids
+            the Moon is the smooth base sphere: for synthetic worlds only.
     """
 
     is_real = False
 
     def __init__(self, shapes, grids=((20.0, 20_000.0),), center=(-90.0, 0.0),
-                 base_height_m: float = 0.0, error_m: float | None = 1.0):
+                 base_height_m: float = 0.0, error_m: float | None = 1.0,
+                 beyond_maps_height_m: float | None = None):
+        if beyond_maps_height_m is not None:
+            self.unknown_height_m = float(beyond_maps_height_m)
         self.shapes = tuple(shapes)
         self.base_height_m = float(base_height_m)
         cx, cy = (float(v) for v in to_xy(*center))

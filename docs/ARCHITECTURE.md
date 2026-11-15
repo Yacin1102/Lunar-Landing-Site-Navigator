@@ -12,6 +12,7 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/contracts.py` | Decides whether a file, an API response or a whole data folder matches the contracts. | `docs/schemas/*.schema.json`, the files being checked | Nothing (returns a list of problems) |
 | `python/lunar_engine/mock_world.py` | An invented landscape given by formulas, with a brute-force skyline, terrain patch and shade grid. Used only for mock data. | Nothing | Nothing |
 | `python/lunar_engine/elevation.py` | Terrain heights behind one interface (`ElevationSource`): the polar projection, a map grid with interpolation between pixel centres, nested maps answered from the finest, and "highest terrain in a block" tables. | Map grids | Nothing |
+| `python/lunar_engine/skyline.py` | The skyline: for every azimuth wedge, a guaranteed interval for the highest elevation angle of any terrain, found by proving which areas cannot matter. | An `ElevationSource` | Nothing (returns a `SkylineResult`) |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -80,12 +81,42 @@ flowchart TD
     proj["projection: to_xy, to_lat_lon, xy_to_unit<br/>south polar stereographic, exact on the sphere"] --> grid
 ```
 
-The terrain is defined as the bilinear blend between pixel centres. Every height, skyline and error figure refers to that surface. A point outside the data, or in a hole, raises `CoverageError`; a height is never guessed.
+The terrain is defined as the bilinear blend between pixel centres. Each map is trusted only inside one disc: the largest disc around the map's centre that lies within its pixel centres and stops a pixel diagonal short of any missing value. At each point the terrain is that of the finest map whose disc contains it; a coarser map takes over where a finer one has a hole. Outside every disc there is no data: a height there raises `CoverageError` and is never guessed.
 
 Two facts established by tests that the skyline search will rely on, with their limits:
 
 - The projection never shrinks distances on the reference sphere: two points on the 1737.4 km sphere are never farther apart than on the sheet. Points standing on high ground are slightly farther apart than their feet (0.3 % at 5 km), so the search must allow for that factor.
 - Each value of a "highest terrain" table is an upper limit for everything beneath it in that one map, with unknown terrain counted as high, not low. It says nothing about a finer map nested over the same area; each map needs its own table.
+
+## The skyline search
+
+```mermaid
+flowchart TD
+    start([point, mast, wedge width]) --> seed["1. First look: sample along the centre line<br/>of every wedge, in every map.<br/>Each sample is a real terrain point:<br/>lower limit for its wedge"]
+    seed --> blocks["2. For each map, finest first: take blocks<br/>from the whole map down to single cells"]
+    blocks --> ceiling["Ceiling for the block: its highest terrain<br/>(from the map's table), at its nearest<br/>possible distance, over the azimuths<br/>it could cover"]
+    ceiling --> prune{ceiling above the<br/>lower limit in any<br/>of those wedges?}
+    prune -- no --> drop([set aside, with proof])
+    prune -- yes --> smaller{single cell?}
+    smaller -- no --> quarters[split into four] --> ceiling
+    smaller -- yes --> pieces["3. Cut the cell into ever smaller pieces;<br/>sample their centres;<br/>stop when a piece's ceiling is within<br/>0.0005 deg of the lower limit, or after 8 cuts"]
+    pieces --> upper[ceilings of the pieces left:<br/>upper limit per wedge]
+    upper --> edge{"4. Could unmapped terrain,<br/>as high as anything on the Moon,<br/>rise above the lower limit anywhere?"}
+    edge -- yes --> error([CoverageError: the search<br/>would leave the data])
+    edge -- no --> result([per wedge: lower and upper limit;<br/>skyline = middle, numerical error = half the gap])
+```
+
+Which map answers where: blocks wholly outside a map's trusted disc, or wholly inside a finer map's disc, are skipped for that map. Samples count for a map only where that map is the one trusted.
+
+Three ceilings, each a proof; the lowest available is used:
+
+- **Block ceiling** (any block): the block's highest terrain at its nearest possible distance.
+- **Corner ceiling** (pieces of single cells): from the exact elevations of the piece's four corner points. The terrain inside the piece lies within a calculable distance (far below a millimetre) of the solid spanned by those points, and no direction into that solid looks higher than its highest corner except by a second-order amount.
+- **Per-wedge ceiling** (pieces covering 2 to 1024 wedges): the corner argument applied to only the part of the solid inside one wedge, cut by the wedge's two vertical edge planes. Without it, a piece's highest part would raise every wedge it touches. It is used only when the solid provably keeps clear of the line where the two edge planes cross (the vertical through the eye); otherwise the piece keeps its single ceiling.
+
+The four facts that make the block ceilings proofs and not estimates are listed in the docstring of `skyline.py`. In short: ground inside a cell is never above its highest corner; distances on the sphere are never longer than on the sheet, so a block lies inside a known circle on the sphere; elevation angle at a given height first rises and then falls with distance; and the azimuths of a circle seen from the eye are exactly known. Height does not change azimuth, because the eye is on the vertical.
+
+Choices fixed in `skyline.py`: ground within 1 m of the point under the eye is not an obstacle; the target interval half-width is 0.0005°; a cell is cut at most 8 times (to 1/256 of a pixel).
 
 ## Timetable and fixtures
 
