@@ -12,8 +12,7 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
 | Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
 | Live API | `http://localhost:8000/api/...` | Running on synthetic terrain: `python python/scripts/serve.py --synthetic`. Real terrain comes with the map reader |
-| Real site list `sites.json` | `web/public/data/` | Ready: the 10 real sites, with sources in `python/sites_sources.md`. Its `has_terrain` and `has_shade_grid` are false until those products are built. Categories: `high_illumination`, `landing_site`, `psr` |
-| Other real products | `web/public/data/` | Built in PRs 10 and 11. Until the manifest is there, keep pointing the app at `data-mock/` |
+| Real data, complete | `web/public/data/` | Ready: the 10 real sites (sources in `python/sites_sources.md`; categories `high_illumination`, `landing_site`, `psr`), their skylines with error bounds, terrain patches, the timetable and the manifest (`data_kind: "real"`). The shade grids follow in a later commit; until then `has_shade_grid` is false, which the app already handles. To use it, set `VITE_DATA_FOLDER=/data` (the default is still `/data-mock`) |
 
 To start in a separate working copy:
 
@@ -173,7 +172,7 @@ Start it from the repository root with `.venv\Scripts\python python/scripts/serv
 | `GET /api/health` | none | `ApiHealth`: `ok`, `real_terrain`, `service_region`, and the accepted and default values of `az_step_deg` and `mast_m` |
 | `GET /api/skyline` | `lat`, `lon`, optional `mast_m`, optional `az_step_deg` | `Skyline`, identical in structure to `skylines/{id}.json` |
 
-- Accepted values: `mast_m` from 0 to 100 m (default 2); `az_step_deg` one of 0.05, 0.1, 0.2, 0.25, 0.5, 1 (default 0.1). Any other parameter is refused.
+- Accepted values: `mast_m` from 0 to 100 m (default 2); `az_step_deg` one of 0.05, 0.1, 0.2, 0.25, 0.5, 1 (default 0.1). On the real maps a 0.1 degree answer takes about 4.5 minutes and a 1 degree one about 25 s, so show progress, or ask for 1 as a quick first look. Always read the step from the response. Any other parameter is refused.
 - Refused requests return `ApiError` with HTTP 400 (bad or missing value), 422 (point outside the service region, or so close to the edge of the data that terrain beyond it could matter) or 500 (a bug). Show `error.message`.
 - The response's `lat` and `lon` are the point actually used: rounded to 5 decimals, and a point closer to the pole than latitude -89.99999 is moved there so that north is defined. Use those, not the ones you sent.
 - If `real_terrain` is false the server is running on synthetic terrain: treat its answers like mock data.

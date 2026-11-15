@@ -10,7 +10,7 @@
       "mission": "Artemis III candidate region (2022)",
       "country": "NASA",
       "notes": "Crest of the ridge joining Shackleton and de Gerlache craters, at one of the most often sunlit points near the pole (point C1 of Gläser et al. 2018).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -20,7 +20,7 @@
       "lon": -156.03,
       "category": "high_illumination",
       "notes": "The most often sunlit point on the rim of Shackleton crater, about 7 km from the pole (point S of Gläser et al. 2018).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -32,7 +32,7 @@
       "mission": "Artemis III candidate region (2022)",
       "country": "NASA",
       "notes": "Top of an isolated peak on the far side of Shackleton, about 36 km from the pole (point SV1 of De Rosa et al. 2012).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -42,7 +42,7 @@
       "lon": -68.2846,
       "category": "high_illumination",
       "notes": "On the rim of de Gerlache crater (point GR1 of De Rosa et al. 2012).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -54,7 +54,7 @@
       "mission": "Artemis III candidate region (2022 and 2024)",
       "country": "NASA",
       "notes": "High on Mons Malapert, a near-side massif about 5 km above the reference sphere (point MP1 of De Rosa et al. 2012).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -67,7 +67,7 @@
       "date_utc": "2025-03-06",
       "country": "USA (Intuitive Machines / NASA)",
       "notes": "Where the lander came to rest, on its side in a crater about 20 m across, on the plateau of Mons Mouton (LROC, 10 March 2025).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -77,7 +77,7 @@
       "lon": 129.174,
       "category": "psr",
       "notes": "Centre of Shackleton crater, about 4 km below its rim (Zuber et al. 2012). The crater's interior holds a permanently shadowed region (Tye et al. 2015).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -87,7 +87,7 @@
       "lon": -5.17,
       "category": "psr",
       "notes": "Centre of Haworth crater, 51 km across (USGS Gazetteer of Planetary Nomenclature). The crater's interior holds a permanently shadowed region (Tye et al. 2015).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -97,7 +97,7 @@
       "lon": 84.31,
       "category": "psr",
       "notes": "Centre of Faustini crater, 42 km across (USGS Gazetteer of Planetary Nomenclature). The crater's interior holds a permanently shadowed region (Tye et al. 2015).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     },
     {
@@ -110,7 +110,7 @@
       "date_utc": "2009-10-09T11:31:19.506Z",
       "country": "USA (NASA)",
       "notes": "Where the LCROSS Centaur stage struck a permanently shadowed region on the floor of Cabeus crater (Marshall et al. 2011).",
-      "has_terrain": false,
+      "has_terrain": true,
       "has_shade_grid": false
     }
   ]

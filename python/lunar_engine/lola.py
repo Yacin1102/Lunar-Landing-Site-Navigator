@@ -43,6 +43,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -164,13 +165,45 @@ def _source_stamp(path: Path) -> dict:
     and date is still noticed)."""
     stat = Path(path).stat()
     stamp = {"file": Path(path).name, "bytes": stat.st_size, "mtime": int(stat.st_mtime)}
-    try:
-        recorded = json.loads(CHECKSUMS.read_text(encoding="utf-8"))["files"].get(f"dem/{Path(path).name}")
-    except (OSError, ValueError, KeyError):
-        recorded = None
+    checksums = _read_json_retrying(CHECKSUMS) if CHECKSUMS.exists() else {}
+    recorded = checksums.get("files", {}).get(f"dem/{Path(path).name}")
     if recorded and recorded.get("size") == stat.st_size:
         stamp["sha256"] = recorded["sha256"]
     return stamp
+
+
+def _read_json_retrying(path: Path, attempts: int = 50):
+    """Read a JSON file that another process may be replacing at that moment.
+
+    On Windows, opening a file while another process replaces it can fail for
+    an instant. Such a failure must never be taken for "nothing recorded":
+    that once made every map cache look out of date while the download script
+    was updating ``data_checksums.json``, and parallel workers then rebuilt
+    the same tables at once. So a failed read is retried for up to about
+    5 seconds, and then raised.
+    """
+    for attempt in range(attempts):
+        try:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.1)
+
+
+def _write_json_atomically(path: Path, data) -> None:
+    """Write JSON so that no reader ever sees a half-written file."""
+    path = Path(path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    for attempt in range(50):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:                  # a reader has it open (Windows)
+            if attempt == 49:
+                raise
+            time.sleep(0.1)
 
 
 class _Tiled:
@@ -215,7 +248,7 @@ def _raw_cache(source: Path, dest: Path, label: dict, log) -> _Tiled:
     rows, cols = label["n_rows"], label["n_cols"]
     n_tr, n_tc = -(-rows // TILE), -(-cols // TILE)
     shape = (n_tr, n_tc, TILE, TILE)
-    usable = dest.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == stamp
+    usable = dest.exists() and meta_path.exists() and _read_json_retrying(meta_path) == stamp
     if usable:
         opened = np.load(dest, mmap_mode="r")
         usable = opened.shape == shape and opened.dtype == np.float32
@@ -241,7 +274,7 @@ def _raw_cache(source: Path, dest: Path, label: dict, log) -> _Tiled:
         out.flush()
         del out
         os.replace(partial, dest)
-        meta_path.write_text(json.dumps(stamp))
+        _write_json_atomically(meta_path, stamp)
     return _Tiled(np.load(dest, mmap_mode="r"), (rows, cols))
 
 
@@ -315,13 +348,13 @@ class LolaGrid(HeightGrid):
     def _meta(self) -> dict:
         path = self.cache / "meta.json"
         if path.exists():
-            meta = json.loads(path.read_text())
+            meta = _read_json_retrying(path)
             if meta.get("stamp") == self._stamp:
                 return meta
         return {"stamp": self._stamp}
 
     def _save_meta(self, meta: dict) -> None:
-        (self.cache / "meta.json").write_text(json.dumps(meta, indent=1))
+        _write_json_atomically(self.cache / "meta.json", meta)
 
     def _strips(self, n_rows: int):
         for r0 in range(0, n_rows, ROWS_PER_STRIP):

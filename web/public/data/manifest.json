@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "data_kind": "real",
+  "built_ms": 1794763608712,
+  "service_region": {
+    "lat_min": -90.0,
+    "lat_max": -80.0
+  },
+  "files": [
+    {
+      "path": "ephem.bin",
+      "contract": "ephem",
+      "version": 1,
+      "bytes": 2761368
+    },
+    {
+      "path": "ephem.json",
+      "contract": "ephem",
+      "version": 1,
+      "bytes": 268
+    },
+    {
+      "path": "sites.json",
+      "contract": "sites",
+      "version": 1,
+      "bytes": 4361
+    },
+    {
+      "path": "skylines/cabeus_lcross.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 64867
+    },
+    {
+      "path": "skylines/connecting_ridge.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 67887
+    },
+    {
+      "path": "skylines/de_gerlache_rim.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 66121
+    },
+    {
+      "path": "skylines/faustini_floor.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 64359
+    },
+    {
+      "path": "skylines/haworth_floor.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 64940
+    },
+    {
+      "path": "skylines/malapert_massif.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 65947
+    },
+    {
+      "path": "skylines/mons_mouton_im2.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 65150
+    },
+    {
+      "path": "skylines/peak_near_shackleton.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 65971
+    },
+    {
+      "path": "skylines/shackleton_floor.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 67844
+    },
+    {
+      "path": "skylines/shackleton_rim.json",
+      "contract": "skyline",
+      "version": 1,
+      "bytes": 67630
+    },
+    {
+      "path": "terrain/cabeus_lcross.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/cabeus_lcross.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 198
+    },
+    {
+      "path": "terrain/connecting_ridge.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/connecting_ridge.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 196
+    },
+    {
+      "path": "terrain/de_gerlache_rim.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/de_gerlache_rim.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 197
+    },
+    {
+      "path": "terrain/faustini_floor.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/faustini_floor.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 193
+    },
+    {
+      "path": "terrain/haworth_floor.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/haworth_floor.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 193
+    },
+    {
+      "path": "terrain/malapert_massif.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/malapert_massif.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 197
+    },
+    {
+      "path": "terrain/mons_mouton_im2.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/mons_mouton_im2.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 196
+    },
+    {
+      "path": "terrain/peak_near_shackleton.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/peak_near_shackleton.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 197
+    },
+    {
+      "path": "terrain/shackleton_floor.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/shackleton_floor.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 196
+    },
+    {
+      "path": "terrain/shackleton_rim.bin",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 232324
+    },
+    {
+      "path": "terrain/shackleton_rim.json",
+      "contract": "terrain",
+      "version": 1,
+      "bytes": 196
+    }
+  ],
+  "sites": [
+    {
+      "id": "connecting_ridge",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "shackleton_rim",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "peak_near_shackleton",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "de_gerlache_rim",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "malapert_massif",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "mons_mouton_im2",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "shackleton_floor",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "haworth_floor",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "faustini_floor",
+      "has_terrain": true,
+      "has_shade_grid": false
+    },
+    {
+      "id": "cabeus_lcross",
+      "has_terrain": true,
+      "has_shade_grid": false
+    }
+  ]
+}

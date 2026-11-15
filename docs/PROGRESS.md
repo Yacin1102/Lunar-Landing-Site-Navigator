@@ -25,9 +25,8 @@ Plan approved on 2026-11-14.
 | 6 Error bound and independent check | Merged (PR #13) |
 | 7 Record writer and live API | Merged (PR #17) |
 | 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
-| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps (option B, 3.05 GB) are added to the download list |
-| 10 Terrain patches, shade grids, manifest | **Next** |
-| 11 Real products and final proof | Not started |
+| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps (option B, 3.05 GB) are downloaded and verified |
+| 10 and 11 Terrain patches, shade grids, real products, final proof | Built, in review. Skylines, terrain, timetable, manifest and proof are ready; the shade grids are being rebuilt after a review fix and will follow as a second commit |
 
 To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
@@ -216,6 +215,12 @@ Decided on 2026-11-15 (you asked me to follow my recommendations):
 - **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the published error clones to check the bound (10 per site, option B of PR 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
 - **All contract interpretations below are in force.**
 
+Taken in PRs 10 and 11 (2026-11-15), within your 3-hour budget:
+
+- **Terrain patches:** 241 x 241 samples, 20 m apart (4.8 km), on the 10 m map.
+- **Shade grids:** 17 x 17 cells, 300 m apart (the same 4.8 km square), with 1° wedges and Int16 x 0.003°. Each cell's skyline comes from the same proven search at display precision (interval half-width 0.01°). It is turned into the site's frame and carries no map height error, because the shade grid is for display only (spec section 9). The error budget is in `docs/ACCURACY.md`.
+- **5 m site maps: downloaded and verified, but not used yet.** The 10 m maps already give proven answers; the 5 m maps would only narrow the bound at 5 sites. Using them (finest map near those sites, measured slope error, clone check) is future work.
+
 Taken in PR 9 (2026-11-15), the site list. You asked me to follow my recommendations.
 
 - **Sites.** The 10 are the connecting ridge, the Shackleton rim, the peak near Shackleton, the de Gerlache rim, the Malapert massif, the IM-2 Athena landing site on Mons Mouton, and the floors of Shackleton, Haworth and Faustini, plus the LCROSS impact point in Cabeus.
@@ -262,10 +267,21 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Proposed spec changes
 
+0. **API default `az_step_deg` of 1° for custom points (needs your approval; not applied).** On the real maps an error-bounded answer at 0.1° takes about 4.5 minutes, and at 1° about 25 s. Spec section 7 asks for "a step fine enough that the disc spans several entries", and at 1° the Sun's 0.53° disc spans only one or two. So the default stays 0.1 (reverted after the contract review), and the web app can ask for 1 as a quick first look. If you accept 1° as the default for custom points, the spec sentence should apply to curated sites only. Either way the answer is proven; coarser wedges only mean more "uncertain" hours.
+
 1. **Manifest `data_kind` field** (`"mock"` or `"real"`). The spec lists what the manifest must contain but does not fix its fields, so this is an addition, not a change. It lets the web app refuse to show mock data as a real verdict.
 2. Step and Float32: answered in PR 3, **no change proposed**. The hourly Float32 timetable with cubic interpolation is within 0.0000017 degrees for the Sun and 0.0000005 degrees for the Earth. A separate effect built into Contract 1 (the timetable is seen from the Moon's centre and shifted to the site by subtraction) adds 0.000027 degrees for the Earth. Both are far below the 0.01 degree pass mark. Details in `docs/ACCURACY.md`.
 
+## Future work
+
+- Use the 5 m site maps near their five sites: as the finest map, with their measured slope error in the bound, and with the 10 clones per site checking that each clone's skyline lies inside the bound.
+- Run the three passes of an error-bounded API answer in parallel processes, about a third of the time.
+- A full-resolution shade grid. Each cell is a full search, so a finer grid costs proportionally more computer time. The current one took about 40 minutes on 8 to 13 cores.
+- **GPU** (the machine has an NVIDIA RTX 3050 with 6 GB). The proven skyline search branches irregularly and suits the processor. A GPU would pay off for two jobs:
+  - a brute-force ray cast for much finer shade grids, checked against the proven search on sample cells;
+  - faster live API answers.
+- Building with fewer workers than cores. 27 processes at once ran out of memory: 48 of 50 GB committed, and heavy paging. 8 workers on 15 GB of RAM was the right setting.
+
 ## Open questions
 
-- **Live API speed on real terrain.** Measured in PR 8 at a point 0.2° from the pole: one skyline run takes 88 s at 0.1° wedges and 8 s at 1° (search reach 127 km). An error-bounded answer is three runs: about 4.5 minutes at 0.1°, 25 s at 1°. Curated sites are built ahead of time, so this only affects custom points. Options: (a) run the three runs in parallel processes (about a third of the time); (b) default the API to 1° wedges for custom points, with 0.1° on request; (c) pre-compute skylines on a grid of points. My recommendation is (a) and (b) together.
 - Mock shade grids exist for 2 of the 10 mock sites, at a small grid size, so the web app meets sites with and without one. Say if the web side needs all 10.

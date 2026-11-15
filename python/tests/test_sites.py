@@ -113,6 +113,9 @@ def test_problems_are_found(tmp_path, site_list):
 
 
 def test_flags_follow_the_files(tmp_path, site_list):
+    site_list = copy.deepcopy(site_list)                        # an empty folder: no products yet
+    for site in site_list["sites"]:
+        site["has_terrain"] = site["has_shade_grid"] = False
     (tmp_path / "sites.json").write_text(json.dumps(site_list, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     original = (tmp_path / "sites.json").read_bytes()
     assert sites.update_flags(tmp_path) == []

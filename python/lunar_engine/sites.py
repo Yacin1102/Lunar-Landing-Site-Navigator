@@ -37,7 +37,7 @@ SITES_PATH = REPO_DIR / "web" / "public" / "data" / "sites.json"
 #: The categories used, with their meaning (spec section 6 asks for the set
 #: to be documented; the web app groups by whatever values appear).
 CATEGORIES = {
-    "high_illumination": "Ridge crests, rims and peaks published as among the most often sunlit points.",
+    "high_illumination": "Ridge crests, rims and peaks in areas published as among the most often sunlit.",
     "landing_site": "Where a spacecraft has landed.",
     "psr": "Crater floors inside published permanently shadowed regions (PSRs).",
 }
