@@ -97,7 +97,7 @@ def test_health_matches_its_schema_and_says_the_terrain_is_synthetic(client, reg
 def test_live_answer_is_identical_to_the_prebuilt_file(client, world, tmp_path):
     """Spec section 11: a live skyline and a pre-made file for the same point
     and parameters must be identical."""
-    response = client.get("/api/skyline", params={"lat": -89.98, "lon": 45.5, "mast_m": 2})
+    response = client.get("/api/skyline", params={"lat": -89.98, "lon": 45.5, "mast_m": 2, "az_step_deg": 0.1})
     assert response.status_code == 200, response.json()
     live = response.json()
     assert contracts.skyline_problems(live) == []

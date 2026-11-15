@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "lat": -85.9756,
+  "lon": -2.11241,
+  "elev_m": 4970.198,
+  "size_m": 4800.0,
+  "n": 241,
+  "spacing_m": 20.0,
+  "dem": [
+    "LDEM_83S_10MPP_ADJ"
+  ],
+  "resolution_m": 10.0
+}

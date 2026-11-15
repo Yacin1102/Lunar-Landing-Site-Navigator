@@ -198,6 +198,37 @@ def test_files_laid_out_differently_are_refused(tmp_path, problem):
     assert lola.read_label(tmp_path / "ok.tif")["n_rows"] == 20, "the same file done right is accepted"
 
 
+def test_a_checksum_file_being_replaced_never_changes_a_maps_identity(tmp_path, monkeypatch):
+    """Found during the real build: while the download script replaced data_checksums.json,
+    a read could fail for an instant, the map's identity lost its checksum, and every cache
+    looked out of date. A failed read is now retried; it never means "nothing recorded"."""
+    import json
+    from pathlib import Path
+
+    tif = tmp_path / "h.tif"
+    tif.write_bytes(b"x" * 100)
+    sums = tmp_path / "data_checksums.json"
+    sums.write_text(json.dumps({"files": {"dem/h.tif": {"size": 100, "sha256": "abc"}}}), encoding="utf-8")
+    monkeypatch.setattr(lola, "CHECKSUMS", sums)
+    expected = lola._source_stamp(tif)
+    assert expected["sha256"] == "abc"
+
+    real_read = Path.read_text
+    failures = {"left": 3}
+
+    def flaky(self, *args, **kwargs):
+        if self == sums and failures["left"]:
+            failures["left"] -= 1
+            raise PermissionError("being replaced")
+        return real_read(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    assert lola._source_stamp(tif) == expected and failures["left"] == 0
+    failures["left"] = 10 ** 6                                       # never readable: an error, not a guess
+    with pytest.raises(PermissionError):
+        lola._source_stamp(tif)
+
+
 def test_an_interrupted_cache_is_never_used(tmp_path, monkeypatch):
     """Found by review: after a crash half-way through decompressing, unwritten
     pixels read 0 m. Now a half-written cache is never adopted."""

@@ -149,8 +149,59 @@ The published per-pixel errors are RMS (1-sigma) values and the products' horizo
 
 **Speed** (a one-off measurement with `python/scripts/time_skyline.py`, not a test; it depends on the machine): at a point 0.2° from the pole on the real maps, one skyline run took 88 s at 0.1° wedges and 8 s at 1°, after storing the decompressed maps in 64 x 64 tiles (368 s and 19 s before). The same run reported: skyline -1.5° to 16.9°, interval half-width mean 0.011° (largest 0.029°) before the map error is added, search reach 127 km, and unmapped terrain proven irrelevant.
 
-## Not yet verified
+## Terrain patches and shade grids (the 3D view)
 
-- The error bound on the real maps, with their published per-pixel errors and horizontal accuracy (the horizontal accuracy of the LOLA product is still to be taken from its paper).
-- The full error bound on the real maps at the curated sites (with the site list).
-- Illumination against published south polar studies: with the real products.
+Both are for display only (spec sections 8 and 9). Every reported number comes from the site's skyline with its error bound.
+
+**Terrain patch.** Each value is found exactly: start on the site's level plane, move along the site's vertical, and correct until the point lies on the 10 m map's surface (eight rounds; the remaining miss is far below a millimetre). Tests on a smooth sphere give `sqrt(R^2 - e^2 - n^2) - R` within 2 mm, for example -2.3 m at a corner 2.8 km out. A hill placed due north shows in the rows above the centre, and one placed due east in the columns to its right.
+
+**Shade grid.** The value stored for a cell and a 1° wedge differs from that cell's true skyline in the site's frame by at most:
+
+| Source | Bound |
+| --- | --- |
+| The search's interval half-width (proven) | 0.01° (target `SHADE_TOLERANCE_DEG`) |
+| Int16 rounding with `skyline_scale` 0.003 | 0.0015° |
+| Turning the cell's frame into the site's (interpretation 6). Directions are carried over exactly. Near the pole the two frames' "north" differs by many degrees (22° for a cell 2.4 km from a site 6 km from the pole), so a cell wedge straddles two stored wedges, and each stored wedge keeps the highest of all cell wedges that truly overlap it | Can be higher than the wedge's own terrain, by up to the difference between neighbouring 1° wedges |
+| Wedge edges are placed at each wedge's own elevation | Terrain at another elevation in the wedge can sit up to `tilt * abs(tan e1 - tan e2)` from them: at most about 0.02° here (tilt at most 0.11°) |
+| The map's height error | Not included: a display product (the site's own skyline includes it) |
+
+**Status:** the first real build had an error, caught by the contract review. A safety margin made each stored wedge the highest of three neighbouring degrees, so the centre cells sat up to 0.35° above the sites' proven ceilings. Those grids were withdrawn and are being rebuilt with the fix, which a test of a narrow peak now proves. The rebuilt grids pass the centre-cell check below at all 10 sites.
+
+A test reads every real shade grid's centre cell (the site itself) and checks that it lies within the site's proven 0.1° skyline and error bound, widened by the first two lines of this table. (At the centre cell the two frames are the same.) A test with a cell near the pole, where the meridians converge, checks the frame turn against geometry within 0.006°. Normals have unit length, and on a sphere they tilt by `(e/R, n/R, 1)`, as they should.
+
+## Illumination at the curated sites (real data, final proof)
+
+From `python python/scripts/check_illumination.py web/public/data`, on the built products. It covers every hour of the timetable (115,057 hours, 16 Nov 2026 to 1 Jan 2040), seen from an eye 2 m above the ground. It uses each site's skyline with its error bound, at 0.1° wedges.
+
+- **Certainly visible:** some of the disc is visible whatever the true terrain is within the bound.
+- **Certainly hidden:** none of it can be.
+- **Uncertain:** neither can be proven.
+
+| id | category | Sun certainly visible | Sun uncertain | Sun certainly hidden | Earth certainly visible | Earth uncertain | Earth certainly hidden |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| connecting_ridge | high_illumination | 77.7% | 17.7% | 4.6% | 56.1% | 2.5% | 41.4% |
+| shackleton_rim | high_illumination | 78.8% | 12.5% | 8.7% | 56.6% | 0.8% | 42.7% |
+| peak_near_shackleton | high_illumination | 36.1% | 17.2% | 46.7% | 48.7% | 12.2% | 39.1% |
+| de_gerlache_rim | high_illumination | 29.9% | 43.2% | 26.9% | 51.8% | 8.4% | 39.7% |
+| malapert_massif | high_illumination | 42.7% | 39.7% | 17.6% | 52.1% | 18.4% | 29.5% |
+| mons_mouton_im2 | landing_site | 45.3% | 2.4% | 52.3% | 88.1% | 6.7% | 5.2% |
+| shackleton_floor | psr | 0.0% | 0.0% | 100.0% | 0.0% | 0.0% | 100.0% |
+| haworth_floor | psr | 0.0% | 0.0% | 100.0% | 4.9% | 2.6% | 92.5% |
+| faustini_floor | psr | 0.0% | 0.0% | 100.0% | 1.4% | 1.6% | 97.0% |
+| cabeus_lcross | psr | 0.0% | 0.0% | 100.0% | 18.6% | 1.3% | 80.1% |
+
+**Against published studies:**
+
+- **The four crater floors are never sunlit, at any hour, with the full error bound.** This matches the published permanently shadowed regions: Tye et al. 2015 for Shackleton, Haworth and Faustini, and Marshall et al. 2011 for the LCROSS point in Cabeus. Shackleton's floor never sees the Earth either.
+- **Gläser et al. 2018, Table 1** (surface level, 20 years) gives solar visibility, the share of time any part of the Sun is visible:
+  - 81.3 % at the connecting ridge point C1. Ours is 77.7 % to 95.4 % (certainly visible, up to certainly visible plus uncertain).
+  - 85.5 % at the Shackleton rim point S. Ours is 78.8 % to 91.3 %.
+
+  Both published values lie inside our proven range (`tests/test_illumination.py`). With the error bound left out, the connecting ridge's middle skyline gives 87.6 %. The eye 2 m above the ground (Gläser: at the surface) and the different period are the obvious reasons it is higher.
+- **For the other tops no published figure exists for these exact points.** De Rosa et al. 2012 give them as centres of regions of interest chosen for illumination, with no percentage at the point. So no test compares them with a number. Their wide uncertain shares (17 to 43 %) come from the error bound on steep ground near the site. The 5 m site maps, with their measured slope error, would narrow it (future work).
+- **Earth:**
+  - The near-side IM-2 site sees it 88 % of the time.
+  - The far-side ridge and rim about 56 %.
+  - The floors almost never.
+  - This follows the sites' facing, as expected.
+

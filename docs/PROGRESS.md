@@ -25,9 +25,8 @@ Plan approved on 2026-11-14.
 | 6 Error bound and independent check | Merged (PR #13) |
 | 7 Record writer and live API | Merged (PR #17) |
 | 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
-| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps wait for your go-ahead (see Open questions) |
-| 10 Terrain patches, shade grids, manifest | **Next** |
-| 11 Real products and final proof | Not started |
+| 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps (option B, 3.05 GB) are downloaded and verified |
+| 10 and 11 Terrain patches, shade grids, real products, final proof | Built, in review (PR #21): skylines, terrain patches, shade grids, timetable, manifest and proof |
 
 To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
@@ -94,7 +93,7 @@ Coarse versions of the same product family, same projection and frame, covering 
 | `LDEM_60S_60MPP_ADJ.TIF` | 60 m | to 60°S (910 km) | 2.9 GB | Outer guard, so the search never leaves the data |
 | The matching four `..._ADJ_ERR.TIF`, same order | same | same | 19 GB | Published per-pixel height error, feeding `skyline_err_deg` |
 
-**Group 4, `sites5m`** (PGDA product 78, Barker et al. 2021, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/`). Not yet in the download list: it waits for your go-ahead (see Open questions). The directory holds six site folders (Site01, 04, 07, 11, 20, 23). Five of them match curated sites: Site01 is `connecting_ridge`, Site04 `shackleton_rim`, Site07 `peak_near_shackleton` and Site11 `de_gerlache_rim` (stated by Barker et al. 2021), and Site23 is the Malapert massif, whose map must be shown to contain the `malapert_massif` point. Each folder has, at 5 m pixels, the heights (`_surf`), the total height error (`_toterr`), the slope error (`_slperr`) and 100 error clones (`Clones/`). File sizes were read from the server on 2026-11-15 without downloading: 41 MB each (71 MB for Site23).
+**Group 4, `sites5m`** (PGDA product 78, Barker et al. 2021, `https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/`). In the download list since 2026-11-15 (option B: 65 files, 3.05 GB; details in `python/DATA.md`). The directory holds six site folders (Site01, 04, 07, 11, 20, 23). Five of them match curated sites: Site01 is `connecting_ridge`, Site04 `shackleton_rim`, Site07 `peak_near_shackleton` and Site11 `de_gerlache_rim` (stated by Barker et al. 2021), and Site23 is the Malapert massif. Each map's header was read: all five contain their site, at least 6.4 km from the edge. Each folder has, at 5 m pixels, the heights (`_surf`), the total height error (`_toterr`), the slope error (`_slperr`) and 100 error clones (`Clones/`). File sizes were read from the server on 2026-11-15 without downloading: 41 MB each (71 MB for Site23).
 
 **Why four nested maps.** A peak 8 km high is geometrically visible from about 170 km away at ground level, and from over 300 km when the observer also stands on high ground. A site at 85°S can therefore be shadowed by terrain 450 km from the pole.
 
@@ -213,8 +212,14 @@ Decided on 2026-11-15 (you asked me to follow my recommendations):
 - **Timetable length:** 115,057 hourly rows, so the last row is 1 Jan 2040 00:00 UTC.
 - **Service region:** 80°S to the pole. Sites farther north, such as Chandrayaan-3 (about 69°S), are out of scope.
 - **Eye at ground level:** the live API accepts `mast_m = 0`. The answer stays proven; on steep ground it is more often "uncertain".
-- **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the 100 published error clones per site to measure the spread of the skyline (PRs 8 and 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
+- **Error model:** keep `K_SIGMA = 3`. Where NASA publishes them (the 5 m site maps, PGDA product 78), use the measured per-pixel slope-error maps instead of the flat 6°, and the published error clones to check the bound (10 per site, option B of PR 9). Elsewhere, including custom points through the API, the general bound of PR 6 applies with 6° and `r0` = 1 pixel diagonal.
 - **All contract interpretations below are in force.**
+
+Taken in PRs 10 and 11 (2026-11-15), within your 3-hour budget:
+
+- **Terrain patches:** 241 x 241 samples, 20 m apart (4.8 km), on the 10 m map.
+- **Shade grids:** 17 x 17 cells, 300 m apart (the same 4.8 km square), with 1° wedges and Int16 x 0.003°. Each cell's skyline comes from the same proven search at display precision (interval half-width 0.01°). It is turned into the site's frame and carries no map height error, because the shade grid is for display only (spec section 9). The error budget is in `docs/ACCURACY.md`.
+- **5 m site maps: downloaded and verified, but not used yet.** The 10 m maps already give proven answers; the 5 m maps would only narrow the bound at 5 sites. Using them (finest map near those sites, measured slope error, clone check) is future work.
 
 Taken in PR 9 (2026-11-15), the site list. You asked me to follow my recommendations.
 
@@ -222,6 +227,7 @@ Taken in PR 9 (2026-11-15), the site list. You asked me to follow my recommendat
   - They contrast five sunlit tops with four shadowed floors, and near-side, limb and far-side longitudes.
   - Every coordinate, its exact source words, and the map check are in `python/sites_sources.md`.
   - The left-out candidates and the reasons are listed there too.
+- **5 m site maps: option B** (your choice, 2026-11-15). For the five sites that PGDA product 78 covers, three maps each: heights, height error and slope error. Plus 10 of the 100 published error clones per site: 65 files, 3.05 GB. The bound stays a proven worst case. The clones check it: each clone's skyline must lie inside the bound. This replaces the earlier plan to use all 100 clones to measure the spread.
 - **Categories:** `high_illumination`, `landing_site` and `psr`. A category is what the source says. Whether a site is actually lit is answered by the engine, and is compared with published studies in PR 11.
 - **Live API values (PR 7):** wedge width default 0.1°, accepted 0.05, 0.1, 0.2, 0.25, 0.5 and 1°; mast default 2 m, accepted 0 to 100 m; custom points rounded to 5 decimals of a degree (at most about 0.6 m along a meridian) and moved no closer to the pole than latitude -89.99999; unknown parameters refused; CORS allows the Vite dev server (`http://localhost:5173`).
 
@@ -261,20 +267,21 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Proposed spec changes
 
+0. **API default `az_step_deg` of 1° for custom points: declined on 2026-11-15** (you asked for the option that balances accuracy and usage). The default stays 0.1°, which is spec-compliant and needs no further work. The web app can ask for 1° as a quick first look. The reasoning, kept for reference: On the real maps an error-bounded answer at 0.1° takes about 4.5 minutes, and at 1° about 25 s. Spec section 7 asks for "a step fine enough that the disc spans several entries", and at 1° the Sun's 0.53° disc spans only one or two. So the default stays 0.1 (reverted after the contract review), and the web app can ask for 1 as a quick first look. If you accept 1° as the default for custom points, the spec sentence should apply to curated sites only. Either way the answer is proven; coarser wedges only mean more "uncertain" hours.
+
 1. **Manifest `data_kind` field** (`"mock"` or `"real"`). The spec lists what the manifest must contain but does not fix its fields, so this is an addition, not a change. It lets the web app refuse to show mock data as a real verdict.
 2. Step and Float32: answered in PR 3, **no change proposed**. The hourly Float32 timetable with cubic interpolation is within 0.0000017 degrees for the Sun and 0.0000005 degrees for the Earth. A separate effect built into Contract 1 (the timetable is seen from the Moon's centre and shifted to the site by subtraction) adds 0.000027 degrees for the Earth. Both are far below the 0.01 degree pass mark. Details in `docs/ACCURACY.md`.
 
+## Future work
+
+- Use the 5 m site maps near their five sites: as the finest map, with their measured slope error in the bound, and with the 10 clones per site checking that each clone's skyline lies inside the bound.
+- Run the three passes of an error-bounded API answer in parallel processes, about a third of the time.
+- A full-resolution shade grid. Each cell is a full search, so a finer grid costs proportionally more computer time. The current one took about 40 minutes on 8 to 13 cores.
+- **GPU** (the machine has an NVIDIA RTX 3050 with 6 GB). The proven skyline search branches irregularly and suits the processor. A GPU would pay off for two jobs:
+  - a brute-force ray cast for much finer shade grids, checked against the proven search on sample cells;
+  - faster live API answers.
+- Building with fewer workers than cores. 27 processes at once ran out of memory: 48 of 50 GB committed, and heavy paging. 8 workers on 15 GB of RAM was the right setting.
+
 ## Open questions
 
-- **Live API speed on real terrain.** Measured in PR 8 at a point 0.2° from the pole: one skyline run takes 88 s at 0.1° wedges and 8 s at 1° (search reach 127 km). An error-bounded answer is three runs: about 4.5 minutes at 0.1°, 25 s at 1°. Curated sites are built ahead of time, so this only affects custom points. Options: (a) run the three runs in parallel processes (about a third of the time); (b) default the API to 1° wedges for custom points, with 0.1° on request; (c) pre-compute skylines on a grid of points. My recommendation is (a) and (b) together.
-
-- **5 m site maps: which files to download (needs your go-ahead).** The five matching sites (see Group 4):
-
-  | Choice | Files | Size | Gives |
-  | --- | --- | --- | --- |
-  | A | heights, height error, slope error | 15 files, 0.70 GB | The near terrain at 5 m instead of 10 m, and the measured slope error in place of the general 6° |
-  | B | A plus 10 clones per site | 65 files, 3.1 GB | Also an independent check: the skyline of each clone must lie inside the bound |
-  | C | A plus all 100 clones | 515 files, 24 GB | The full spread; about 3 hours at the measured server speed |
-
-  My recommendation is B. This narrows the earlier decision ("use the 100 clones to measure the spread"), so it needs your yes. The bound itself must stay a proven worst case, which the clones cannot give (they are samples), so their job is to check the bound. Ten per site is enough to catch a bound that is too narrow.
 - Mock shade grids exist for 2 of the 10 mock sites, at a small grid size, so the web app meets sites with and without one. Say if the web side needs all 10.

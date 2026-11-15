@@ -47,6 +47,10 @@ from .contracts import SERVICE_REGION
 from .elevation import CoverageError, ElevationSource
 from .records import RecordContractError, skyline_record
 
+#: Default wedge width, degrees. Spec section 7 asks for a step fine enough that
+#: the Sun's disc (0.53 degrees) spans several entries. On the real maps such an
+#: answer takes about 4.5 minutes; a faster 1 degree default is proposed in
+#: docs/PROGRESS.md, not applied. 1 can be requested explicitly.
 DEFAULT_AZ_STEP_DEG = 0.1
 #: Accepted wedge widths, degrees. All divide 360.
 ALLOWED_AZ_STEPS_DEG = (0.05, 0.1, 0.2, 0.25, 0.5, 1.0)

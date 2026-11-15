@@ -17,7 +17,7 @@ The web app groups sites by whatever categories appear. The set used is:
 
 | Category | Meaning |
 | --- | --- |
-| `high_illumination` | Ridge crests, rims and peaks published as among the most often sunlit points |
+| `high_illumination` | Ridge crests, rims and peaks in areas published as among the most often sunlit. For `connecting_ridge` and `shackleton_rim` the point itself is published as such (Gläser et al. 2018). For `peak_near_shackleton`, `de_gerlache_rim` and `malapert_massif` it is the centre of a region of interest chosen for its illumination (De Rosa et al. 2012), which publishes no figure for the point itself |
 | `landing_site` | Where a spacecraft has landed |
 | `psr` | Crater floors inside published permanently shadowed regions (PSRs) |
 
@@ -25,7 +25,7 @@ The category is the source's description. Whether each site is actually lit is a
 
 ## Why these 10
 
-- **Lit against dark.** Five published high-illumination points are set against four crater floors in published permanently shadowed regions. Each dark floor is a short distance from a sunlit rim, so the answer changes over short distances.
+- **Lit against dark.** Five ridge, rim and peak tops in published high-illumination areas are set against four crater floors in published permanently shadowed regions. The engine measures how often each is actually lit (`docs/ACCURACY.md`). Each dark floor is a short distance from a sunlit rim, so the answer changes over short distances.
 - **Earth in view or not.**
   - Near-side sites, where Earth is usually up: Malapert (-2°), Haworth (-5°), Mons Mouton (29°) and Cabeus (-49°).
   - Limb sites: de Gerlache (-68°) and Faustini (84°).

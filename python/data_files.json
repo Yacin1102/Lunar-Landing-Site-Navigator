@@ -161,6 +161,526 @@
       "size": 4218063226,
       "modified": "2023-06-03",
       "role": "Height error, 60 m pixels, pole to 60S"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_surf.tif",
+      "dest": "dem/sites5m/Site01/Site01_final_adj_5mpp_surf.tif",
+      "size": 40980810,
+      "modified": "2020-06-05",
+      "role": "Heights, 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_toterr.tif",
+      "dest": "dem/sites5m/Site01/Site01_final_adj_5mpp_toterr.tif",
+      "size": 40980810,
+      "modified": "2020-06-05",
+      "role": "Total height error (RMS), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_slperr.tif",
+      "dest": "dem/sites5m/Site01/Site01_final_adj_5mpp_slperr.tif",
+      "size": 40980810,
+      "modified": "2020-06-05",
+      "role": "Slope error (RMS, degrees), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0001_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0001_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 1 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0002_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0002_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 2 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0003_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0003_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 3 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0004_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0004_err.tif",
+      "size": 40987161,
+      "modified": "2020-10-15",
+      "role": "Error clone 4 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0005_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0005_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 5 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0006_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0006_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 6 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0007_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0007_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 7 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0008_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0008_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 8 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0009_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0009_err.tif",
+      "size": 40987153,
+      "modified": "2020-10-15",
+      "role": "Error clone 9 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/Site01_final_adj_5mpp_0010_err.tif",
+      "dest": "dem/sites5m/Site01/Clones/Site01_final_adj_5mpp_0010_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 10 of 10 used (of 100 published), 5 m pixels, Site01 (connecting_ridge)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_surf.tif",
+      "dest": "dem/sites5m/Site04/Site04_final_adj_5mpp_surf.tif",
+      "size": 40980806,
+      "modified": "2020-06-05",
+      "role": "Heights, 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_toterr.tif",
+      "dest": "dem/sites5m/Site04/Site04_final_adj_5mpp_toterr.tif",
+      "size": 40980808,
+      "modified": "2020-06-05",
+      "role": "Total height error (RMS), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_slperr.tif",
+      "dest": "dem/sites5m/Site04/Site04_final_adj_5mpp_slperr.tif",
+      "size": 40980806,
+      "modified": "2020-06-05",
+      "role": "Slope error (RMS, degrees), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0001_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0001_err.tif",
+      "size": 40987161,
+      "modified": "2020-10-15",
+      "role": "Error clone 1 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0002_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0002_err.tif",
+      "size": 40987159,
+      "modified": "2020-10-15",
+      "role": "Error clone 2 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0003_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0003_err.tif",
+      "size": 40987161,
+      "modified": "2020-10-15",
+      "role": "Error clone 3 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0004_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0004_err.tif",
+      "size": 40987161,
+      "modified": "2020-10-15",
+      "role": "Error clone 4 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0005_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0005_err.tif",
+      "size": 40987159,
+      "modified": "2020-10-15",
+      "role": "Error clone 5 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0006_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0006_err.tif",
+      "size": 40987153,
+      "modified": "2020-10-15",
+      "role": "Error clone 6 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0007_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0007_err.tif",
+      "size": 40987157,
+      "modified": "2020-10-15",
+      "role": "Error clone 7 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0008_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0008_err.tif",
+      "size": 40987161,
+      "modified": "2020-10-15",
+      "role": "Error clone 8 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0009_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0009_err.tif",
+      "size": 40987157,
+      "modified": "2020-10-15",
+      "role": "Error clone 9 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Clones/Site04_final_adj_5mpp_0010_err.tif",
+      "dest": "dem/sites5m/Site04/Clones/Site04_final_adj_5mpp_0010_err.tif",
+      "size": 40987153,
+      "modified": "2020-10-15",
+      "role": "Error clone 10 of 10 used (of 100 published), 5 m pixels, Site04 (shackleton_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_surf.tif",
+      "dest": "dem/sites5m/Site07/Site07_final_adj_5mpp_surf.tif",
+      "size": 40980808,
+      "modified": "2020-06-05",
+      "role": "Heights, 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_toterr.tif",
+      "dest": "dem/sites5m/Site07/Site07_final_adj_5mpp_toterr.tif",
+      "size": 40980810,
+      "modified": "2020-06-05",
+      "role": "Total height error (RMS), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_slperr.tif",
+      "dest": "dem/sites5m/Site07/Site07_final_adj_5mpp_slperr.tif",
+      "size": 40980808,
+      "modified": "2020-06-05",
+      "role": "Slope error (RMS, degrees), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0001_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0001_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 1 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0002_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0002_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 2 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0003_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0003_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 3 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0004_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0004_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 4 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0005_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0005_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 5 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0006_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0006_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 6 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0007_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0007_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 7 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0008_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0008_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 8 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0009_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0009_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 9 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Clones/Site07_final_adj_5mpp_0010_err.tif",
+      "dest": "dem/sites5m/Site07/Clones/Site07_final_adj_5mpp_0010_err.tif",
+      "size": 40987165,
+      "modified": "2020-10-15",
+      "role": "Error clone 10 of 10 used (of 100 published), 5 m pixels, Site07 (peak_near_shackleton)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Site11_final_adj_5mpp_surf.tif",
+      "dest": "dem/sites5m/Site11/Site11_final_adj_5mpp_surf.tif",
+      "size": 40980806,
+      "modified": "2020-06-05",
+      "role": "Heights, 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Site11_final_adj_5mpp_toterr.tif",
+      "dest": "dem/sites5m/Site11/Site11_final_adj_5mpp_toterr.tif",
+      "size": 40980810,
+      "modified": "2020-06-05",
+      "role": "Total height error (RMS), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Site11_final_adj_5mpp_slperr.tif",
+      "dest": "dem/sites5m/Site11/Site11_final_adj_5mpp_slperr.tif",
+      "size": 40980808,
+      "modified": "2020-06-05",
+      "role": "Slope error (RMS, degrees), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0001_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0001_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 1 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0002_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0002_err.tif",
+      "size": 40987159,
+      "modified": "2020-10-15",
+      "role": "Error clone 2 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0003_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0003_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 3 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0004_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0004_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 4 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0005_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0005_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 5 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0006_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0006_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 6 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0007_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0007_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 7 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0008_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0008_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 8 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0009_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0009_err.tif",
+      "size": 40987163,
+      "modified": "2020-10-15",
+      "role": "Error clone 9 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Clones/Site11_final_adj_5mpp_0010_err.tif",
+      "dest": "dem/sites5m/Site11/Clones/Site11_final_adj_5mpp_0010_err.tif",
+      "size": 40987159,
+      "modified": "2020-10-15",
+      "role": "Error clone 10 of 10 used (of 100 published), 5 m pixels, Site11 (de_gerlache_rim)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_surf.tif",
+      "dest": "dem/sites5m/Site23/Site23_final_adj_5mpp_surf.tif",
+      "size": 70586804,
+      "modified": "2020-06-12",
+      "role": "Heights, 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_toterr.tif",
+      "dest": "dem/sites5m/Site23/Site23_final_adj_5mpp_toterr.tif",
+      "size": 70586811,
+      "modified": "2021-02-19",
+      "role": "Total height error (RMS), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_slperr.tif",
+      "dest": "dem/sites5m/Site23/Site23_final_adj_5mpp_slperr.tif",
+      "size": 70586809,
+      "modified": "2021-02-19",
+      "role": "Slope error (RMS, degrees), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0001_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0001_err.tif",
+      "size": 70595161,
+      "modified": "2021-02-12",
+      "role": "Error clone 1 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0002_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0002_err.tif",
+      "size": 70595151,
+      "modified": "2021-02-12",
+      "role": "Error clone 2 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0003_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0003_err.tif",
+      "size": 70595147,
+      "modified": "2021-02-12",
+      "role": "Error clone 3 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0004_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0004_err.tif",
+      "size": 70595155,
+      "modified": "2021-02-12",
+      "role": "Error clone 4 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0005_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0005_err.tif",
+      "size": 70595159,
+      "modified": "2021-02-12",
+      "role": "Error clone 5 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0006_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0006_err.tif",
+      "size": 70595161,
+      "modified": "2021-02-12",
+      "role": "Error clone 6 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0007_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0007_err.tif",
+      "size": 70595153,
+      "modified": "2021-02-12",
+      "role": "Error clone 7 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0008_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0008_err.tif",
+      "size": 70595161,
+      "modified": "2021-02-12",
+      "role": "Error clone 8 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0009_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0009_err.tif",
+      "size": 70595155,
+      "modified": "2021-02-12",
+      "role": "Error clone 9 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
+    },
+    {
+      "group": "sites5m",
+      "url": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Clones/Site23_final_adj_5mpp_0010_err.tif",
+      "dest": "dem/sites5m/Site23/Clones/Site23_final_adj_5mpp_0010_err.tif",
+      "size": 70595151,
+      "modified": "2021-02-12",
+      "role": "Error clone 10 of 10 used (of 100 published), 5 m pixels, Site23 (malapert_massif)"
     }
   ]
 }

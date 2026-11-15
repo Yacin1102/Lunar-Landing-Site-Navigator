@@ -23,6 +23,10 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/sites.py` | The curated site list (Contract 2): checks it (schema, unique ids, service region, documented categories), sets its `has_terrain` / `has_shade_grid` flags from the files present, and describes the ground around a site for the map cross-check. | `web/public/data/sites.json`, an `ElevationSource` | `sites.json` (flags only) |
 | `python/scripts/check_sites.py` | Prints the ground around each site on the real maps (the table in `python/sites_sources.md`). | `sites`, `lola` | Report on screen |
 | `python/scripts/update_site_flags.py` | Sets the site flags after terrain patches or shade grids are built. | `sites` | `sites.json` |
+| `python/lunar_engine/patches.py` | Terrain patches (Contract 4) and shade grids (Contract 5): the exact ground in the site's frame, surface normals, and each shade cell's skyline from the proven search, turned into the site's frame. | An `ElevationSource`, `skyline` | Arrays |
+| `python/lunar_engine/illumination.py` | The final proof: how often each site certainly sees the Sun and the Earth over the whole timetable, from the products the web app receives. | A skyline record, the timetable | Shares of hours |
+| `python/scripts/build_products.py` | Builds the whole real data folder (skylines, terrain, shade grids, timetable, flags, manifest) in parallel and resumably, then checks it. | `lola`, `records`, `patches`, `sites`, SPICE | `web/public/data/` |
+| `python/scripts/check_illumination.py` | Prints the Sun and Earth visibility table of `docs/ACCURACY.md`. | `illumination`, `web/public/data/` | Report on screen |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -235,3 +239,23 @@ Tests are marked with the data groups they need, for example `@pytest.mark.reald
 A group counts as present when every one of its files exists with the recorded size and has a recorded checksum. This check is quick and does not re-read the files; the full re-read is `download_data.py --verify`.
 
 Every test run ends with a "Real-data tests" section listing each skipped test and the files it is waiting for.
+
+## Building the real data folder
+
+```mermaid
+flowchart LR
+    sites[sites.json] --> build[build_products.py]
+    maps[LOLA maps and tables<br/>python/dem/cache] --> build
+    build -- "first site alone,<br/>so all tables exist" --> pool[worker processes]
+    pool --> sky[skylines/id.json<br/>records.skyline_record]
+    pool --> rows[shade rows<br/>python/dem/cache/shade_rows]
+    rows --> shade[shade/id.json, _skyline.bin, _normal.bin]
+    build --> terrain[terrain/id.json, .bin<br/>patches.SiteFrame]
+    build --> ephem[ephem.bin, ephem.json<br/>SPICE]
+    build --> flags[sites.update_flags] --> manifest[manifest.json<br/>written last]
+    manifest --> check[contracts.data_folder_problems]
+    sky --> proof[illumination.py<br/>final proof]
+    ephem --> proof
+```
+
+Map caches are identified by each source file's name, size, date and recorded checksum. A failed read of `data_checksums.json` (it is replaced while downloads run) is retried, never taken as "no checksum", and cache records are written in one step. Otherwise a cache can look out of date and parallel workers rebuild the same table at once, as happened once during the first real build.

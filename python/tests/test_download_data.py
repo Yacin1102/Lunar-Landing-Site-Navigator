@@ -474,6 +474,7 @@ def test_real_manifest_is_well_formed_and_in_the_planned_order():
 
     assert groups == sorted(groups, key=dd.GROUP_ORDER.index), "manifest is not in download order"
     assert groups.count("kernels") == 8 and groups.count("coarse") == 4 and groups.count("full") == 8
+    assert groups.count("sites5m") == 65                     # option B: 5 sites x (3 maps + 10 clones)
     for f in files:
         assert f["url"].startswith("https://")
         assert f["url"].rsplit("/", 1)[1] == f["dest"].rsplit("/", 1)[1]
@@ -485,8 +486,12 @@ def test_real_manifest_is_well_formed_and_in_the_planned_order():
     full = [f for f in files if f["group"] == "full"]
     assert all(not f["dest"].endswith("_ERR.TIF") for f in full[:4]), "height maps come before error maps"
     assert all(f["dest"].endswith("_ERR.TIF") for f in full[4:])
-    total = sum(f["size"] for f in files)
+    total = sum(f["size"] for f in files if f["group"] != "sites5m")
     assert 34.5e9 < total < 35.5e9
+    sites5m = [f for f in files if f["group"] == "sites5m"]
+    assert 3.0e9 < sum(f["size"] for f in sites5m) < 3.1e9
+    assert all(f["url"].endswith("/LOLA_5mpp/" + f["dest"][len("dem/sites5m/"):]) for f in sites5m), \
+        "5 m files keep the server's folders under dem/sites5m/"
 
 
 def test_every_manifest_file_is_explained_in_data_md():
