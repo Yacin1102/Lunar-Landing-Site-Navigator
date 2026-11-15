@@ -104,5 +104,6 @@ describe("mission dashboard", () => {
     });
     expect(screen.getByRole("heading", { name: "Site view" })).toBeTruthy();
     expect(screen.getByText("-89.000° latitude")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Interactive Moon scene centered on Mock site" })).toBeTruthy();
   });
 });

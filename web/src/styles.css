@@ -441,6 +441,43 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   letter-spacing: 0.08em;
 }
 
+.moon-scene {
+  position: relative;
+  min-height: 31rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: #080d18;
+  cursor: grab;
+  touch-action: none;
+}
+
+.moon-scene:active { cursor: grabbing; }
+
+.moon-canvas {
+  display: block;
+  width: 100%;
+  height: 31rem;
+}
+
+.moon-scene-hint {
+  position: absolute;
+  top: 0.85rem;
+  left: 1rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.moon-reset {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  color: var(--muted);
+  background: rgba(8, 13, 24, 0.72);
+}
+
 .polar-map {
   position: relative;
   width: min(34rem, 100%);

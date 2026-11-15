@@ -6,7 +6,7 @@ This page describes the code as it exists today. It grows with each pull request
 
 | Module | Job | Reads | Writes |
 | --- | --- | --- | --- |
-| `web/src/App.tsx` | Renders the mission dashboard, on-site terrain view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
+| `web/src/App.tsx` | Renders the mission dashboard, interactive Moon site view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
 | `web/src/visual-model.ts` | Samples browser engine results into chart-ready points and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
 | `web/src/styles.css` | Provides the dark, glass-panel visual system and responsive layout for the dashboard and site view. | React class names | Browser styles |
 | `python/scripts/download_data.py` | Downloads the NASA input files, four at a time and started in a fixed order, resumes after an interruption, and verifies size and checksum. Refuses to run twice in the same folder. Also answers "is this group of data on disk?" for the tests. | `python/data_files.json`, `python/data_checksums.json`, the NAIF and PGDA servers | `python/kernels/`, `python/dem/`, `python/data_checksums.json`, `python/dem/download.log`, `python/dem/download.lock`, and a `name.part.json` side file next to each partial download |
@@ -94,7 +94,7 @@ The web app offers two primary experiences over the same prepared data:
 flowchart LR
     data[manifest, sites, skylines, terrain] --> bundle[loadDataBundle]
     bundle --> dashboard[Dashboard view<br/>skyline, Sun/Earth paths,<br/>status cards, timeline]
-    bundle --> siteview[Site view<br/>prepared terrain patch,<br/>observer marker, coordinates]
+    bundle -->     siteview[Site view<br/>interactive Moon scene,<br/>site markers, coordinates]
     bundle --> map[Site map<br/>curated site selection]
     dashboard --> compare[Comparison page]
 ```
