@@ -36,8 +36,7 @@ export function shadeBrightness(
   const row = Math.floor(cellIndex / n);
   const column = cellIndex % n;
   const azimuths = Array.from({ length: shade.label.n_az }, (_, index) => {
-    const offset = index * shade.label.az_step_deg;
-    return shade.skyline[(cellIndex * shade.label.n_az) + index] * shade.label.skyline_scale + offset;
+    return shade.skyline[(cellIndex * shade.label.n_az) + index] * shade.label.skyline_scale;
   });
   const skyline = {
     ...skylineFallback,
@@ -77,6 +76,15 @@ export function buildTerrainGeometry(patch: TerrainPatch, exaggeration: number):
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const uvs = new Float32Array(n * n * 2);
+  for (let row = 0; row < n; row += 1) {
+    for (let column = 0; column < n; column += 1) {
+      const index = row * n + column;
+      uvs[index * 2] = column / Math.max(1, n - 1);
+      uvs[index * 2 + 1] = 1 - row / Math.max(1, n - 1);
+    }
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -126,8 +134,20 @@ export function Terrain3DView({
     resetCamera();
     resize();
     const geometry = buildTerrainGeometry(patch, exaggeration);
-    const material = new THREE.MeshStandardMaterial({ color: "#777b80", roughness: 1 });
+    const material = new THREE.MeshStandardMaterial({ color: "#777b80", roughness: 1, vertexColors: true });
     const terrain = new THREE.Mesh(geometry, material);
+    if (shade && skyline) {
+      const colors = new Float32Array(patch.label.n * patch.label.n * 3);
+      for (let index = 0; index < patch.label.n * patch.label.n; index += 1) {
+        const brightness = shadeBrightness(shade, index, sun, "sun", skyline);
+        const value = 0.18 + brightness * 0.82;
+        colors[index * 3] = value;
+        colors[index * 3 + 1] = value;
+        colors[index * 3 + 2] = value;
+      }
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geometry.attributes.color.needsUpdate = true;
+    }
     scene.add(terrain);
     scene.add(new THREE.AmbientLight("#6b6b6b", 0.35));
     const sunLight = new THREE.DirectionalLight("#f4c95d", Math.max(0.1, sunFraction));
