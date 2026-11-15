@@ -1,52 +1,26 @@
-import { calculateMetrics } from "./metrics";
-import { directionsAt } from "./astro";
-import { findEvents } from "./events";
-import { classifyVisibility } from "./visibility";
+import { evaluateSite } from "./evaluate";
 import type { EphemerisLabel } from "./runtime-types";
 import type { Skyline } from "./types";
 
-type WorkerRequest = {
-  id: number;
-  type: "evaluate";
-  values: Float32Array;
-  label: EphemerisLabel;
-  skyline: Skyline;
-  site: { lat: number; lon: number; elev_m: number; mast_m?: number };
-  timeMs: number;
-  startMs: number;
-  endMs: number;
-};
+/** Messages the worker accepts: the timetable once, then any number of evaluations. */
+export type WorkerRequest =
+  | { type: "init"; values: Float32Array; label: EphemerisLabel }
+  | { type: "evaluate"; id: number; skyline: Skyline; site: { lat: number; lon: number }; timeMs: number; startMs: number; endMs: number };
 
-/** Evaluate one time and event window inside a dedicated browser worker. */
+let timetable: { values: Float32Array; label: EphemerisLabel } | undefined;
+
+/** Evaluate one site, time and window away from the UI thread; errors are sent back, never swallowed. */
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
-  if (request.type !== "evaluate") return;
-  const directions = directionsAt(
-    request.values,
-    request.label,
-    request.timeMs,
-    request.site.lat,
-    request.site.lon,
-    request.site.elev_m,
-    request.site.mast_m,
-  );
-  const sunVisibility = classifyVisibility(directions.sun, "sun", request.skyline);
-  const earthVisibility = classifyVisibility(directions.earth, "earth", request.skyline);
-  const events = findEvents(request.values, request.label, request.skyline, request.site, request.startMs, request.endMs);
-  const metrics = calculateMetrics(
-    events,
-    request.startMs,
-    request.endMs,
-    (time) => classifyVisibility(
-      directionsAt(request.values, request.label, time, request.site.lat, request.site.lon, request.site.elev_m, request.site.mast_m).sun,
-      "sun",
-      request.skyline,
-    ).status === "visible",
-    (time) => classifyVisibility(
-      directionsAt(request.values, request.label, time, request.site.lat, request.site.lon, request.site.elev_m, request.site.mast_m).earth,
-      "earth",
-      request.skyline,
-    ).status === "visible",
-  );
-  self.postMessage({ id: request.id, directions, sunVisibility, earthVisibility, events, metrics });
+  if (request.type === "init") {
+    timetable = { values: request.values, label: request.label };
+    return;
+  }
+  try {
+    if (!timetable) throw new Error("The worker has no timetable yet");
+    const result = evaluateSite(timetable.values, timetable.label, request.skyline, request.site, request.timeMs, request.startMs, request.endMs);
+    self.postMessage({ id: request.id, ok: true, result });
+  } catch (reason: unknown) {
+    self.postMessage({ id: request.id, ok: false, error: reason instanceof Error ? reason.message : String(reason) });
+  }
 };

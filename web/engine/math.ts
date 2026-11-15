@@ -40,12 +40,3 @@ export function normalize(vector: Vector3): Vector3 {
 export function dot(a: Vector3, b: Vector3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
-
-/** Linearly interpolate two vectors when a sample is at an endpoint. */
-export function lerp(a: Vector3, b: Vector3, fraction: number): Vector3 {
-  return {
-    x: a.x + (b.x - a.x) * fraction,
-    y: a.y + (b.y - a.y) * fraction,
-    z: a.z + (b.z - a.z) * fraction,
-  };
-}
