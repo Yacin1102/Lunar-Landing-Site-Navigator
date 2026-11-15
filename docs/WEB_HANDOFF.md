@@ -97,8 +97,8 @@ The same steps are written out in Python as `interpolate_rows` and `view_from_ro
 
 For each azimuth, the highest elevation angle at which terrain appears from the eye.
 
-- `skyline_deg[k]` belongs to azimuth `k * az_step_deg`. It is the **maximum over the whole wedge** from half a step before to half a step after that azimuth, so treat the skyline as a step function. Do not interpolate between entries: interpolation could cut a corner off a peak.
-- `skyline_err_deg[k]` is the uncertainty bound of entry `k`, in degrees.
+- `skyline_deg[k]` belongs to the wedge of azimuths from half a step before to half a step after `k * az_step_deg`. Treat the skyline as a step function. Do not interpolate between entries: interpolation could cut a corner off a peak.
+- `skyline_err_deg[k]` is the uncertainty bound of entry `k`, in degrees. The interval `skyline_deg[k] +/- skyline_err_deg[k]` contains the skyline at **every** azimuth of the wedge (both its highest terrain and the lowest the skyline dips to inside the wedge), for any terrain within the map's published error. So a direction above the interval is certainly clear and one below it is certainly blocked, wherever it falls in the wedge.
 - `elev_m` is the ground height and `mast_m` the eye height above it. The eye is at `MOON_RADIUS_M + elev_m + mast_m` from the Moon's centre.
 - Values can be negative: from a peak the horizon is below the level plane.
 
