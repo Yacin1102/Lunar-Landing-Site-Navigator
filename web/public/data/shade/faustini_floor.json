@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "center_lat": -87.18,
+  "center_lon": 84.31,
+  "size_m": 4800.0,
+  "n": 17,
+  "spacing_m": 300.0,
+  "az_step_deg": 1.0,
+  "n_az": 360,
+  "skyline_scale": 0.003,
+  "mast_m": 2.0,
+  "dem": [
+    "LDEM_83S_10MPP_ADJ",
+    "LDEM_80S_20MPP_ADJ",
+    "LDEM_75S_30MPP_ADJ",
+    "LDEM_60S_60MPP_ADJ"
+  ],
+  "resolution_m": 10.0
+}

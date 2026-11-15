@@ -165,7 +165,7 @@ Both are for display only (spec sections 8 and 9). Every reported number comes f
 | Wedge edges are placed at each wedge's own elevation | Terrain at another elevation in the wedge can sit up to `tilt * abs(tan e1 - tan e2)` from them: at most about 0.02° here (tilt at most 0.11°) |
 | The map's height error | Not included: a display product (the site's own skyline includes it) |
 
-**Status:** the first real build had an error, caught by the contract review. A safety margin made each stored wedge the highest of three neighbouring degrees, so the centre cells sat up to 0.35° above the sites' proven ceilings. Those grids were withdrawn and are being rebuilt with the fix, which a test of a narrow peak now proves. They will be added in a later commit; until then the shade flags are false.
+**Status:** the first real build had an error, caught by the contract review. A safety margin made each stored wedge the highest of three neighbouring degrees, so the centre cells sat up to 0.35° above the sites' proven ceilings. Those grids were withdrawn and are being rebuilt with the fix, which a test of a narrow peak now proves. The rebuilt grids pass the centre-cell check below at all 10 sites.
 
 A test reads every real shade grid's centre cell (the site itself) and checks that it lies within the site's proven 0.1° skyline and error bound, widened by the first two lines of this table. (At the centre cell the two frames are the same.) A test with a cell near the pole, where the meridians converge, checks the frame turn against geometry within 0.006°. Normals have unit length, and on a sphere they tilt by `(e/R, n/R, 1)`, as they should.
 

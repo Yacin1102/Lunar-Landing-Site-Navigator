@@ -26,7 +26,7 @@ Plan approved on 2026-11-14.
 | 7 Record writer and live API | Merged (PR #17) |
 | 8 LOLA reader | Reviewed in PR #18, which was merged into the `feat/live-api` branch after #17 had gone to `main`; carried to `main` unchanged by PR #19 (open) |
 | 9 Site list | Built, in review (PR #20, stacked on PR #19). The 5 m site maps (option B, 3.05 GB) are downloaded and verified |
-| 10 and 11 Terrain patches, shade grids, real products, final proof | Built, in review. Skylines, terrain, timetable, manifest and proof are ready; the shade grids are being rebuilt after a review fix and will follow as a second commit |
+| 10 and 11 Terrain patches, shade grids, real products, final proof | Built, in review (PR #21): skylines, terrain patches, shade grids, timetable, manifest and proof |
 
 To run the live API on synthetic terrain for the web app: `.venv\Scripts\python python/scripts/serve.py --synthetic` (port 8000).
 
@@ -267,7 +267,7 @@ Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages
 
 ## Proposed spec changes
 
-0. **API default `az_step_deg` of 1° for custom points (needs your approval; not applied).** On the real maps an error-bounded answer at 0.1° takes about 4.5 minutes, and at 1° about 25 s. Spec section 7 asks for "a step fine enough that the disc spans several entries", and at 1° the Sun's 0.53° disc spans only one or two. So the default stays 0.1 (reverted after the contract review), and the web app can ask for 1 as a quick first look. If you accept 1° as the default for custom points, the spec sentence should apply to curated sites only. Either way the answer is proven; coarser wedges only mean more "uncertain" hours.
+0. **API default `az_step_deg` of 1° for custom points: declined on 2026-11-15** (you asked for the option that balances accuracy and usage). The default stays 0.1°, which is spec-compliant and needs no further work. The web app can ask for 1° as a quick first look. The reasoning, kept for reference: On the real maps an error-bounded answer at 0.1° takes about 4.5 minutes, and at 1° about 25 s. Spec section 7 asks for "a step fine enough that the disc spans several entries", and at 1° the Sun's 0.53° disc spans only one or two. So the default stays 0.1 (reverted after the contract review), and the web app can ask for 1 as a quick first look. If you accept 1° as the default for custom points, the spec sentence should apply to curated sites only. Either way the answer is proven; coarser wedges only mean more "uncertain" hours.
 
 1. **Manifest `data_kind` field** (`"mock"` or `"real"`). The spec lists what the manifest must contain but does not fix its fields, so this is an addition, not a change. It lets the web app refuse to show mock data as a real verdict.
 2. Step and Float32: answered in PR 3, **no change proposed**. The hourly Float32 timetable with cubic interpolation is within 0.0000017 degrees for the Sun and 0.0000005 degrees for the Earth. A separate effect built into Contract 1 (the timetable is seen from the Moon's centre and shifted to the site by subtraction) adds 0.000027 degrees for the Earth. Both are far below the 0.01 degree pass mark. Details in `docs/ACCURACY.md`.

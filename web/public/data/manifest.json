@@ -1,7 +1,7 @@
 {
   "version": 1,
   "data_kind": "real",
-  "built_ms": 1794763608712,
+  "built_ms": 1794765587044,
   "service_region": {
     "lat_min": -90.0,
     "lat_max": -80.0
@@ -20,10 +20,190 @@
       "bytes": 268
     },
     {
+      "path": "shade/cabeus_lcross.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 347
+    },
+    {
+      "path": "shade/cabeus_lcross_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/cabeus_lcross_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/connecting_ridge.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 346
+    },
+    {
+      "path": "shade/connecting_ridge_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/connecting_ridge_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/de_gerlache_rim.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 347
+    },
+    {
+      "path": "shade/de_gerlache_rim_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/de_gerlache_rim_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/faustini_floor.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 342
+    },
+    {
+      "path": "shade/faustini_floor_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/faustini_floor_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/haworth_floor.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 342
+    },
+    {
+      "path": "shade/haworth_floor_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/haworth_floor_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/malapert_massif.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 347
+    },
+    {
+      "path": "shade/malapert_massif_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/malapert_massif_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/mons_mouton_im2.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 346
+    },
+    {
+      "path": "shade/mons_mouton_im2_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/mons_mouton_im2_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/peak_near_shackleton.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 347
+    },
+    {
+      "path": "shade/peak_near_shackleton_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/peak_near_shackleton_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/shackleton_floor.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 345
+    },
+    {
+      "path": "shade/shackleton_floor_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/shackleton_floor_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
+      "path": "shade/shackleton_rim.json",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 346
+    },
+    {
+      "path": "shade/shackleton_rim_normal.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 3468
+    },
+    {
+      "path": "shade/shackleton_rim_skyline.bin",
+      "contract": "shade",
+      "version": 1,
+      "bytes": 208080
+    },
+    {
       "path": "sites.json",
       "contract": "sites",
       "version": 1,
-      "bytes": 4361
+      "bytes": 4351
     },
     {
       "path": "skylines/cabeus_lcross.json",
@@ -210,52 +390,52 @@
     {
       "id": "connecting_ridge",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "shackleton_rim",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "peak_near_shackleton",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "de_gerlache_rim",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "malapert_massif",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "mons_mouton_im2",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "shackleton_floor",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "haworth_floor",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "faustini_floor",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     },
     {
       "id": "cabeus_lcross",
       "has_terrain": true,
-      "has_shade_grid": false
+      "has_shade_grid": true
     }
   ]
 }
