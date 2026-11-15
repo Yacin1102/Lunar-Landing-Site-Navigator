@@ -25,6 +25,6 @@ describe("power and battery", () => {
     );
     expect(result.energy_produced_Wh).toBe(0);
     expect(result.lowest_charge_Wh).toBe(0);
-    expect(result.battery_runs_out_ms).toBe(3600000);
+    expect(result.battery_runs_out_ms).toBe(3600000); // 10 Wh at 10 W: empty exactly at the first sample
   });
 });

@@ -7,11 +7,12 @@ describe("event search", () => {
       384400, 0, 1000, -384400, 0, 1000,
       384400, 0, 1000, -384400, 0, 1000,
       384400, 0, 1000, -384400, 0, 1000,
+      384400, 0, 1000, -384400, 0, 1000,
     ]);
     const events = findEvents(
       values,
       {
-        version: 1, t0_ms: 0, step_s: 600, count: 3,
+        version: 1, t0_ms: 0, step_s: 600, count: 4,
         columns: ["sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z"],
         units: "km", frame: "MOON_ME", origin: "MOON", aberration: "test",
       },
@@ -20,7 +21,7 @@ describe("event search", () => {
         skyline_deg: [0, 0, 0, 0], skyline_err_deg: [0, 0, 0, 0],
         dem: ["test"], resolution_m: 1, max_reach_km: 1,
       },
-      { lat: -90, lon: 0, elev_m: 0 },
+      { lat: -90, lon: 0 },
       0,
       1200000,
     );

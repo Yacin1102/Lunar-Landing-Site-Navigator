@@ -1,5 +1,6 @@
 import { classifyVisibility } from "../engine/visibility";
-import { directionsAt, discRadiusDeg, skylineAt } from "../engine/astro";
+import { directionsAt, discRadiusDeg, skylineAt, timetableSpan } from "../engine/astro";
+import { evaluateSite } from "../engine/evaluate";
 import { panelPowerW, simulateBattery } from "../engine/power";
 import type { DataBundle, Direction, MissionMetrics } from "../engine/runtime-types";
 import type { Site, Skyline } from "../engine/types";
@@ -46,8 +47,10 @@ export function buildTimeline(
     return { site, points: [], sunlightHours: 0, lowestBatteryWh: 0, unavailable: "Terrain not included; verdict unavailable." };
   }
   const bounds = timelineBounds(centerMs, spanDays);
+  const table = timetableSpan(bundle.ephemeris.label);
   const points: TimelinePoint[] = [];
-  for (let timeMs = bounds.startMs; timeMs <= bounds.endMs; timeMs += bounds.stepMs) {
+  // Only times the timetable covers: near its ends the window is cut rather than extrapolated.
+  for (let timeMs = Math.max(bounds.startMs, table.startMs); timeMs <= Math.min(bounds.endMs, table.endMs); timeMs += bounds.stepMs) {
     const directions = directionsAt(bundle.ephemeris.values, bundle.ephemeris.label, timeMs, site.lat, site.lon, skyline.elev_m, skyline.mast_m);
     const sun = classifyVisibility(directions.sun, "sun", skyline);
     const earth = classifyVisibility(directions.earth, "earth", skyline);
@@ -70,19 +73,18 @@ export function buildTimeline(
   battery.charge_Wh.forEach((charge, index) => {
     points[index].batteryWh = charge.charge_Wh;
   });
-  let sunlightHours = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    if (points[index - 1].sunStatus === "visible") sunlightHours += (points[index].timeMs - points[index - 1].timeMs) / 3600000;
-  }
-  const sunset = points.find((point, index) => index > 0 && points[index - 1].sunStatus === "visible" && point.sunStatus !== "visible")?.timeMs;
-  const earthset = points.find((point, index) => index > 0 && points[index - 1].earthStatus === "visible" && point.earthStatus !== "visible")?.timeMs;
+  // Sunlight hours and countdowns come from the engine's exact crossings, counted from the chosen
+  // time; sampling the chart points instead missed short stretches and could return a sunset
+  // from before the chosen time.
+  const { metrics } = evaluateSite(bundle.ephemeris.values, bundle.ephemeris.label, skyline, site,
+    Math.min(Math.max(centerMs, table.startMs), table.endMs), bounds.startMs, bounds.endMs);
   return {
     site,
     skyline,
     points,
-    sunlightHours,
-    timeToSunsetMs: sunset === undefined ? undefined : sunset - centerMs,
-    timeToEarthsetMs: earthset === undefined ? undefined : earthset - centerMs,
+    sunlightHours: metrics.sunlight_hours,
+    timeToSunsetMs: metrics.time_to_next_sunset_ms,
+    timeToEarthsetMs: metrics.time_to_next_earthset_ms,
     lowestBatteryWh: battery.lowest_charge_Wh,
   };
 }

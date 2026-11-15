@@ -232,7 +232,7 @@ function durationUntil(timeMs: number | undefined, nowMs: number): number | unde
 
 /** Describe the three-state Sun result in words for a first-time visitor. */
 function sunStatusLabel(status: TimelinePoint["sunStatus"]): string {
-  return status === "visible" ? "Visible" : status === "blocked" ? "Hidden" : "Partly hidden";
+  return status === "visible" ? "Visible" : status === "blocked" ? "Hidden" : "Uncertain";
 }
 
 /** Describe the three-state Earth result in words for a first-time visitor. */
