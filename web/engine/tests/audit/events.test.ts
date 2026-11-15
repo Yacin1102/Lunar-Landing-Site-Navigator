@@ -39,8 +39,8 @@ describe("short grazes between scan samples", () => {
     for (let t = 0; t <= 60 * MINUTE; t += 10 * MINUTE) expect(graze(t)).toBeLessThan(0);
   });
 
-  it("is found by the turning-point search, rise and set to the second", () => {
-    const c = findCrossings(graze, 0, 60 * MINUTE);
+  it("is found by the search, rise and set to the second", () => {
+    const c = findCrossings(graze, 0, 60 * MINUTE, 0.01 / MINUTE);
     expect(c.rise_ms).toHaveLength(1);
     expect(c.set_ms).toHaveLength(1);
     expect(Math.abs(c.rise_ms[0] - (peak - 3 * MINUTE))).toBeLessThan(1000);
@@ -49,20 +49,20 @@ describe("short grazes between scan samples", () => {
 
   it("is found in the first and the last scan interval too", () => {
     const early = (t: number) => 0.001 - k * (t - 4 * MINUTE) ** 2;
-    const c1 = findCrossings(early, 0, 60 * MINUTE);
+    const c1 = findCrossings(early, 0, 60 * MINUTE, 0.02 / MINUTE);
     expect([c1.rise_ms.length, c1.set_ms.length]).toEqual([1, 1]);
     const late = (t: number) => 0.001 - k * (t - 56 * MINUTE) ** 2;
-    const c2 = findCrossings(late, 0, 60 * MINUTE);
+    const c2 = findCrossings(late, 0, 60 * MINUTE, 0.02 / MINUTE);
     expect([c2.rise_ms.length, c2.set_ms.length]).toEqual([1, 1]);
   });
 
   it("handles several crossings and a window with one more rise than set", () => {
     // sin wave: positive from 0 to 30 min, negative to 60, ... starting just below zero.
     const wave = (t: number) => Math.sin(2 * Math.PI * (t - 1 * MINUTE) / (60 * MINUTE));
-    const c = findCrossings(wave, 0, 100 * MINUTE);
+    const c = findCrossings(wave, 0, 100 * MINUTE, 0.11 / MINUTE);
     expect(c.rise_ms.map((t) => Math.round(t / MINUTE))).toEqual([1, 61]);
     expect(c.set_ms.map((t) => Math.round(t / MINUTE))).toEqual([31, 91]);
-    const c2 = findCrossings(wave, 0, 80 * MINUTE);
+    const c2 = findCrossings(wave, 0, 80 * MINUTE, 0.11 / MINUTE);
     expect([c2.rise_ms.length, c2.set_ms.length]).toEqual([2, 1]);
   });
 });

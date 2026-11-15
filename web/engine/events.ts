@@ -1,10 +1,29 @@
 import type { EphemerisLabel, EventSet } from "./runtime-types";
 import type { Skyline } from "./types";
 import { directionFromBody, interpolateBody, timetableSpan } from "./astro";
-import { discClearanceDeg, type SkylineShift } from "./visibility";
+import { degToRad } from "./math";
+import { discMarginDeg, MARGIN_REACH_DEG, type SkylineShift } from "./visibility";
 
-/** Spacing of the first scan, milliseconds. Short grazes between samples are caught by the turning-point search. */
-export const SCAN_STEP_MS = 10 * 60 * 1000;
+/**
+ * Fastest angular motion of each body across the lunar sky, degrees per hour.
+ *
+ * Measured over the whole timetable (2026 to 2040) from 80°S to the pole: 0.511 for the Sun and
+ * 0.113 for the Earth. The bounds keep a margin of 17 % and 32 %; `tests/audit/events.test.ts`
+ * checks them against the timetable.
+ */
+export const ANGULAR_SPEED_BOUND_DEG_PER_H = { sun: 0.6, earth: 0.15 } as const;
+
+/** Fastest change of either disc's angular radius, degrees per hour (measured: Earth 0.0008, Sun 0.00002). */
+export const RADIUS_RATE_BOUND_DEG_PER_H = 0.002;
+
+/**
+ * Largest |elevation| of the Sun or the Earth the search accepts, degrees. From 80°S to the pole
+ * the measured largest is 17.1° (the Earth). The rate bound uses it, so a larger one is refused.
+ */
+export const MAX_ABS_ELEVATION_DEG = 30;
+
+/** Shortest step of the search, milliseconds: crossings are found to this resolution. */
+export const MIN_STEP_MS = 1000;
 
 /** Rise and set times of one function's zero crossings, UTC milliseconds in time order. */
 export interface Crossings {
@@ -12,12 +31,26 @@ export interface Crossings {
   set_ms: number[];
 }
 
-/** Time between two samples where `f` changes sign, to 1 ms (bisection). */
+/**
+ * The fastest the margin of `discMarginDeg` can change, degrees per millisecond.
+ *
+ * The margin is the disc's radius minus a distance from its centre to a region fixed on the sky.
+ * In the tangent plane, a centre moving at angular speed ω moves the distance by at most
+ * cos(el)|d az/dt| + |d el/dt| ≤ 2ω. The plane's horizontal scale, cos(el), also changes as
+ * the elevation changes, which moves points up to `MARGIN_REACH_DEG` away by at most
+ * reach × tan(el) × ω more. The radius changes by at most `RADIUS_RATE_BOUND_DEG_PER_H`.
+ */
+export function marginRateBoundDegPerMs(body: "sun" | "earth"): number {
+  const scaleTerm = degToRad(MARGIN_REACH_DEG) * Math.tan(degToRad(MAX_ABS_ELEVATION_DEG));
+  return ((2 + scaleTerm) * ANGULAR_SPEED_BOUND_DEG_PER_H[body] + RADIUS_RATE_BOUND_DEG_PER_H) / 3_600_000;
+}
+
+/** Time between two samples where `f` changes between "above 0" and "not above 0", to 1 ms (bisection). */
 function crossingTime(f: (t: number) => number, lo: number, hi: number, fLo: number): number {
   while (hi - lo > 1) {
     const mid = 0.5 * (lo + hi);
     const fMid = f(mid);
-    if ((fMid < 0) === (fLo < 0)) {
+    if ((fMid > 0) === (fLo > 0)) {
       lo = mid;
       fLo = fMid;
     } else {
@@ -27,66 +60,42 @@ function crossingTime(f: (t: number) => number, lo: number, hi: number, fLo: num
   return Math.round(0.5 * (lo + hi));
 }
 
-/** Highest (sign = +1) or lowest (sign = -1) point of `f` between two times, to about 1 s (ternary search). */
-function turningPoint(f: (t: number) => number, a: number, b: number, sign: number): [number, number] {
-  while (b - a > 1000) {
-    const third = (b - a) / 3;
-    const m1 = a + third;
-    const m2 = b - third;
-    if (sign * f(m1) < sign * f(m2)) a = m1;
-    else b = m2;
-  }
-  const t = 0.5 * (a + b);
-  return [t, f(t)];
-}
-
 /**
- * Every zero crossing of `f` (degrees above a horizon, as a function of UTC ms) in a window.
+ * Every time a function goes above 0 (rise) or comes back to 0 or below (set) in a window.
  *
- * A port of `find_events` in python/lunar_engine/events_reference.py, which made events.json.
- * 1. Sample every 10 minutes.
- * 2. Where three samples show a turning point (a local top or bottom), find it; if it is on the
- *    other side of zero from the middle sample, the curve poked through zero between samples,
- *    and the turning point becomes an extra split point. The first and last interval have no
- *    neighbour on one side, so they are searched directly.
- * 3. Between consecutive split points of opposite sign, bisect to the crossing.
- * A crossing from below to above is a rise, the other way a set.
+ * `f` must change by at most `rateDegPerMs` per millisecond. Then if |f(t)| = v, f keeps its
+ * sign until at least t + v / rate, so the search jumps straight there: far from a crossing the
+ * steps are long, near one they shrink. No step is shorter than `minStepMs`. Where the sign
+ * differs at the two ends of a step, bisection finds the crossing to 1 ms.
+ *
+ * What this proves: every crossing is found, except that a stretch above or below 0 shorter than
+ * `minStepMs` (1 s) can be missed. No 10-minute sampling, so no graze between samples can slip
+ * through.
+ *
+ * @param f the function, degrees, of UTC milliseconds
+ * @param startMs, endMs the window, UTC milliseconds
+ * @param rateDegPerMs a proven bound on |df/dt|, degrees per millisecond
+ * @param minStepMs the shortest step, milliseconds
  */
-export function findCrossings(f: (t: number) => number, startMs: number, endMs: number, scanStepMs = SCAN_STEP_MS): Crossings {
-  const times: number[] = [];
-  for (let t = startMs; t < endMs; t += scanStepMs) times.push(t);
-  times.push(endMs);
-  const values = times.map(f);
-  const points: Array<[number, number]> = times.map((t, i) => [t, values[i]]);
-  if (times.length >= 2) {
-    for (const [a, b] of [[0, 1], [times.length - 2, times.length - 1]]) {
-      for (const sign of [1, -1]) {
-        const [tTurn, vTurn] = turningPoint(f, times[a], times[b], sign);
-        if (Math.min(tTurn - times[a], times[b] - tTurn) > 2000
-          && (vTurn < 0) !== (values[a] < 0) && (vTurn < 0) !== (values[b] < 0)) {
-          points.push([tTurn, vTurn]);
-        }
-      }
-    }
-  }
-  for (let i = 1; i < times.length - 1; i += 1) {
-    const [left, mid, right] = [values[i - 1], values[i], values[i + 1]];
-    for (const sign of [1, -1]) {
-      const isTurn = sign * mid >= sign * left && sign * mid >= sign * right;
-      if (isTurn && !(left === mid && mid === right)) {
-        const [tTurn, vTurn] = turningPoint(f, times[i - 1], times[i + 1], sign);
-        if ((vTurn < 0) !== (mid < 0)) points.push([tTurn, vTurn]);
-      }
-    }
-  }
-  points.sort((p, q) => p[0] - q[0]);
+export function findCrossings(
+  f: (t: number) => number,
+  startMs: number,
+  endMs: number,
+  rateDegPerMs: number,
+  minStepMs = MIN_STEP_MS,
+): Crossings {
+  if (!(rateDegPerMs > 0) || !(minStepMs > 0)) throw new RangeError("The rate bound and the shortest step must be positive");
   const result: Crossings = { rise_ms: [], set_ms: [] };
-  for (let i = 0; i + 1 < points.length; i += 1) {
-    const [tA, fA] = points[i];
-    const [tB, fB] = points[i + 1];
-    if ((fA < 0) !== (fB < 0)) {
-      (fA < 0 ? result.rise_ms : result.set_ms).push(crossingTime(f, tA, tB, fA));
+  let t = startMs;
+  let v = f(t);
+  while (t < endMs) {
+    const next = Math.min(endMs, t + Math.max(minStepMs, Math.abs(v) / rateDegPerMs));
+    const vNext = f(next);
+    if ((v > 0) !== (vNext > 0)) {
+      (vNext > 0 ? result.rise_ms : result.set_ms).push(crossingTime(f, t, next, v));
     }
+    t = next;
+    v = vNext;
   }
   return result;
 }
@@ -98,11 +107,12 @@ export interface EventSite {
 }
 
 /**
- * Clearance of one body's disc above a site's skyline, degrees, as a function of UTC ms.
- * Positive when some of the disc is visible against the chosen skyline (nominal, or shifted by
- * the error bound).
+ * Margin of one body's disc against a site's skyline (`discMarginDeg`), degrees, as a function of
+ * UTC ms. Positive when some of the disc is clear of the chosen skyline: nominal (0), or shifted
+ * by the error bound and the flat-disc margins (+1 for certain, −1 for possible).
+ * A direction higher than `MAX_ABS_ELEVATION_DEG` is refused, since the rate bound assumes it.
  */
-export function clearanceFunction(
+export function marginFunction(
   values: Float32Array,
   label: EphemerisLabel,
   skyline: Skyline,
@@ -113,8 +123,25 @@ export function clearanceFunction(
   const offset = body === "sun" ? 0 : 3;
   return (timeMs: number) => {
     const direction = directionFromBody(interpolateBody(values, label, timeMs, offset), site.lat, site.lon, skyline.elev_m, skyline.mast_m);
-    return discClearanceDeg(direction, body, skyline, shift);
+    if (!(Math.abs(direction.el_deg) <= MAX_ABS_ELEVATION_DEG)) {
+      throw new RangeError(`The ${body} is at ${direction.el_deg} degrees, beyond the search's ${MAX_ABS_ELEVATION_DEG} degree bound`);
+    }
+    return discMarginDeg(direction, body, skyline, shift);
   };
+}
+
+/** Rises and sets of one body against one skyline (nominal or shifted) in a window. */
+export function bodyCrossings(
+  values: Float32Array,
+  label: EphemerisLabel,
+  skyline: Skyline,
+  site: EventSite,
+  body: "sun" | "earth",
+  shift: SkylineShift,
+  startMs: number,
+  endMs: number,
+): Crossings {
+  return findCrossings(marginFunction(values, label, skyline, site, body, shift), startMs, endMs, marginRateBoundDegPerMs(body));
 }
 
 /** Clip a window to the timetable, so the search never asks for a time outside it. */
@@ -140,7 +167,7 @@ export function findEvents(
 ): EventSet {
   const window = clipToTimetable(label, startMs, endMs);
   if (window.endMs <= window.startMs) return { sunrise: [], sunset: [], earthrise: [], earthset: [] };
-  const sun = findCrossings(clearanceFunction(values, label, skyline, site, "sun"), window.startMs, window.endMs);
-  const earth = findCrossings(clearanceFunction(values, label, skyline, site, "earth"), window.startMs, window.endMs);
+  const sun = bodyCrossings(values, label, skyline, site, "sun", 0, window.startMs, window.endMs);
+  const earth = bodyCrossings(values, label, skyline, site, "earth", 0, window.startMs, window.endMs);
   return { sunrise: sun.rise_ms, sunset: sun.set_ms, earthrise: earth.rise_ms, earthset: earth.set_ms };
 }

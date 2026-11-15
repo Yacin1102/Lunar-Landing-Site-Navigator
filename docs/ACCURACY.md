@@ -130,7 +130,7 @@ Found by review and fixed in this PR:
 
 Without map error, what is left is how much the skyline genuinely varies inside one 0.1° wedge (the record has one value per wedge), plus the numerical error. With map error, the largest values come from ground a few hundred metres from the eye, which the model allows to be up to 3 sigma higher than the eye's own ground. These figures depend directly on the error model's three proposed values: 3 sigma, 6° of slope error, and no error relative to the eye within one pixel diagonal.
 
-**Not included in this bound:** the Sun and Earth positions themselves (up to 0.000027°, `docs/ACCURACY.md` above) and the flattening of the Earth's disc (up to 0.0012°), which belong to the browser's calculation, not to the terrain.
+**Not included in this bound:** the Sun and Earth positions themselves (up to 0.000027°, `docs/ACCURACY.md` above), the flattening of the Earth's disc (up to 0.0012°), and the flat-disc model of the browser (up to 0.0029° in elevation and 0.0067° in azimuth for the Earth). These belong to the browser's calculation, not to the terrain; the browser adds the flat-disc bound itself to its lit and blocked tests (`web/engine/visibility.ts`).
 
 ## Elevation maps (real data)
 
@@ -219,4 +219,18 @@ Measured by `web/engine/tests/audit/` (`cd web; npm test`); details in `docs/WEB
 | Visible fraction of the disc, flat skyline | Circle-segment formula | below 1e-9 |
 | Visible fraction, peaks inside the disc, across north | Brute-force area count | below 2e-3 (the count's own resolution) |
 
-The visible fraction is exact for the step skyline. The only approximation is the flat tangent plane across the disc, about ρ² tan(el) / 2: below 0.00001° at the elevations reached from the south pole.
+The visible fraction is exact for the step skyline in a flat tangent plane across the disc. That plane misplaces points of the disc, mostly its left and right edges, which on the real sky sit lower than the plane puts them. The errors are bounded in `flatDiscErrorDeg` and checked on the sphere (`disc.test.ts`):
+
+| Body, elevation | Worst error on the sphere, elevation / azimuth | Proven bound, elevation / azimuth |
+| --- | --- | --- |
+| Sun, 11.6° | 0.000132° / 0.000135° | 0.000133° / 0.000283° |
+| Earth (nearest), 5° | 0.00080° / 0.00084° | 0.00085° / 0.00232° |
+| Earth (nearest), 17° | 0.00279° / 0.00296° | 0.00286° / 0.00667° |
+
+An earlier version of this page said the error was below 0.00001°: that was wrong by up to 280 times for the Earth (found by the contract review, 2026-11-16). The lit and blocked tests now widen skyline ± error by these bounds, so the verdict stays proven; on 400 adversarial skylines the flat model alone was wrong 4 times, the widened test never. The nominal fraction keeps the flat model.
+
+| Event search | Reference | Result |
+| --- | --- | --- |
+| Rate bound | Fastest motion over 2026 to 2040, 80°S to the pole | Sun 0.511°/h (bound 0.6), Earth 0.113°/h (bound 0.15) |
+| Rate bound | The margin on the 10 real skylines, 334,800 samples 2 s apart around crossings | at most 35 % of the bound |
+| Crossings found | Dense 30 s scan over 365 days, two sites | 61 of 61 and 60 of 60 (the old 10-minute scan found 51 of 61 and 40 of 58) |

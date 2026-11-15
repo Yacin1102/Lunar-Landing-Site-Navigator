@@ -9,6 +9,13 @@ This page describes the code as it exists today. It grows with each pull request
 | `web/src/App.tsx` | Renders the mission dashboard, interactive Moon site view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
 | `web/src/visual-model.ts` | Samples browser engine results into chart-ready points and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
 | `web/src/styles.css` | Provides the dark, glass-panel visual system and responsive layout for the dashboard and site view. | React class names | Browser styles |
+| `web/engine/data.ts` | Loads the data folder: checks every `version`, the timetable label (columns, units, frame, origin), exact binary sizes from labels and the manifest's `bytes`. | `web/public/data/` | `DataBundle` |
+| `web/engine/astro.ts` | The timetable cubic (4-point Lagrange), Sun and Earth azimuth, elevation and distance from a site, disc radii, the step skyline read. | The timetable | Directions |
+| `web/engine/visibility.ts` | How much of a disc clears the step skyline (exact per wedge), the lit / blocked / uncertain verdict with the proven flat-disc margins, and the continuous margin the event search follows. | A direction, a skyline record | `Visibility`, margins |
+| `web/engine/events.ts` | Rise and set times: a search that steps by margin / proven rate bound and bisects to 1 ms, so it skips no crossing. | `visibility`, `astro` | Crossings, `EventSet` |
+| `web/engine/metrics.ts` | Lit and uncertain stretches, countdowns and the longest night, from the crossings. | Crossings | `MissionMetrics` |
+| `web/engine/power.ts` | Solar irradiance, panel incidence (flat, tracking, fixed tilt) and the battery over time. | Sun distance and visible fraction, panel and battery settings | Power and charge series |
+| `web/engine/evaluate.ts`, `worker.ts`, `client.ts` | One evaluation of a site at a time and over a window, run in a Web Worker. | All of the above | `Evaluation` |
 | `python/scripts/download_data.py` | Downloads the NASA input files, four at a time and started in a fixed order, resumes after an interruption, and verifies size and checksum. Refuses to run twice in the same folder. Also answers "is this group of data on disk?" for the tests. | `python/data_files.json`, `python/data_checksums.json`, the NAIF and PGDA servers | `python/kernels/`, `python/dem/`, `python/data_checksums.json`, `python/dem/download.log`, `python/dem/download.lock`, and a `name.part.json` side file next to each partial download |
 | `python/tests/conftest.py` | Skips tests marked `realdata` while their data is missing and prints which ones were skipped. | What `download_data.missing_files` reports | Test report only |
 | `python/lunar_engine/geometry.py` | Exact geometry on the reference sphere: latitude/longitude to a direction, the local east/north/up frame, azimuth and elevation. | Nothing | Nothing |
@@ -49,6 +56,23 @@ Data files that are not code:
 | `python/DATA.md` | Why each file was chosen and what its label says. |
 | `web/public/data/sites.json` | The 10 curated sites, written by hand: the only place site coordinates exist. |
 | `python/sites_sources.md` | The source, exact words and map check of every site coordinate, and the category set. |
+
+## The browser engine: verdict and event search
+
+```mermaid
+flowchart LR
+    eph[ephem.bin + ephem.json] --> astro[astro.ts<br/>cubic, site subtraction,<br/>az / el / distance]
+    sky[skylines/id.json] --> vis
+    astro --> vis[visibility.ts]
+    vis --> frac[fraction against<br/>skyline + error + flat-disc margin: f_low<br/>skyline − error − flat-disc margin: f_high]
+    frac --> verdict[lit if f_low > 0<br/>blocked if f_high = 0<br/>else uncertain]
+    vis --> margin[margin = radius − distance<br/>from disc centre to visible sky]
+    margin --> search[events.ts<br/>step = margin / rate bound,<br/>bisect to 1 ms]
+    search --> metrics[metrics.ts<br/>lit and uncertain hours,<br/>countdowns, longest night]
+```
+
+- **Flat disc, proven margins.** The disc is drawn as a flat circle around its centre. `flatDiscErrorDeg` bounds how far that misplaces any point of the real disc (at most 0.0029° in elevation and 0.0067° in azimuth, for the Earth at 17°). For the lit and blocked tests each wedge is raised or lowered by that elevation bound, and each wedge boundary is widened by the azimuth bound at the higher or lower neighbour. So "lit" and "blocked" hold on the real sphere, not only in the flat picture.
+- **A search that cannot skip a crossing.** The margin (disc radius minus the distance from its centre to the visible sky) is positive exactly when some of the disc is clear. A distance to a fixed region changes no faster than the point moves, so the margin changes by at most a rate bound set from the fastest motion of the Sun (0.6°/h) and the Earth (0.15°/h). If the margin is v now, its sign cannot change for v / rate, so the search jumps that far. Steps are hours long far from a crossing and shrink near one, never below 1 s. A 30-day search takes at most about 50 ms per site and body.
 
 ## Structure
 

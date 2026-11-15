@@ -2,7 +2,7 @@ import type { Direction, EphemerisLabel, EventSet, MissionMetrics, Visibility } 
 import type { Skyline } from "./types";
 import { directionsAt } from "./astro";
 import { classifyVisibility } from "./visibility";
-import { clearanceFunction, clipToTimetable, findCrossings, findEvents, type EventSite } from "./events";
+import { bodyCrossings, clipToTimetable, findEvents, marginFunction, type EventSite } from "./events";
 import { calculateMetrics, intervalsFromCrossings } from "./metrics";
 
 /** Everything the dashboard needs for one site, time and window. */
@@ -36,9 +36,10 @@ export function evaluateSite(
   const window = clipToTimetable(label, startMs, endMs);
   const events = findEvents(values, label, skyline, site, window.startMs, window.endMs);
   const intervals = (body: "sun" | "earth", shift: 1 | -1) => {
-    const f = clearanceFunction(values, label, skyline, site, body, shift);
     if (window.endMs <= window.startMs) return [];
-    return intervalsFromCrossings(f(window.startMs) > 0, findCrossings(f, window.startMs, window.endMs), window.startMs, window.endMs);
+    const onAtStart = marginFunction(values, label, skyline, site, body, shift)(window.startMs) > 0;
+    const crossings = bodyCrossings(values, label, skyline, site, body, shift, window.startMs, window.endMs);
+    return intervalsFromCrossings(onAtStart, crossings, window.startMs, window.endMs);
   };
   const metrics = calculateMetrics(events, timeMs, window.startMs, window.endMs,
     intervals("sun", 1), intervals("sun", -1), intervals("earth", 1));

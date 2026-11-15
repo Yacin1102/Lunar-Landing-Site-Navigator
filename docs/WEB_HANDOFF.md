@@ -150,7 +150,7 @@ Angular radius of a disc: `asin(body_radius / |d|)`, with `|d|` the distance fro
 
 At the pole the Sun skims the skyline for days, so the answer has three values, not two.
 
-The spec words it as: lit when "the whole relevant part of the disc is above skyline + error", blocked when it is "below skyline - error", uncertain in between. That sentence can be read in more than one way, so the reading below is **proposed and awaiting approval** (see `docs/PROGRESS.md`). It answers the spec's question "does sunlight reach this point: yes or no, and how much of the disc clears the terrain?":
+The spec words it as: lit when "the whole relevant part of the disc is above skyline + error", blocked when it is "below skyline - error", uncertain in between. That sentence can be read in more than one way; the reading below was **approved on 2026-11-15** (interpretation 11 in `docs/PROGRESS.md`). It answers the spec's question "does sunlight reach this point: yes or no, and how much of the disc clears the terrain?":
 
 1. Compute the fraction of the Sun's disc above the skyline twice: once against `skyline_deg + skyline_err_deg` (pessimistic, gives `f_low`) and once against `skyline_deg - skyline_err_deg` (optimistic, gives `f_high`).
 2. **Lit**: `f_low > 0`. Some of the disc is certainly visible.
@@ -158,6 +158,8 @@ The spec words it as: lit when "the whole relevant part of the disc is above sky
 4. **Uncertain**: anything else. Show it as uncertain, with the range `f_low` to `f_high`.
 
 Report the visible fraction as the range `f_low` to `f_high` too. The same test with the Earth's disc gives Earth visibility.
+
+If the disc is drawn as a flat circle on the sky (as `web/engine/visibility.ts` does), its points can be misplaced by up to about 0.003° in elevation and 0.007° in azimuth for the Earth (far less for the Sun). Widen both thresholds by the proven bounds of `flatDiscErrorDeg` in that file, so that lit and blocked stay proven.
 
 The disc spans several skyline entries (about five at a step of 0.1 degrees). Use every entry whose wedge overlaps the disc's azimuth range, remembering that near elevation `el` a disc of radius `rho` covers `rho / cos(el)` in azimuth.
 

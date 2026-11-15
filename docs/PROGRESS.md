@@ -2,7 +2,15 @@
 
 ## Now (2026-11-15)
 
-**Next:** verify the Three.js satellite view in a browser and confirm the external Three.js runtime loads in the target environment.
+**Next:** the UI work (kept for later, at your request): the UI test `web/src/App.test.tsx:106` fails on `main` since the satellite view PRs (#28, #29), because it looks for "-89.000° latitude", which the view no longer shows. Also: verify the Three.js satellite view in a browser, confirm the external Three.js runtime loads in the target environment, and decide whether the old 3D view on `yacin1102-lunar-web-3d` is still wanted now that #28 added a new one.
+
+**Done in the audit follow-up (2026-11-16):** the leftovers of the web engine audit.
+- **Python suite re-run** with the kernels and the coarse maps re-downloaded and verified: 235 passed, 20 skipped, 0 failed. The 20 need the full-resolution maps (about 32 GB, not downloaded).
+- **Contract review** of PRs #22 to #24: no blockers. It raised two precision faults, both confirmed on real data and fixed (findings 14 and 15 in `docs/WEB_AUDIT.md`):
+  - The event search missed crossings on the real skylines: in a year, 51 of 61 sunrises and sunsets at the Malapert massif. It now follows a continuous margin with a proven rate bound and skips none.
+  - The flat disc model put the Earth's disc edges up to 0.0028° too high, where the docs claimed below 0.00001°. Proven margins now widen the lit and blocked tests.
+  - Also fixed: the timetable label is checked, a test claiming "rows north to south" now really checks it, the lit rule is marked approved in `docs/WEB_HANDOFF.md`, and the leftover API references are marked as removed.
+- **`npm run build`** passes on `main` (both before and after this work). If it fails on your machine, run `git pull`, then `npm install` in `web/`.
 
 **Web UI:** the browser app presents a dashboard view for the skyline and mission timeline plus a separate Three.js satellite scene for inspecting curated sites. The scene follows the supplied Moon viewer prototype with orbit controls, Moon lighting, Sun/Earth objects, stars, and clickable site markers. Playback uses one fixed UTC window so the cursor advances instead of moving the window underneath it, and the 3D scene keeps its camera while time changes. Coordinates are displayed from the curated `sites.json` records; custom coordinate evaluation remains intentionally removed.
 
@@ -19,7 +27,7 @@ The disc fraction is now exact per wedge. The event search is a port of the Pyth
 - vitest raised to 5.1.0. An endless loop in `App.tsx` showed up with it: the timeline window was a new object on every render and an effect dependency, so every worker result started another worker. Fixed by memoising it.
 - Merged branches deleted locally and on GitHub. **Not deleted:** `yacin1102-lunar-web-3d`, `-evaluator`, `-stage1`. The 3D view (PR #16, commits `209c7f9`, `2a985b1`) was merged into the stage-1 branch after that branch had gone to `main`, so it never reached `main`. It is kept on those branches to be brought in.
 
-**Data on disk: none.** On 2026-11-15 the removal of the old engine worktree also emptied `python/kernels/` and `python/dem/` in this checkout (most likely through folder links inside the worktree). Nothing committed was affected: `web/public/data/` holds every product the app needs, and `python/data_checksums.json` records all 85 files. The app is independent of the maps. To rebuild products later: `python python/scripts/download_data.py` (verified against the recorded checksums), then `python python/scripts/build_dem_cache.py`. The audit needs only the kernels group: `--group kernels`.
+**Data on disk (updated 2026-11-16): the kernels and the coarse maps are back** (verified against `python/data_checksums.json`); the full-resolution and 5 m maps are not. What follows is how they were lost. On 2026-11-15 the removal of the old engine worktree also emptied `python/kernels/` and `python/dem/` in this checkout (most likely through folder links inside the worktree). Nothing committed was affected: `web/public/data/` holds every product the app needs, and `python/data_checksums.json` records all 85 files. The app is independent of the maps. To rebuild products later: `python python/scripts/download_data.py` (verified against the recorded checksums), then `python python/scripts/build_dem_cache.py`. The audit needs only the kernels group: `--group kernels`.
 
 ## Status of the engine plan
 
@@ -122,7 +130,7 @@ Everything downstream talks to one interface, `ElevationSource`: height at a poi
 - **`SyntheticElevation`**: a sphere plus shapes (walls, cones, ridges, spikes) placed anywhere, including next to the pole. It is sampled onto a pixel grid like a real map, so the engine runs the same code path, and each shape also has a hand-calculated skyline to test against.
 - **`LolaElevation`**: the real nested GeoTIFFs. It converts at the edge (stereographic metres, LOLA longitudes, no-data, height reference) and returns the same things.
 
-The skyline engine, stopping rule, `skyline_err_deg`, the independent line-of-sight check, the record writer and the live API are built and tested on `SyntheticElevation` only. The server gets a synthetic mode in which `/api/health` reports that real terrain is not available.
+The skyline engine, stopping rule, `skyline_err_deg`, the independent line-of-sight check, the record writer and the live API were built and tested on `SyntheticElevation` only (the live API was removed on 2026-11-15).
 
 ### Tests that need real data
 
@@ -151,7 +159,7 @@ So that review does not hold up the evening, each PR branches from the one befor
 | 4 | Elevation interface and synthetic terrain | nothing | `ElevationSource`, `SyntheticElevation`, exact spherical geometry helpers. | Heights of each shape against the formula; east is east and north is north, also next to the pole. |
 | 5 | Skyline core | PR 4 | The skyline algorithm. Works pixel by pixel instead of along sampled rays, so no peak can fall between samples; each azimuth entry is the maximum over its wedge. Stops in a direction only when the highest remaining terrain provably cannot rise above the current skyline. True local vertical, eye height, observer's own ground excluded. | Hand-calculated skylines: smooth sphere dip, wall due east at azimuth 90, thin spike between azimuths caught, tall far peak behind a low near ridge caught, leaving the data raises an error. |
 | 6 | Error bound and independent check | PR 5 | `skyline_err_deg` (height error, horizontal error, interpolation, numerical). A second method: 3D line-of-sight ray casting toward points on the Sun's disc. `docs/ACCURACY.md` started. | The two methods agree within `skyline_err_deg` on synthetic terrain; the bound grows when the input error grows. |
-| 7 | Record writer and live API (Contracts 3 and 7) | PR 6 | The shared skyline record writer; FastAPI server with `/api/health`, `/api/skyline`, validation, rounding, cache, CORS, and a synthetic mode the web agent can run tonight. | API response equals the written file for the same point; out-of-region and bad parameters are refused with a clear error; records pass the schema. |
+| 7 | Record writer and live API (Contracts 3 and 7; the API was removed on 2026-11-15) | PR 6 | The shared skyline record writer; FastAPI server with `/api/health`, `/api/skyline`, validation, rounding, cache, CORS, and a synthetic mode the web agent can run tonight. | API response equals the written file for the same point; out-of-region and bad parameters are refused with a clear error; records pass the schema. |
 
 **Evening: in parallel, as data arrives**
 
@@ -220,7 +228,7 @@ Taken in PR 9 (2026-11-15), the site list. You asked me to follow my recommendat
   - The left-out candidates and the reasons are listed there too.
 - **5 m site maps: option B** (your choice, 2026-11-15). For the five sites that PGDA product 78 covers, three maps each: heights, height error and slope error. Plus 10 of the 100 published error clones per site: 65 files, 3.05 GB. The bound stays a proven worst case. The clones check it: each clone's skyline must lie inside the bound. This replaces the earlier plan to use all 100 clones to measure the spread.
 - **Categories:** `high_illumination`, `landing_site` and `psr`. A category is what the source says. Whether a site is actually lit is answered by the engine, and is compared with published studies in PR 11.
-- **Live API values (PR 7):** wedge width default 0.1°, accepted 0.05, 0.1, 0.2, 0.25, 0.5 and 1°; mast default 2 m, accepted 0 to 100 m; custom points rounded to 5 decimals of a degree (at most about 0.6 m along a meridian) and moved no closer to the pole than latitude -89.99999; unknown parameters refused; CORS allows the Vite dev server (`http://localhost:5173`).
+- **Live API values (PR 7; the API was removed on 2026-11-15, kept for the record):** wedge width default 0.1°, accepted 0.05, 0.1, 0.2, 0.25, 0.5 and 1°; mast default 2 m, accepted 0 to 100 m; custom points rounded to 5 decimals of a degree (at most about 0.6 m along a meridian) and moved no closer to the pole than latitude -89.99999; unknown parameters refused; CORS allows the Vite dev server (`http://localhost:5173`).
 
 ## Contract interpretations awaiting approval
 
@@ -233,7 +241,7 @@ PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where th
 5. **A terrain value is the ground height above the site's level plane, along the site's vertical.** This is how the Moon's curvature is "included": flat ground falls away from the centre.
 6. **Shade grid angles and normals are in the patch centre's frame**, not each cell's own. The browser then computes the Sun's direction once per time step for the whole patch.
 7. **Manifest fields**: `data_kind`, `built_ms`, `service_region` (`lat_min`, `lat_max`), `files` (`path`, `contract`, `version`, `bytes`) and `sites` (`id`, `has_terrain`, `has_shade_grid`).
-8. **API shapes**: `/api/health` returns `ok`, `real_terrain`, `service_region` and the default and accepted `az_step_deg` and `mast_m`. A refused request returns `{"version": 1, "ok": false, "error": {"code", "param", "message"}}` with HTTP 400 or 422. API responses carry `version` like files do.
+8. ~~**API shapes**: `/api/health` returns `ok`, `real_terrain`, `service_region` and the default and accepted `az_step_deg` and `mast_m`. A refused request returns `{"version": 1, "ok": false, "error": {"code", "param", "message"}}` with HTTP 400 or 422. API responses carry `version` like files do.~~ (API removed 2026-11-15.)
 9. **Fixture cases may carry an optional `name`** saying what the case is meant to expose.
 10. **No extra fields**: the schemas reject any field the contract does not list.
 11. **Lit, blocked, uncertain (decided 2026-11-15: as proposed here).** The spec says lit is when "the whole relevant part of the disc is above skyline + error". `docs/WEB_HANDOFF.md` proposes: compute the visible fraction of the disc against skyline + error (`f_low`) and against skyline - error (`f_high`); **lit** if `f_low > 0` (some of the disc is certainly visible), **blocked** if `f_high == 0`, **uncertain** otherwise, and report the fraction as the range `f_low` to `f_high`. The stricter reading would call a site lit only when the entire disc is certainly clear, and everything partial "uncertain". This decides what the app says during the hours the Sun is half hidden, so it should be your call.
