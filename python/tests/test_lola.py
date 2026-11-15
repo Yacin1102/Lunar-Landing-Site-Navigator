@@ -83,6 +83,16 @@ def test_heights_errors_and_layout_equal_the_in_memory_map(pair):
     assert np.array_equal(files.height_xy(x, y), memory.height_xy(x, y), equal_nan=True)
 
 
+@pytest.mark.parametrize("window", [(0, 200, 0, 200), (5, 6, 7, 8), (63, 130, 1, 199), (150, 120, 3, 9),
+                                    (190, 260, -40, 70), (-20, -3, 64, 128)])
+def test_windows_read_the_same_as_in_memory(pair, window):
+    """A rectangular window, including empty ones and ends outside the map."""
+    memory, files, _ = pair
+    r0, r1, c0, c1 = window
+    assert np.array_equal(files.read(r0, r1, c0, c1), memory.read(r0, r1, c0, c1), equal_nan=True)
+    assert np.array_equal(files.read_error(r0, r1, c0, c1), memory.read_error(r0, r1, c0, c1))
+
+
 def test_trusted_disc_equals_the_in_memory_one(pair):
     memory, files, _ = pair
     assert files.disc() == pytest.approx(memory.disc(), abs=1e-9)

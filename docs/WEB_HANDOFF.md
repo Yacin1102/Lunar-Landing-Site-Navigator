@@ -12,7 +12,8 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
 | Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
 | Live API | `http://localhost:8000/api/...` | Running on synthetic terrain: `python python/scripts/serve.py --synthetic`. Real terrain comes with the map reader |
-| Real data | `web/public/data/` | Built after the NASA maps finish downloading |
+| Real site list `sites.json` | `web/public/data/` | Ready: the 10 real sites, with sources in `python/sites_sources.md`. Its `has_terrain` and `has_shade_grid` are false until those products are built. Categories: `high_illumination`, `landing_site`, `psr` |
+| Other real products | `web/public/data/` | Built in PRs 10 and 11. Until the manifest is there, keep pointing the app at `data-mock/` |
 
 To start in a separate working copy:
 

@@ -176,8 +176,9 @@ def _source_stamp(path: Path) -> dict:
 class _Tiled:
     """A map stored in TILE x TILE tiles on disk, read like an ordinary 2-D array.
 
-    Answers ``a[rows, cols]`` for arrays of pixel indices and ``a[p0:p1]``
-    for a run of whole rows, which is all the reader needs.
+    Answers ``a[rows, cols]`` for arrays of pixel indices, ``a[p0:p1]`` for a
+    run of whole rows and ``a[p0:p1, q0:q1]`` for a window (slices of step 1,
+    ends treated as NumPy treats them), which is all the reader needs.
     """
 
     def __init__(self, tiles: np.ndarray, shape: tuple[int, int]):
@@ -185,13 +186,21 @@ class _Tiled:
 
     def __getitem__(self, key):
         if isinstance(key, slice):
-            p0, p1, _ = key.indices(self.shape[0])
-            if p1 <= p0:
-                return np.empty((0, self.shape[1]), np.float32)
+            key = (key, slice(None))
+        if all(isinstance(k, slice) for k in key):
+            # Only the tiles touching the window are read. (A window was
+            # refused before; found while checking the sites on the maps.)
+            if any(k.step not in (None, 1) for k in key):
+                raise IndexError("only slices of step 1 are supported")
+            (p0, p1, _), (q0, q1, _) = key[0].indices(self.shape[0]), key[1].indices(self.shape[1])
+            p1, q1 = max(p0, p1), max(q0, q1)
+            if p1 == p0 or q1 == q0:
+                return np.empty((p1 - p0, q1 - q0), np.float32)
             t0, t1 = p0 // TILE, (p1 - 1) // TILE + 1
-            block = np.asarray(self.tiles[t0:t1])
-            rows = block.transpose(0, 2, 1, 3).reshape((t1 - t0) * TILE, -1)
-            return rows[p0 - t0 * TILE:p1 - t0 * TILE, :self.shape[1]]
+            u0, u1 = q0 // TILE, (q1 - 1) // TILE + 1
+            block = np.asarray(self.tiles[t0:t1, u0:u1])
+            window = block.transpose(0, 2, 1, 3).reshape((t1 - t0) * TILE, (u1 - u0) * TILE)
+            return window[p0 - t0 * TILE:p1 - t0 * TILE, q0 - u0 * TILE:q1 - u0 * TILE]
         rows, cols = (np.asarray(k, dtype=np.int64) for k in key)
         return self.tiles[rows // TILE, cols // TILE, rows % TILE, cols % TILE]
 

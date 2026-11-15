@@ -41,6 +41,10 @@ EPHEM_COLUMNS = ("sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z")
 #: The timetable must reach this time: 1 Jan 2040 00:00 UTC, milliseconds since 1970.
 EPHEM_END_MS = 2_208_988_800_000
 
+#: The service region of the real data: 80 S to the pole (decision of
+#: 2026-11-15, docs/PROGRESS.md). Degrees.
+SERVICE_REGION = {"lat_min": -90.0, "lat_max": -80.0}
+
 
 @lru_cache(maxsize=None)
 def _validator(name: str) -> Draft202012Validator:
