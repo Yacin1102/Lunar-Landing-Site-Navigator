@@ -1,11 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { evaluateInWorker } from "../engine/client";
 import { loadDataBundle } from "../engine/data";
+import { panelPowerW } from "../engine/power";
 import type { DataBundle, Direction } from "../engine/runtime-types";
 import type { Site, Skyline } from "../engine/types";
 import { fetchCustomSkyline } from "./api";
-import { fromDateTimeInputValue, buildTimeline, elevationRange, formatDuration, skyBodySize, skyElevation, skyPoint, timelineBounds, toDateTimeInputValue, type ScenarioSummary } from "./visual-model";
+import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
+import {
+  buildTimeline,
+  elevationRange,
+  skyBodySize,
+  skyPoint,
+  timelineBounds,
+  type ScenarioSummary,
+  type TimelinePoint,
+} from "./visual-model";
 import { readSavedScenarios, saveScenariosToUrl, type SavedScenario } from "./url-state";
+
+type ViewMode = "sky" | "terrain" | "map";
+type ExperienceMode = "beginner" | "expert";
+type Page = "dashboard" | "compare";
 
 interface WorkerEvents {
   sunrise: number[];
@@ -24,21 +38,26 @@ interface ExtraSite {
 }
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000";
+const PANEL = { type: "tracking" as const, area_m2: 4, efficiency: 0.25 };
 
-/** Render the mission-planning dashboard while keeping all astronomy in the existing engine. */
+/** Render the focused mission dashboard without changing the existing astronomy engine. */
 export default function App() {
   const [bundle, setBundle] = useState<DataBundle>();
   const [loadError, setLoadError] = useState<string>();
   const [extraSites, setExtraSites] = useState<ExtraSite[]>([]);
   const [scenarios, setScenarios] = useState<SavedScenario[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [selectedSiteId, setSelectedSiteId] = useState("");
-  const [customLat, setCustomLat] = useState("-89");
-  const [customLon, setCustomLon] = useState("0");
-  const [customMessage, setCustomMessage] = useState<string>();
+  const [view, setView] = useState<ViewMode>("sky");
+  const [mode, setMode] = useState<ExperienceMode>("beginner");
+  const [page, setPage] = useState<Page>("dashboard");
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [spanDays, setSpanDays] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [workerResult, setWorkerResult] = useState<WorkerResult>();
+  const [customLat, setCustomLat] = useState("-89");
+  const [customLon, setCustomLon] = useState("0");
+  const [customMessage, setCustomMessage] = useState<string>();
+  const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
 
   useEffect(() => {
     loadDataBundle()
@@ -46,9 +65,7 @@ export default function App() {
         setBundle(loaded);
         const saved = readSavedScenarios().filter((scenario) => loaded.sites.some((site) => site.id === scenario.siteId));
         const initialDate = loaded.ephemeris.label.t0_ms + 12 * 3600000;
-        const initial = saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }];
-        setScenarios(initial.slice(0, 4));
-        setSelectedSiteId(loaded.sites[0]?.id ?? "");
+        setScenarios((saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }]).slice(0, 4));
       })
       .catch((reason: unknown) => setLoadError(reason instanceof Error ? reason.message : "Prepared data could not be loaded."));
   }, []);
@@ -62,11 +79,7 @@ export default function App() {
     : undefined;
   const effectiveBundle = useMemo(() => {
     if (!bundle) return undefined;
-    return {
-      ...bundle,
-      sites: allSites,
-      skylines: new Map([...bundle.skylines, ...extraSkylineMap]),
-    };
+    return { ...bundle, sites: allSites, skylines: new Map([...bundle.skylines, ...extraSkylineMap]) };
   }, [allSites, bundle, extraSkylineMap]);
   const activeSummary = useMemo(
     () => effectiveBundle && activeSite && activeScenario
@@ -74,17 +87,8 @@ export default function App() {
       : undefined,
     [activeScenario, activeSite, activeSkyline, effectiveBundle, spanDays],
   );
-  const comparisonSummaries = useMemo(
-    () => effectiveBundle
-      ? scenarios.flatMap((scenario) => {
-        const site = allSites.find((candidate) => candidate.id === scenario.siteId);
-        if (!site) return [];
-        return [buildTimeline(effectiveBundle, site, extraSkylineMap.get(site.id) ?? bundle?.skylines.get(site.id), scenario.dateMs, spanDays)];
-      })
-      : [],
-    [allSites, bundle?.skylines, effectiveBundle, extraSkylineMap, scenarios, spanDays],
-  );
   const bounds = activeScenario ? timelineBounds(activeScenario.dateMs, spanDays) : undefined;
+  const currentPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
 
   useEffect(() => {
     if (scenarios.length) saveScenariosToUrl(scenarios);
@@ -109,203 +113,282 @@ export default function App() {
     if (!playing || !activeScenario || !bounds) return;
     const timer = window.setInterval(() => {
       setScenarios((current) => current.map((scenario, index) => index === activeIndex
-        ? { ...scenario, dateMs: scenario.dateMs + bounds.stepMs }
+        ? { ...scenario, dateMs: Math.min(bounds.endMs, scenario.dateMs + bounds.stepMs) }
         : scenario));
     }, 250);
     return () => window.clearInterval(timer);
   }, [activeIndex, activeScenario, bounds, playing]);
 
-  /** Add a curated site to the comparison set without duplicating an existing scenario. */
-  function addScenario(siteId: string): void {
-    if (!siteId || scenarios.some((scenario) => scenario.siteId === siteId) || scenarios.length >= 4) return;
+  useEffect(() => {
+    if (mode === "expert") setDetailsOpen(true);
+  }, [mode]);
+
+  /** Select a site, reusing an existing scenario when it is already open. */
+  function selectSite(siteId: string): void {
+    const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
+    if (existingIndex >= 0) {
+      setActiveIndex(existingIndex);
+      return;
+    }
+    if (!siteId) return;
     const dateMs = activeScenario?.dateMs ?? bundle?.ephemeris.label.t0_ms ?? Date.now();
-    setScenarios((current) => [...current, { siteId, dateMs }]);
-    setActiveIndex(scenarios.length);
-  }
-
-  /** Remove one comparison scenario and keep the active tab within bounds. */
-  function removeScenario(index: number): void {
-    setScenarios((current) => current.filter((_, candidateIndex) => candidateIndex !== index));
-    setActiveIndex((current) => Math.max(0, Math.min(current, scenarios.length - 2)));
-  }
-
-  /** Request a custom skyline and add it only when the API gives a valid answer. */
-  async function addCustomSite(): Promise<void> {
-    const lat = Number(customLat);
-    const lon = Number(customLon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > -80 || lon < -180 || lon > 180) {
-      setCustomMessage("Use a south-polar latitude from -90° to -80° and longitude from -180° to 180°.");
-      return;
-    }
-    setCustomMessage("Requesting terrain skyline…");
-    const result = await fetchCustomSkyline(API_BASE, lat, lon);
-    if (!result.ok) {
-      setCustomMessage(result.message);
-      return;
-    }
-    const id = `custom_${lat.toFixed(4)}_${lon.toFixed(4)}`.replace("-", "m").replace(".", "p");
-    const site: Site = { id, name: `Custom ${lat.toFixed(3)}°, ${lon.toFixed(3)}°`, lat, lon, category: "custom", has_terrain: false, has_shade_grid: false };
-    setExtraSites((current) => [...current.filter((entry) => entry.site.id !== id), { site, skyline: result.skyline }]);
-    setScenarios((current) => [...current.filter((scenario) => scenario.siteId !== id), { siteId: id, dateMs: activeScenario?.dateMs ?? Date.now() }].slice(0, 4));
+    setScenarios((current) => [...current, { siteId, dateMs }].slice(-4));
     setActiveIndex(Math.min(scenarios.length, 3));
-    setCustomMessage("Custom skyline loaded. Terrain view is unavailable for custom points.");
   }
 
-  /** Move one scenario's selected instant when the date input or timeline changes. */
+  /** Change the selected UTC instant without changing the active site. */
   function updateActiveDate(dateMs: number): void {
     if (!activeScenario || !Number.isFinite(dateMs)) return;
     setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs } : scenario));
   }
 
-  if (loadError) return <main className="app-shell"><aside className="banner error" role="alert">{loadError}</aside></main>;
-  if (!bundle || !activeScenario || !activeSite || !activeSummary) return <main className="app-shell"><p className="loading">Loading prepared mission data…</p></main>;
+  /** Request a terrain skyline for a custom south-polar coordinate. */
+  async function addCustomSite(): Promise<void> {
+    const lat = Number(customLat);
+    const lon = Number(customLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > -80 || lon < -180 || lon > 180) {
+      setCustomMessage("Latitude must be -90° to -80° and longitude -180° to 180°.");
+      return;
+    }
+    setCustomMessage("Requesting terrain…");
+    const result = await fetchCustomSkyline(API_BASE, lat, lon);
+    if (!result.ok) {
+      setCustomMessage(result.message);
+      return;
+    }
+    const id = `custom_${lat.toFixed(4)}_${lon.toFixed(4)}`.replaceAll("-", "m").replaceAll(".", "p");
+    const site: Site = { id, name: `Custom ${lat.toFixed(3)}°, ${lon.toFixed(3)}°`, lat, lon, category: "custom", has_terrain: false, has_shade_grid: false };
+    setExtraSites((current) => [...current.filter((entry) => entry.site.id !== id), { site, skyline: result.skyline }]);
+    setScenarios((current) => [...current.filter((scenario) => scenario.siteId !== id), { siteId: id, dateMs: activeScenario?.dateMs ?? Date.now() }].slice(-4));
+    setActiveIndex(Math.min(scenarios.length, 3));
+    setCustomMessage("Terrain loaded.");
+  }
 
-  const nextSunset = workerResult?.events?.sunset.find((time) => time >= activeScenario.dateMs) ?? (activeSummary.timeToSunsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToSunsetMs);
-  const nextEarthset = workerResult?.events?.earthset.find((time) => time >= activeScenario.dateMs) ?? (activeSummary.timeToEarthsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToEarthsetMs);
-  const timeToSunset = nextSunset === undefined ? undefined : nextSunset - activeScenario.dateMs;
-  const timeToEarthset = nextEarthset === undefined ? undefined : nextEarthset - activeScenario.dateMs;
-  const scrubRatio = bounds ? Math.max(0, Math.min(1, (activeScenario.dateMs - bounds.startMs) / (bounds.endMs - bounds.startMs))) : 0;
+  /** Remove a scenario from the comparison page's saved set. */
+  function removeScenario(index: number): void {
+    setScenarios((current) => current.filter((_, candidateIndex) => candidateIndex !== index));
+    setActiveIndex((current) => Math.max(0, Math.min(current, scenarios.length - 2)));
+  }
+
+  /** Store the first-visit explanation dismissal so returning visitors see the focused dashboard. */
+  function dismissIntro(): void {
+    window.localStorage.setItem("lunar-intro-dismissed", "1");
+    setIntroOpen(false);
+  }
+
+  /** Put a map-picked coordinate into the custom point controls and open Details. */
+  function pickCustomCoordinate(lat: number, lon: number): void {
+    setCustomLat(lat.toFixed(4));
+    setCustomLon(lon.toFixed(4));
+    setDetailsOpen(true);
+  }
+
+  if (loadError) return <main className="app-shell"><aside className="error-panel" role="alert">{loadError}</aside></main>;
+  if (!bundle || !activeScenario || !activeSite || !activeSummary || !currentPoint) return <main className="app-shell"><p className="loading">Loading mission data…</p></main>;
+
+  if (page === "compare") {
+    return <ComparePage
+      scenarios={scenarios}
+      summaries={buildComparisonSummaries(effectiveBundle, scenarios, allSites, extraSkylineMap, spanDays)}
+      activeIndex={activeIndex}
+      onBack={() => setPage("dashboard")}
+      onSelect={setActiveIndex}
+    />;
+  }
+
+  const nextSunset = workerResult?.events?.sunset.find((time) => time >= activeScenario.dateMs)
+    ?? (activeSummary.timeToSunsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToSunsetMs);
+  const nextSunrise = workerResult?.events?.sunrise.find((time) => time >= activeScenario.dateMs);
+  const nextEarthset = workerResult?.events?.earthset.find((time) => time >= activeScenario.dateMs)
+    ?? (activeSummary.timeToEarthsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToEarthsetMs);
+  const nextEarthrise = workerResult?.events?.earthrise.find((time) => time >= activeScenario.dateMs);
 
   return (
     <main className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">NASA Space Apps · lunar south pole</p>
-          <h1>Lunar Landing Site Navigator</h1>
-          <p className="lede">Plan sunlight, Earth visibility, and battery margins without hiding uncertainty.</p>
+      <header className="topbar">
+        <button className="brand" type="button" onClick={() => setPage("dashboard")}>Lunar Landing Site Navigator</button>
+        <label className="top-control">Site
+          <select value={activeSite.id} onChange={(event) => selectSite(event.target.value)} aria-label="Select site">
+            {allSites.map((site) => <option value={site.id} key={site.id}>{site.name}</option>)}
+          </select>
+        </label>
+        <label className="top-control">UTC
+          <input type="datetime-local" value={toDateTimeInputValue(activeScenario.dateMs)} onChange={(event) => updateActiveDate(fromDateTimeInputValue(event.target.value))} aria-label="Select UTC date and time" />
+          <small className="local-time">{formatLocalTime(activeScenario.dateMs)} local</small>
+        </label>
+        <div className="top-actions">
+          <button type="button" onClick={() => setPage("compare")}>Compare</button>
+          <button type="button" className={mode === "expert" ? "mode-toggle active" : "mode-toggle"} onClick={() => setMode(mode === "beginner" ? "expert" : "beginner")}>
+            {mode === "beginner" ? "Beginner" : "Expert"}
+          </button>
+          <button type="button" onClick={() => setDetailsOpen(true)}>Details</button>
         </div>
-        {bundle.manifest.data_kind === "mock" && <aside className="banner compact" role="status">Mock terrain data — not a mission verdict.</aside>}
       </header>
 
-      <section className="control-panel card">
-        <div className="section-heading"><div><p className="eyebrow">1 · Where and when</p><h2>Mission scenario</h2></div><span className="help" title="A scenario is one site viewed at one UTC instant. Add up to four to compare mission options.">ⓘ</span></div>
-        <div className="scenario-tabs" role="tablist" aria-label="Saved scenarios">
-          {scenarios.map((scenario, index) => (
-            <button className={index === activeIndex ? "tab active" : "tab"} key={`${scenario.siteId}-${index}`} onClick={() => setActiveIndex(index)} type="button">
-              {allSites.find((site) => site.id === scenario.siteId)?.name ?? scenario.siteId}
-              {scenarios.length > 1 && <span className="tab-remove" onClick={(event) => { event.stopPropagation(); removeScenario(index); }} aria-label="Remove scenario">×</span>}
-            </button>
-          ))}
-        </div>
-        <div className="form-grid">
-          <label>Curated site <select value={selectedSiteId} onChange={(event) => setSelectedSiteId(event.target.value)}><option value="">Choose a site…</option>{bundle.sites.map((site) => <option key={site.id} value={site.id}>{site.name} · {site.category}</option>)}</select></label>
-          <button type="button" onClick={() => addScenario(selectedSiteId)} disabled={!selectedSiteId || scenarios.length >= 4}>Add to comparison</button>
-          <label>UTC date and time <input type="datetime-local" value={toDateTimeInputValue(activeScenario.dateMs)} onChange={(event) => updateActiveDate(fromDateTimeInputValue(event.target.value))} /></label>
-          <label>Timeline span <select value={spanDays} onChange={(event) => setSpanDays(Number(event.target.value))}><option value={1}>One lunar day · 24 hours</option><option value={30}>One month</option><option value={90}>Three months</option></select></label>
-        </div>
-        <div className="custom-row">
-          <label>Custom latitude <input value={customLat} onChange={(event) => setCustomLat(event.target.value)} inputMode="decimal" /></label>
-          <label>Custom longitude <input value={customLon} onChange={(event) => setCustomLon(event.target.value)} inputMode="decimal" /></label>
-          <button type="button" onClick={addCustomSite}>Load custom skyline</button>
-          {customMessage && <span className="inline-message" role="status">{customMessage}</span>}
-        </div>
-        <div className="scrubber">
-          <button type="button" className="play" onClick={() => setPlaying((current) => !current)}>{playing ? "Pause" : "Play timeline"}</button>
-          <input aria-label="Timeline position" type="range" min="0" max="1000" value={Math.round(scrubRatio * 1000)} onChange={(event) => updateActiveDate((bounds?.startMs ?? activeScenario.dateMs) + (Number(event.target.value) / 1000) * (bounds ? bounds.endMs - bounds.startMs : 0))} />
-          <time>{new Date(activeScenario.dateMs).toISOString().replace(".000Z", "Z")}</time>
-        </div>
-      </section>
+      {bundle.manifest.data_kind === "mock" && <div className="mock-strip">Mock terrain data — not a mission verdict.</div>}
+      {introOpen && <IntroPanel onDismiss={dismissIntro} />}
 
-      <section className="countdown-grid" aria-label="Countdowns">
-        <CountdownCard label="Time to sunset" value={formatDuration(timeToSunset)} explanation="How long until the Sun's upper edge drops below the terrain skyline." />
-        <CountdownCard label="Time to Earthset" value={formatDuration(timeToEarthset)} explanation="How long until the Earth becomes hidden by the local terrain." />
-        <CountdownCard label="Sunlight in this window" value={`${activeSummary.sunlightHours.toFixed(1)} h`} explanation="Total time classified as visibly lit in the selected timeline." />
-        <CountdownCard label="Lowest battery" value={`${activeSummary.lowestBatteryWh.toFixed(0)} Wh`} explanation="The lowest simulated charge for a 4 m² tracking array, 25% efficient, under a 120 W load." />
-      </section>
+      <div className="workspace">
+        <section className="main-column" aria-label="Main mission view">
+          <div className="view-tabs" role="tablist" aria-label="Mission views">
+            {(["sky", "terrain", "map"] as ViewMode[]).map((tab) => (
+              <button type="button" role="tab" aria-selected={view === tab} className={view === tab ? "view-tab active" : "view-tab"} onClick={() => setView(tab)} key={tab}>
+                {tab === "sky" ? "Sky view" : tab === "terrain" ? "3D view" : "Map"}
+              </button>
+            ))}
+          </div>
+          {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
+          {view === "terrain" && <TerrainView bundle={effectiveBundle} site={activeSite} />}
+          {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} onPickCustom={pickCustomCoordinate} />}
+        </section>
 
-      <section className="dashboard-grid">
-        <SkyView summary={activeSummary} />
-        <TimelineChart summary={activeSummary} />
-      </section>
+        <aside className="status-column" aria-label="Mission status">
+          <StatusCard tone="sun" label="Sun" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={formatPercent(currentPoint.sunFraction)} exact={mode === "expert" ? `${formatDegrees(currentPoint.sun.el_deg)} elevation · ${formatDegrees(currentPoint.sun.az_deg)} azimuth` : undefined} />
+          <StatusCard label={currentPoint.sunStatus === "visible" ? "Time until sunset" : "Time until sunrise"} help="The next time the Sun changes between visible and hidden, based on the current terrain skyline." value={formatDuration(durationUntil(currentPoint.sunStatus === "visible" ? nextSunset : nextSunrise, activeScenario.dateMs))} />
+          <StatusCard tone="earth" label="Earth" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} exact={mode === "expert" ? `${formatDegrees(currentPoint.earth.el_deg)} elevation · ${formatDegrees(currentPoint.earth.az_deg)} azimuth` : undefined} />
+          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={formatPower(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} exact={mode === "expert" ? `${Math.round(currentPoint.batteryWh)} Wh battery · 120 W load` : `Battery ${formatPercent(currentPoint.batteryWh / 2400)}`} />
+        </aside>
+      </div>
 
-      <ComparisonTable summaries={comparisonSummaries} activeIndex={activeIndex} />
+      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={() => setPlaying((current) => !current)} onChange={updateActiveDate} bounds={bounds} />
+
+      {detailsOpen && <DetailsDrawer
+        summary={activeSummary}
+        mode={mode}
+        customLat={customLat}
+        customLon={customLon}
+        customMessage={customMessage}
+        onClose={() => setDetailsOpen(false)}
+        onLatChange={setCustomLat}
+        onLonChange={setCustomLon}
+        onLoadCustom={addCustomSite}
+      />}
     </main>
   );
 }
 
-/** Explain one mission number with a prominent value and plain-language tooltip. */
-function CountdownCard({ label, value, explanation }: { label: string; value: string; explanation: string }) {
-  return <article className="countdown-card card" title={explanation}><p>{label} <span className="help">ⓘ</span></p><strong>{value}</strong><small>{explanation}</small></article>;
+/** Find the timeline sample closest to a selected UTC instant. */
+function nearestPoint(points: TimelinePoint[], timeMs: number): TimelinePoint | undefined {
+  return points.reduce<TimelinePoint | undefined>((best, point) => !best || Math.abs(point.timeMs - timeMs) < Math.abs(best.timeMs - timeMs) ? point : best, undefined);
 }
 
-/** Draw the skyline silhouette and body positions/paths in the local north-clockwise sky. */
-function SkyView({ summary }: { summary: ScenarioSummary }) {
+/** Convert an event timestamp into a non-negative countdown. */
+function durationUntil(timeMs: number | undefined, nowMs: number): number | undefined {
+  return timeMs === undefined ? undefined : Math.max(0, timeMs - nowMs);
+}
+
+/** Describe the three-state Sun result in words for a first-time visitor. */
+function sunStatusLabel(status: TimelinePoint["sunStatus"]): string {
+  return status === "visible" ? "Visible" : status === "blocked" ? "Hidden" : "Partly hidden";
+}
+
+/** Describe the three-state Earth result in words for a first-time visitor. */
+function earthStatusLabel(status: TimelinePoint["earthStatus"]): string {
+  return status === "visible" ? "In view" : status === "blocked" ? "Out of view" : "Uncertain";
+}
+
+/** Explain the south-pole planning problem once, then let the visitor focus on the answer. */
+function IntroPanel({ onDismiss }: { onDismiss: () => void }) {
+  return <section className="intro-panel"><div><p className="eyebrow">First visit</p><h2>Why the lunar south pole is difficult</h2><p>The Sun and Earth skim the horizon, so small terrain changes can decide whether a landing site has power and contact.</p></div><button type="button" onClick={onDismiss}>Got it</button></section>;
+}
+
+/** Render one compact status card with optional exact values for expert mode. */
+function StatusCard({ tone, label, status, value, exact, help }: { tone?: "sun" | "earth"; label: string; status?: string; value: string; exact?: string; help: string }) {
+  return <article className={`status-card ${tone ?? ""}`}><div className="status-card-heading"><span>{label}</span><Tooltip text={help} /></div>{status && <strong className="status-word">{status}</strong>}<strong className="status-value">{value}</strong>{exact && <small>{exact}</small>}</article>;
+}
+
+/** Render the primary sky view with terrain, body paths, and current body positions. */
+function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentPoint: TimelinePoint }) {
   const width = 720;
-  const height = 300;
+  const height = 420;
   const range = elevationRange(summary);
   const skyline = summary.skyline;
-  if (!skyline) return <section className="card panel"><h2>Sky view</h2><p className="unavailable">Terrain not included; verdict unavailable.</p></section>;
+  if (!skyline) return <section className="view-panel unavailable">Terrain not included; verdict unavailable.</section>;
   const skylinePoints = skyline.skyline_deg.map((elevation, index) => skyPoint(index * skyline.az_step_deg, elevation, width, height, range.min, range.max));
   const bodyPath = (body: "sun" | "earth") => summary.points.map((point) => {
     const screen = skyPoint(point[body].az_deg, point[body].el_deg, width, height, range.min, range.max);
     return `${screen.x.toFixed(1)},${screen.y.toFixed(1)}`;
   }).join(" ");
-  const sun = summary.points[Math.floor(summary.points.length / 2)]?.sun;
-  const earth = summary.points[Math.floor(summary.points.length / 2)]?.earth;
-  const sunScreen = sun ? skyPoint(sun.az_deg, sun.el_deg, width, height, range.min, range.max) : undefined;
-  const earthScreen = earth ? skyPoint(earth.az_deg, earth.el_deg, width, height, range.min, range.max) : undefined;
-  return <section className="card panel"><div className="section-heading"><div><p className="eyebrow">2 · Sky view</p><h2>Terrain and body paths</h2></div><span className="help" title="The white silhouette is the terrain skyline. A body above it can be seen; paths show how azimuth and elevation change over the selected window.">ⓘ</span></div>
-    <svg className="sky-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Skyline silhouette with Sun and Earth paths">
+  const sunScreen = skyPoint(currentPoint.sun.az_deg, currentPoint.sun.el_deg, width, height, range.min, range.max);
+  const earthScreen = skyPoint(currentPoint.earth.az_deg, currentPoint.earth.el_deg, width, height, range.min, range.max);
+  return <section className="view-panel sky-panel">
+    <div className="view-title"><div><p className="eyebrow">Current sky</p><h1>{summary.site.name}</h1></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
+    <svg className="sky-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Skyline with Sun and Earth paths">
       <line x1="0" y1={height - ((0 - range.min) / (range.max - range.min)) * height} x2={width} y2={height - ((0 - range.min) / (range.max - range.min)) * height} className="horizon" />
       <polyline points={skylinePoints.map((point) => `${point.x},${point.y}`).join(" ")} className="skyline-line" />
       <polyline points={bodyPath("sun")} className="sun-path" />
       <polyline points={bodyPath("earth")} className="earth-path" />
-      {sunScreen && sun && <circle cx={sunScreen.x} cy={sunScreen.y} r={skyBodySize(sun, "sun", height, range.min, range.max)} className="sun-dot"><title>Sun: {sun.el_deg.toFixed(2)}° elevation</title></circle>}
-      {earthScreen && earth && <circle cx={earthScreen.x} cy={earthScreen.y} r={skyBodySize(earth, "earth", height, range.min, range.max)} className="earth-dot"><title>Earth: {earth.el_deg.toFixed(2)}° elevation</title></circle>}
+      <circle cx={sunScreen.x} cy={sunScreen.y} r={skyBodySize(currentPoint.sun, "sun", height, range.min, range.max)} className="sun-dot" />
+      <circle cx={earthScreen.x} cy={earthScreen.y} r={skyBodySize(currentPoint.earth, "earth", height, range.min, range.max)} className="earth-dot" />
     </svg>
-    <div className="legend"><span><i className="legend-sun" />Sun</span><span><i className="legend-earth" />Earth</span><span><i className="legend-skyline" />Terrain skyline</span><span className="muted">0° is local level</span></div>
-    <p className="microcopy">At the selected instant, terrain is {skyElevation(skyline, sun?.az_deg ?? 0).toFixed(2)}° high toward the Sun. <span className="help" title="Skyline elevation is measured above the local level plane; negative values mean the curved horizon is below level.">ⓘ</span></p>
+    <div className="view-legend"><span className="sun-key">Sun</span><span className="earth-key">Earth</span><span>Terrain skyline</span></div>
   </section>;
 }
 
-/** Draw elevation traces, lit/visible shading, and the simulated battery charge. */
-function TimelineChart({ summary }: { summary: ScenarioSummary }) {
-  const width = 720;
-  const height = 300;
+/** Render a lightweight terrain view from the prepared display-only patch. */
+function TerrainView({ bundle, site }: { bundle: DataBundle | undefined; site: Site }) {
+  const patch = bundle?.terrain.get(site.id);
+  if (!patch) return <section className="view-panel unavailable"><h1>3D view</h1><p>Terrain patch unavailable for this point.</p></section>;
+  const size = patch.label.n;
+  const samples = Array.from({ length: 11 }, (_, row) => Array.from({ length: 11 }, (_, column) => {
+    const sourceRow = Math.round((row / 10) * (size - 1));
+    const sourceColumn = Math.round((column / 10) * (size - 1));
+    return patch.values[sourceRow * size + sourceColumn] ?? 0;
+  }));
+  const max = Math.max(...samples.flat(), 1);
+  return <section className="view-panel terrain-panel"><div className="view-title"><div><p className="eyebrow">Prepared terrain patch</p><h1>3D view</h1></div><Tooltip text="This display uses the prepared terrain patch. Mission verdicts still come from the skyline." /></div><div className="terrain-grid" style={{ "--terrain-scale": `${max}` } as CSSProperties}>{samples.flatMap((row, rowIndex) => row.map((height, columnIndex) => <span key={`${rowIndex}-${columnIndex}`} style={{ transform: `translateZ(${(height / max) * 18}px)` }} />))}</div><p className="view-caption">{patch.label.size_m.toFixed(0)} m patch · {patch.label.spacing_m.toFixed(0)} m spacing</p></section>;
+}
+
+/** Render the data-driven south-polar map and allow selecting sites or a custom point. */
+function MapView({ site, sites, onSelect, onPickCustom }: { site: Site; sites: Site[]; onSelect: (siteId: string) => void; onPickCustom: (lat: number, lon: number) => void }) {
+  const x = 50 + (site.lon / 180) * 36;
+  const y = 50 + ((site.lat + 90) / 10) * 36;
+  function handleMapClick(event: MouseEvent<HTMLDivElement>): void {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const lon = Math.max(-180, Math.min(180, ((event.clientX - bounds.left) / bounds.width - 0.5) / 0.36 * 180));
+    const lat = Math.max(-90, Math.min(-80, -90 + ((event.clientY - bounds.top) / bounds.height - 0.5) / 0.36 * 10));
+    onPickCustom(lat, lon);
+  }
+  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="Select a curated site marker or click anywhere on the polar map to prepare a custom coordinate." /></div><div className="polar-map" onClick={handleMapClick}><div className="polar-grid" />{sites.map((candidate) => <button type="button" className={candidate.id === site.id ? "site-marker selected" : "site-marker"} style={{ left: `${50 + (candidate.lon / 180) * 36}%`, top: `${50 + ((candidate.lat + 90) / 10) * 36}%` }} onClick={(event) => { event.stopPropagation(); onSelect(candidate.id); }} title={candidate.name} aria-label={`Select ${candidate.name}`} key={candidate.id} />)}<span className="site-marker custom-marker" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden="true" /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
+}
+
+/** Render the single compact timeline and its draggable UTC cursor. */
+function Timeline({ summary, selectedMs, playing, onPlay, onChange, bounds }: { summary: ScenarioSummary; selectedMs: number; playing: boolean; onPlay: () => void; onChange: (timeMs: number) => void; bounds: { startMs: number; endMs: number; stepMs: number } | undefined }) {
+  const width = 1000;
+  const height = 160;
   const values = summary.points.flatMap((point) => [point.sun.el_deg, point.earth.el_deg, 0]);
   const min = Math.min(...values, -2);
   const max = Math.max(...values, 2);
   const x = (index: number) => summary.points.length <= 1 ? 0 : (index / (summary.points.length - 1)) * width;
   const y = (value: number) => height - ((value - min) / (max - min)) * height;
   const line = (body: "sun" | "earth") => summary.points.map((point, index) => `${x(index).toFixed(1)},${y(point[body].el_deg).toFixed(1)}`).join(" ");
-  const batteryLine = summary.points.map((point, index) => `${x(index).toFixed(1)},${height - (point.batteryWh / 2400) * height}`).join(" ");
-  return <section className="card panel"><div className="section-heading"><div><p className="eyebrow">3 · Timeline</p><h2>Elevation, visibility, and charge</h2></div><span className="help" title="Elevation is the angle above local level. Shaded bands indicate periods classified as visible; the amber line is stored energy.">ⓘ</span></div>
-    <svg className="timeline-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Sun and Earth elevation timeline">
-      {summary.points.map((point, index) => <g key={point.timeMs}><rect x={x(index)} y="0" width={Math.max(1, width / Math.max(1, summary.points.length - 1))} height={height} className={point.sunStatus === "visible" ? "lit-band" : point.earthStatus === "visible" ? "earth-band" : ""} /></g>)}
-      <line x1="0" y1={y(0)} x2={width} y2={y(0)} className="horizon" />
-      <polyline points={line("sun")} className="sun-path" />
-      <polyline points={line("earth")} className="earth-path" />
-      <polyline points={batteryLine} className="battery-path" />
-    </svg>
-    <div className="legend"><span><i className="legend-sun" />Sun elevation</span><span><i className="legend-earth" />Earth elevation</span><span><i className="legend-battery" />Battery charge</span></div>
-  </section>;
+  const ratio = bounds ? Math.max(0, Math.min(1, (selectedMs - bounds.startMs) / (bounds.endMs - bounds.startMs))) : 0;
+  return <section className="timeline-panel"><div className="timeline-heading"><div><p className="eyebrow">Mission timeline</p><h2>Sunlight and Earth contact</h2></div><Tooltip text="Drag the cursor or press play to move through the selected UTC window." /></div><div className="timeline-plot"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Sun and Earth elevation over time"><line x1="0" y1={y(0)} x2={width} y2={y(0)} className="horizon" /><polyline points={line("sun")} className="sun-path" /><polyline points={line("earth")} className="earth-path" /><line x1={ratio * width} y1="0" x2={ratio * width} y2={height} className="time-cursor" /></svg><div className="timeline-controls"><button type="button" onClick={onPlay}>{playing ? "Pause" : "Play"}</button><input type="range" min="0" max="1000" value={Math.round(ratio * 1000)} onChange={(event) => onChange((bounds?.startMs ?? selectedMs) + (Number(event.target.value) / 1000) * (bounds ? bounds.endMs - bounds.startMs : 0))} aria-label="Timeline cursor" /><time>{new Date(selectedMs).toISOString().replace(".000Z", "Z")}</time></div></div></section>;
 }
 
-/** Compare up to four scenario summaries and highlight the best/worst metric values. */
-function ComparisonTable({ summaries, activeIndex }: { summaries: ScenarioSummary[]; activeIndex: number }) {
-  if (summaries.length < 2) return null;
+/** Render a right-side drawer with precision, metrics, and custom coordinate controls. */
+function DetailsDrawer({ summary, mode, customLat, customLon, customMessage, onClose, onLatChange, onLonChange, onLoadCustom }: { summary: ScenarioSummary; mode: ExperienceMode; customLat: string; customLon: string; customMessage?: string; onClose: () => void; onLatChange: (value: string) => void; onLonChange: (value: string) => void; onLoadCustom: () => void }) {
+  return <aside className="details-drawer" aria-label="Mission details"><div className="drawer-heading"><div><p className="eyebrow">Mission details</p><h2>{mode === "expert" ? "Expert readout" : "Additional information"}</h2></div><button type="button" onClick={onClose} aria-label="Close details">×</button></div><dl className="detail-list"><div><dt>Sunlight in selected window</dt><dd>{summary.sunlightHours.toFixed(1)} h</dd></div><div><dt>Lowest battery</dt><dd>{summary.lowestBatteryWh.toFixed(0)} Wh</dd></div><div><dt>Skyline DEM</dt><dd>{summary.skyline?.dem.join(", ") ?? "Unavailable"}</dd></div><div><dt>Resolution</dt><dd>{summary.skyline?.resolution_m.toFixed(0) ?? "—"} m</dd></div><div><dt>Skyline uncertainty</dt><dd>{summary.skyline ? `${Math.max(...summary.skyline.skyline_err_deg).toFixed(2)}° max` : "—"}</dd></div></dl><div className="drawer-section"><p className="eyebrow">Custom point</p><div className="custom-fields"><label>Latitude<input value={customLat} onChange={(event) => onLatChange(event.target.value)} /></label><label>Longitude<input value={customLon} onChange={(event) => onLonChange(event.target.value)} /></label></div><button type="button" onClick={onLoadCustom}>Load skyline</button>{customMessage && <p className="drawer-message" role="status">{customMessage}</p>}</div></aside>;
+}
+
+/** Render the separate scenario comparison page without crowding the dashboard. */
+function ComparePage({ scenarios, summaries, activeIndex, onBack, onSelect }: { scenarios: SavedScenario[]; summaries: ScenarioSummary[]; activeIndex: number; onBack: () => void; onSelect: (index: number) => void }) {
   const sunlight = summaries.map((summary) => summary.sunlightHours);
   const battery = summaries.map((summary) => summary.lowestBatteryWh);
-  const bestSun = Math.max(...sunlight);
-  const worstSun = Math.min(...sunlight);
-  const bestBattery = Math.max(...battery);
-  const worstBattery = Math.min(...battery);
-  return <section className="card comparison"><div className="section-heading"><div><p className="eyebrow">4 · Compare</p><h2>Mission scenarios</h2></div><span className="help" title="Best and worst highlights compare only the scenarios currently saved in this page URL.">ⓘ</span></div>
-    <div className="table-scroll"><table><thead><tr><th>Metric</th>{summaries.map((summary, index) => <th className={index === activeIndex ? "active-column" : ""} key={summary.site.id}>{summary.site.name}</th>)}</tr></thead>
-      <tbody>
-        <MetricRow label="Sunlight hours" values={summaries.map((summary) => `${summary.sunlightHours.toFixed(1)} h`)} numbers={sunlight} best={bestSun} worst={worstSun} higherIsBetter />
-        <MetricRow label="Lowest battery" values={summaries.map((summary) => `${summary.lowestBatteryWh.toFixed(0)} Wh`)} numbers={battery} best={bestBattery} worst={worstBattery} higherIsBetter />
-        <MetricRow label="Data source" values={summaries.map((summary) => summary.skyline?.dem.join(", ") ?? "Unavailable")} />
-      </tbody></table></div>
-  </section>;
+  return <main className="app-shell compare-page"><header className="compare-header"><button type="button" onClick={onBack}>← Dashboard</button><div><p className="eyebrow">Scenario comparison</p><h1>Compare mission options</h1></div></header><section className="comparison-card"><table><thead><tr><th>Metric</th>{summaries.map((summary, index) => <th className={index === activeIndex ? "active-column" : ""} key={summary.site.id}>{summary.site.name}</th>)}</tr></thead><tbody><tr><th>Sunlight</th>{summaries.map((summary, index) => <td className={summary.sunlightHours === Math.max(...sunlight) ? "best" : summary.sunlightHours === Math.min(...sunlight) ? "worst" : ""} key={summary.site.id}>{summary.sunlightHours.toFixed(1)} h</td>)}</tr><tr><th>Lowest battery</th>{summaries.map((summary, index) => <td className={summary.lowestBatteryWh === Math.max(...battery) ? "best" : summary.lowestBatteryWh === Math.min(...battery) ? "worst" : ""} key={summary.site.id}>{summary.lowestBatteryWh.toFixed(0)} Wh</td>)}</tr><tr><th>Open scenario</th>{scenarios.map((scenario, index) => <td key={scenario.siteId}><button type="button" onClick={() => { onSelect(index); onBack(); }}>Open</button></td>)}</tr></tbody></table></section></main>;
 }
 
-/** Render one comparison metric and mark its best and worst values. */
-function MetricRow({ label, values, numbers, best, worst, higherIsBetter }: { label: string; values: string[]; numbers?: number[]; best?: number; worst?: number; higherIsBetter?: boolean }) {
-  return <tr><th>{label}</th>{values.map((value, index) => {
-    const number = numbers?.[index];
-    const isBest = number !== undefined && number === (higherIsBetter ? best : worst);
-    const isWorst = number !== undefined && number === (higherIsBetter ? worst : best);
-    return <td className={isBest ? "best" : isWorst ? "worst" : ""} key={`${label}-${index}`}>{value}</td>;
-  })}</tr>;
+/** Build summaries for the separate comparison page from the same browser engine calls. */
+function buildComparisonSummaries(bundle: DataBundle | undefined, scenarios: SavedScenario[], sites: Site[], extraSkylines: Map<string, Skyline>, spanDays: number): ScenarioSummary[] {
+  if (!bundle) return [];
+  return scenarios.flatMap((scenario) => {
+    const site = sites.find((candidate) => candidate.id === scenario.siteId);
+    if (!site) return [];
+    return [buildTimeline(bundle, site, extraSkylines.get(site.id) ?? bundle.skylines.get(site.id), scenario.dateMs, spanDays)];
+  });
+}
+
+/** Render a small question-mark tooltip trigger for unfamiliar terms. */
+function Tooltip({ text }: { text: string }) {
+  return <button className="tooltip-button" type="button" title={text} aria-label={text}>?</button>;
 }

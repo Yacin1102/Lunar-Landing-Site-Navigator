@@ -26,28 +26,6 @@ export interface ScenarioSummary {
   unavailable?: string;
 }
 
-/** Convert a date into the browser input format without losing the UTC instant. */
-export function toDateTimeInputValue(timeMs: number): string {
-  const date = new Date(timeMs);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
-}
-
-/** Convert a browser date input into UTC milliseconds. */
-export function fromDateTimeInputValue(value: string): number {
-  return Date.parse(`${value}:00Z`);
-}
-
-/** Format a duration as a compact countdown for a mission planner. */
-export function formatDuration(durationMs: number | undefined): string {
-  if (durationMs === undefined || !Number.isFinite(durationMs)) return "No crossing in range";
-  const totalMinutes = Math.max(0, Math.round(durationMs / 60000));
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-  return `${days ? `${days}d ` : ""}${hours}h ${minutes}m`;
-}
-
 /** Build a fixed-width timeline around a selected instant for the chart and scrubber. */
 export function timelineBounds(centerMs: number, spanDays: number): { startMs: number; endMs: number; stepMs: number } {
   const spanMs = spanDays * 86400000;
