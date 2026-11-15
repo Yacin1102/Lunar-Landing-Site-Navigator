@@ -34,6 +34,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [spanDays, setSpanDays] = useState(1);
+  const [windowAnchorMs, setWindowAnchorMs] = useState<number>();
   const [playing, setPlaying] = useState(false);
   const [evaluation, setEvaluation] = useState<Evaluation>();
   const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
@@ -44,7 +45,9 @@ export default function App() {
         setBundle(loaded);
         const saved = readSavedScenarios().filter((scenario) => loaded.sites.some((site) => site.id === scenario.siteId));
         const initialDate = loaded.ephemeris.label.t0_ms + 12 * 3600000;
-        setScenarios((saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }]).slice(0, 4));
+        const initialScenarios = (saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }]).slice(0, 4);
+        setScenarios(initialScenarios);
+        setWindowAnchorMs(initialScenarios[0]?.dateMs ?? initialDate);
       })
       .catch((reason: unknown) => setLoadError(reason instanceof Error ? reason.message : "Prepared data could not be loaded."));
   }, []);
@@ -55,16 +58,16 @@ export default function App() {
   const activeSkyline = activeScenario ? bundle?.skylines.get(activeScenario.siteId) : undefined;
   const activeSummary = useMemo(
     () => bundle && activeSite && activeScenario
-      ? buildTimeline(bundle, activeSite, activeSkyline, activeScenario.dateMs, spanDays)
+      ? buildTimeline(bundle, activeSite, activeSkyline, windowAnchorMs ?? activeScenario.dateMs, spanDays, activeScenario.dateMs)
       : undefined,
-    [activeScenario, activeSite, activeSkyline, bundle, spanDays],
+    [activeScenario, activeSite, activeSkyline, bundle, spanDays, windowAnchorMs],
   );
   // Memoised on the instant and span: a fresh object on every render would re-run the worker effect
   // below after each result, an endless loop of worker evaluations.
   const activeDateMs = activeScenario?.dateMs;
   const bounds = useMemo(
-    () => activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
-    [activeDateMs, spanDays],
+    () => activeDateMs === undefined ? undefined : timelineBounds(windowAnchorMs ?? activeDateMs, spanDays),
+    [activeDateMs, spanDays, windowAnchorMs],
   );
   const sampledPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
   const currentPoint = evaluation && sampledPoint
@@ -104,17 +107,23 @@ export default function App() {
     if (mode === "expert") setDetailsOpen(true);
   }, [mode]);
 
+  useEffect(() => {
+    if (activeScenario && windowAnchorMs === undefined) setWindowAnchorMs(activeScenario.dateMs);
+  }, [activeScenario, windowAnchorMs]);
+
   /** Select a site, reusing an existing scenario when it is already open. */
   function selectSite(siteId: string): void {
     const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
     if (existingIndex >= 0) {
       setEvaluation(undefined);
+      setWindowAnchorMs(scenarios[existingIndex]?.dateMs);
       setActiveIndex(existingIndex);
       return;
     }
     if (!siteId) return;
     const dateMs = activeScenario?.dateMs ?? bundle?.ephemeris.label.t0_ms ?? Date.now();
     setEvaluation(undefined);
+    setWindowAnchorMs(dateMs);
     setScenarios((current) => [...current, { siteId, dateMs }].slice(-4));
     setActiveIndex(Math.min(scenarios.length, 3));
   }

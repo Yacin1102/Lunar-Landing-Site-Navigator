@@ -37,18 +37,24 @@ export function timelineBounds(centerMs: number, spanDays: number): { startMs: n
   return { startMs, endMs, stepMs: spanDays <= 2 ? 30 * 60000 : 6 * 3600000 };
 }
 
-/** Sample the existing engine for directions, disc visibility, and battery charge. */
+/**
+ * Sample the existing engine for the fixed chart window and evaluate the selected instant exactly.
+ *
+ * `windowCenterMs` anchors the plotted window; `selectedMs` is the moving cursor inside it.
+ * Keeping these separate prevents the chart from recentering on every scrub or play tick.
+ */
 export function buildTimeline(
   bundle: DataBundle,
   site: Site,
   skyline: Skyline | undefined,
-  centerMs: number,
+  windowCenterMs: number,
   spanDays: number,
+  selectedMs = windowCenterMs,
 ): ScenarioSummary {
   if (!skyline) {
     return { site, points: [], sunlightHours: 0, lowestBatteryWh: 0, unavailable: "Terrain not included; verdict unavailable." };
   }
-  const bounds = timelineBounds(centerMs, spanDays);
+  const bounds = timelineBounds(windowCenterMs, spanDays);
   const table = timetableSpan(bundle.ephemeris.label);
   const points: TimelinePoint[] = [];
   // Only times the timetable covers: near its ends the window is cut rather than extrapolated.
@@ -81,7 +87,7 @@ export function buildTimeline(
   // time; sampling the chart points instead missed short stretches and could return a sunset
   // from before the chosen time.
   const { metrics } = evaluateSite(bundle.ephemeris.values, bundle.ephemeris.label, skyline, site,
-    Math.min(Math.max(centerMs, table.startMs), table.endMs), bounds.startMs, bounds.endMs);
+    Math.min(Math.max(selectedMs, table.startMs), table.endMs), bounds.startMs, bounds.endMs);
   return {
     site,
     skyline,
