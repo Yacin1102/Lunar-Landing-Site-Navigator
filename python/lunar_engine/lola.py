@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -68,35 +69,81 @@ class LabelError(Exception):
     """A map file is not laid out the way the reader requires."""
 
 
-def read_label(path: Path) -> dict:
+#: What the projection must be, as rasterio reports it: south polar
+#: stereographic on the 1737.4 km sphere, true scale at the pole, no offsets.
+EXPECTED_PROJECTION = {"proj": "stere", "lat_0": -90, "lon_0": 0, "x_0": 0, "y_0": 0,
+                       "R": 1737400, "units": "m"}
+
+
+def _metres_problem(kind: str, value_range) -> str | None:
+    """Check that values are in metres, from the range the file records.
+
+    The files carry no unit, but their processing history shows a
+    conversion from km (``grdmath ... 1000.0 MUL``) and they record the range
+    of their values. Heights in metres reach hundreds to thousands (in km
+    they would stay below about 11); RMS errors in metres reach a few tenths
+    or more (in km they would stay below 0.1).
+    """
+    if value_range is None:
+        return f"no recorded value range, so the {kind} cannot be confirmed to be in metres"
+    low, high = value_range
+    if kind == "heights" and not 100.0 <= max(abs(low), abs(high)) <= 20_000.0:
+        return f"heights range {low} to {high} does not look like metres"
+    if kind == "errors" and not 0.1 <= high <= 1_000.0:
+        return f"errors reach {high}, which does not look like metres"
+    return None
+
+
+def read_label(path: Path, kind: str = "heights") -> dict:
     """What the GeoTIFF says about itself, checked against the reader's assumptions.
+
+    Args:
+        path: the GeoTIFF.
+        kind: ``"heights"`` or ``"errors"`` (for the check that values are metres).
 
     Returns:
         ``pixel_m``, ``x_left``, ``y_top``, ``n_rows``, ``n_cols``, ``nodata``
         and the projection text.
 
     Raises:
-        LabelError: for a different projection, sphere, pixel layout or
-            registration.
+        LabelError: for a different projection (including false offsets or
+            an ellipsoid), scaled values, another pixel layout or
+            registration, or values that are not in metres.
     """
     import rasterio
 
     with rasterio.open(path) as raster:
         t = raster.transform
         wkt = raster.crs.to_wkt() if raster.crs else ""
+        projection = raster.crs.to_dict() if raster.crs else {}
+        tags = raster.tags()
+        value_range = None
+        if "z#actual_range" in tags:
+            try:
+                value_range = tuple(float(v) for v in tags["z#actual_range"].strip("{}").split(","))
+            except ValueError:
+                value_range = None
         label = {"pixel_m": float(t.a), "x_left": float(t.c), "y_top": float(t.f),
                  "n_rows": raster.height, "n_cols": raster.width, "nodata": raster.nodata,
-                 "dtype": raster.dtypes[0], "bands": raster.count,
-                 "area_or_point": raster.tags().get("AREA_OR_POINT"), "crs": wkt}
+                 "dtype": raster.dtypes[0], "bands": raster.count, "scales": raster.scales,
+                 "offsets": raster.offsets, "area_or_point": tags.get("AREA_OR_POINT"),
+                 "value_range": value_range, "crs": wkt}
     problems = []
     if label["bands"] != 1:
         problems.append(f"{label['bands']} bands, expected 1")
     if t.b != 0 or t.d != 0 or not t.a == -t.e > 0:
         problems.append("pixels are not square and axis-aligned with row 0 at the top")
-    if "Polar_Stereographic" not in wkt or "1737400" not in wkt:
-        problems.append("not polar stereographic on the 1737.4 km sphere")
-    if 'PARAMETER["latitude_of_origin",-90]' not in wkt or 'PARAMETER["central_meridian",0]' not in wkt:
-        problems.append("not centred on the south pole with central meridian 0")
+    for key, expected in EXPECTED_PROJECTION.items():
+        if projection.get(key) != expected:
+            problems.append(f"projection {key} is {projection.get(key)!r}, expected {expected!r}")
+    true_scale = projection.get("lat_ts", -90) == -90 and projection.get("k", projection.get("k_0", 1)) == 1
+    if not true_scale:
+        problems.append("projection is not true to scale at the pole")
+    if tuple(label["scales"]) != (1.0,) or tuple(label["offsets"]) != (0.0,):
+        problems.append(f"values are scaled ({label['scales']}, {label['offsets']})")
+    metres = _metres_problem(kind, value_range)
+    if metres:
+        problems.append(metres)
     if label["area_or_point"] != "Area":
         problems.append(f"registration {label['area_or_point']!r}, expected 'Area'")
     if label["dtype"] != "float32":
@@ -108,9 +155,22 @@ def read_label(path: Path) -> dict:
     return label
 
 
+CHECKSUMS = Path(__file__).resolve().parents[1] / "data_checksums.json"
+
+
 def _source_stamp(path: Path) -> dict:
+    """What identifies a source file: name, size, date, and its recorded SHA-256
+    if the download script recorded one (so a file replaced with the same size
+    and date is still noticed)."""
     stat = Path(path).stat()
-    return {"file": Path(path).name, "bytes": stat.st_size, "mtime": int(stat.st_mtime)}
+    stamp = {"file": Path(path).name, "bytes": stat.st_size, "mtime": int(stat.st_mtime)}
+    try:
+        recorded = json.loads(CHECKSUMS.read_text(encoding="utf-8"))["files"].get(f"dem/{Path(path).name}")
+    except (OSError, ValueError, KeyError):
+        recorded = None
+    if recorded and recorded.get("size") == stat.st_size:
+        stamp["sha256"] = recorded["sha256"]
+    return stamp
 
 
 class _Tiled:
@@ -145,9 +205,20 @@ def _raw_cache(source: Path, dest: Path, label: dict, log) -> _Tiled:
     stamp = {**_source_stamp(source), "version": CACHE_VERSION}
     rows, cols = label["n_rows"], label["n_cols"]
     n_tr, n_tc = -(-rows // TILE), -(-cols // TILE)
-    if not (dest.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == stamp):
+    shape = (n_tr, n_tc, TILE, TILE)
+    usable = dest.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == stamp
+    if usable:
+        opened = np.load(dest, mmap_mode="r")
+        usable = opened.shape == shape and opened.dtype == np.float32
+        del opened
+    if not usable:
+        # Crash-safe: the stamp is removed first and the data written to a
+        # temporary file that replaces the cache only once complete. A cache
+        # that was interrupted half-way is never used. (Found by review.)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        out = np.lib.format.open_memmap(dest, mode="w+", dtype=np.float32, shape=(n_tr, n_tc, TILE, TILE))
+        meta_path.unlink(missing_ok=True)
+        partial = dest.with_name(dest.stem + ".partial.npy")
+        out = np.lib.format.open_memmap(partial, mode="w+", dtype=np.float32, shape=shape)
         strip = max(TILE, (ROWS_PER_STRIP // TILE) * TILE)
         with rasterio.open(source) as raster:
             for r0 in range(0, rows, strip):
@@ -160,6 +231,7 @@ def _raw_cache(source: Path, dest: Path, label: dict, log) -> _Tiled:
                 log(f"  {source.name}: decompressed rows {r1} of {rows}")
         out.flush()
         del out
+        os.replace(partial, dest)
         meta_path.write_text(json.dumps(stamp))
     return _Tiled(np.load(dest, mmap_mode="r"), (rows, cols))
 
@@ -217,7 +289,7 @@ class LolaGrid(HeightGrid):
         self._heights = _raw_cache(path, self.cache / "heights.npy", label, log)
         self._errors = None
         if error_path is not None:
-            error_label = read_label(Path(error_path))
+            error_label = read_label(Path(error_path), kind="errors")
             if (error_label["pixel_m"], error_label["x_left"], error_label["y_top"],
                     error_label["n_rows"], error_label["n_cols"]) != (
                     label["pixel_m"], label["x_left"], label["y_top"], label["n_rows"], label["n_cols"]):

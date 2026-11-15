@@ -147,11 +147,10 @@ Verified in `python/tests/test_lola.py` and `test_elevation.py`.
 
 The published per-pixel errors are RMS (1-sigma) values and the products' horizontal accuracy is 1 m (Barker et al. 2023), see `python/DATA.md`.
 
-**Speed** at a point 0.2° from the pole on the real maps: 88 s per skyline run at 0.1° wedges, 8 s at 1° (after storing the decompressed maps in 64 x 64 tiles; 368 s and 19 s before). The result: skyline -1.5° to 16.9°, interval half-width mean 0.011° (largest 0.029°) before the map error is added, no terrain beyond 127 km needed, and unmapped terrain proven irrelevant.
+**Speed** (a one-off measurement with `python/scripts/time_skyline.py`, not a test; it depends on the machine): at a point 0.2° from the pole on the real maps, one skyline run took 88 s at 0.1° wedges and 8 s at 1°, after storing the decompressed maps in 64 x 64 tiles (368 s and 19 s before). The same run reported: skyline -1.5° to 16.9°, interval half-width mean 0.011° (largest 0.029°) before the map error is added, search reach 127 km, and unmapped terrain proven irrelevant.
 
 ## Not yet verified
 
-- (Elevation reading: now verified; see below.)
 - The error bound on the real maps, with their published per-pixel errors and horizontal accuracy (the horizontal accuracy of the LOLA product is still to be taken from its paper).
-- Skyline speed and interval width on the real maps.
+- The full error bound on the real maps at the curated sites (with the site list).
 - Illumination against published south polar studies: with the real products.

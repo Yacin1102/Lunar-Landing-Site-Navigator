@@ -29,7 +29,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 8): 232 passed, 0 skipped, 0 failed: with all data on disk, all 55 real-data tests run.
+Last result (PR 8): 238 passed, 0 skipped, 0 failed: with all data on disk, all 55 real-data tests run.
 
 
 ## Principle: nothing waits on the download

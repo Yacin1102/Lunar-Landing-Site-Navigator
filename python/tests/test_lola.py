@@ -49,6 +49,8 @@ def write_tif(path, heights, pixel=40.0, x_left=-4_000.0, y_top=4_000.0, wkt=LOL
                        blockxsize=64, blockysize=64, compress="deflate") as out:
         out.write(heights.astype(np.float32), 1)
         out.update_tags(AREA_OR_POINT="Area" if area else "Point")
+        if np.isfinite(heights).any():
+            out.update_tags(**{"z#actual_range": f"{{{np.nanmin(heights)},{np.nanmax(heights)}}}"})
 
 
 @pytest.fixture
@@ -159,15 +161,83 @@ def test_caches_are_reused_and_rebuilt_when_the_source_changes(tmp_path):
     assert rebuilt.values(np.array([5]), np.array([7]))[0] == changed[5, 7]
 
 
-@pytest.mark.parametrize("problem", ["wrong projection", "point registration"])
+@pytest.mark.parametrize("problem", ["wrong projection", "point registration", "false easting",
+                                     "ellipsoid", "heights in km", "scaled values"])
 def test_files_laid_out_differently_are_refused(tmp_path, problem):
-    heights = np.zeros((20, 20), np.float32)
+    """Found by review: the first label check was a text search and let a
+    false offset, an ellipsoid, km heights and scaled values through."""
+    heights = np.linspace(-2_000, 3_000, 400, dtype=np.float32).reshape(20, 20)
     if problem == "wrong projection":
         write_tif(tmp_path / "x.tif", heights, wkt="EPSG:4326")
-    else:
+    elif problem == "point registration":
         write_tif(tmp_path / "x.tif", heights, area=False)
+    elif problem == "false easting":
+        write_tif(tmp_path / "x.tif", heights, wkt=LOLA_WKT.replace('"false_easting",0', '"false_easting",500'))
+    elif problem == "ellipsoid":
+        write_tif(tmp_path / "x.tif", heights, wkt=LOLA_WKT.replace("1737400,0", "1737400,3.2"))
+    elif problem == "heights in km":
+        write_tif(tmp_path / "x.tif", heights / 1000.0)
+    else:
+        write_tif(tmp_path / "x.tif", heights)
+        import rasterio
+        with rasterio.open(tmp_path / "x.tif", "r+") as raster:
+            raster.scales = (0.001,)
     with pytest.raises(lola.LabelError):
         lola.read_label(tmp_path / "x.tif")
+    write_tif(tmp_path / "ok.tif", heights)
+    assert lola.read_label(tmp_path / "ok.tif")["n_rows"] == 20, "the same file done right is accepted"
+
+
+def test_an_interrupted_cache_is_never_used(tmp_path, monkeypatch):
+    """Found by review: after a crash half-way through decompressing, unwritten
+    pixels read 0 m. Now a half-written cache is never adopted."""
+    import gc
+    import rasterio
+
+    heights = (np.arange(130 * 70, dtype=np.float32).reshape(130, 70) + 1_500.0)
+    write_tif(tmp_path / "c.tif", heights)
+    cache = tmp_path / "cache"
+    grid = lola.LolaGrid(tmp_path / "c.tif", cache_root=cache, log=lambda m: None)
+    del grid
+    gc.collect()
+    (cache / "c" / "heights.npy").unlink()               # e.g. deleted to free disk space
+    monkeypatch.setattr(lola, "ROWS_PER_STRIP", 64)
+    original = rasterio.io.DatasetReader.read
+    calls = {"n": 0}
+
+    def crash_on_second_strip(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("disk full")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(rasterio.io.DatasetReader, "read", crash_on_second_strip)
+    with pytest.raises(OSError):
+        lola.LolaGrid(tmp_path / "c.tif", cache_root=cache, log=lambda m: None)
+    monkeypatch.setattr(rasterio.io.DatasetReader, "read", original)
+    gc.collect()
+    again = lola.LolaGrid(tmp_path / "c.tif", cache_root=cache, log=lambda m: None)
+    rows, cols = np.indices(heights.shape)
+    assert np.array_equal(again.values(rows, cols), heights), "rebuilt, never read half-written"
+
+
+def test_odd_and_non_square_maps_read_the_same_as_in_memory(tmp_path, monkeypatch):
+    monkeypatch.setattr(lola, "ROWS_PER_STRIP", 64)
+    rng = np.random.default_rng(6)
+    heights = rng.normal(0, 200, (133, 71)).astype(np.float32) + 1_000.0
+    heights[60, 3] = np.nan
+    write_tif(tmp_path / "o.tif", heights, x_left=-1_420.0, y_top=2_660.0)
+    memory = HeightGrid("m", GridSpec(40.0, -1_420.0, 2_660.0, 133, 71), heights)
+    files = lola.LolaGrid(tmp_path / "o.tif", cache_root=tmp_path / "cache", log=lambda m: None)
+    rows, cols = np.indices(heights.shape)
+    assert np.array_equal(files.values(rows, cols), heights, equal_nan=True)
+    assert np.allclose(files.slope_bound(rows.ravel(), cols.ravel()),
+                       memory.slope_bound(rows.ravel(), cols.ravel()), equal_nan=True)
+    expected = max_pyramid(cell_max(memory._heights), 11_000.0)
+    for a, b in zip(files.pyramid(11_000.0), expected):
+        r, c = np.indices(b.shape)
+        assert np.array_equal(np.asarray(a[r.ravel(), c.ravel()], dtype=float), b.ravel().astype(float))
+    assert files.disc() == pytest.approx(memory.disc(), abs=1e-9)
 
 
 # ---- The real maps ------------------------------------------------------------------

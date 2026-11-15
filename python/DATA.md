@@ -120,9 +120,11 @@ What the products' paper says (Barker et al. 2023, *Planet. Sci. J.* 4, 183; NTR
 - **Horizontal accuracy:** "we consider 1.00/1.00/0.15 m as a conservative estimate of the final track geolocation errors" (along-track, cross-track, radial). The engine uses 1 m (`lola.HORIZONTAL_ERROR_M`).
 - The maps are in the `MOON_ME` frame of DE421, whose coordinates "have an overall uncertainty of a few meters". That moves the site and its terrain together, so it does not change the skyline.
 
+**Units.** The files carry no unit tag. Their processing history reads `gmt grdmath ... 1000.0 MUL` (a conversion from km), and their recorded value ranges are -7296 to +7026 for heights and 0.019 to 8.96 for errors, which only make sense in metres. `read_label` refuses a file whose recorded range does not look like metres, and any file with a scale or offset.
+
 Checked against published features (`python/tests/test_lola.py`): Shackleton crater on the 80 m map is 4104 m deep from its rim to its floor; Zuber et al. 2012 (*Nature* 486, 378) give a diameter of 21 km and depth/diameter 0.195 +/- 0.025, that is 4100 +/- 500 m. The deepest point lies within the 7 km floor round the gazetteer centre (89.67 S, 129.78 E). At the three places where a mirrored or rotated read would put the crater, the same measurement finds 319 m, 1111 m and -136 m.
 
-The decompressed copies and tables take about 50 GB in `python/dem/cache/` (never committed). Prepare them with `python python/scripts/build_dem_cache.py`.
+The decompressed copies and tables take about 42 GB in `python/dem/cache/` (never committed). Prepare them with `python python/scripts/build_dem_cache.py`.
 
 ## Group 4: 5 m site maps (`python/dem/`)
 
