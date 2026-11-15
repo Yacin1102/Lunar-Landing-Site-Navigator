@@ -190,10 +190,13 @@ class HeightGrid:
             where there is no data.
         errors: array of the same shape with the height error of each pixel,
             metres, or ``None`` if the map has none.
+        horizontal_error_m: how far the map as a whole may be shifted
+            sideways from the truth, metres (the published geolocation
+            accuracy of the product). 0 for synthetic maps.
     """
 
     def __init__(self, name: str, spec: GridSpec, heights: np.ndarray,
-                 errors: np.ndarray | None = None):
+                 errors: np.ndarray | None = None, horizontal_error_m: float = 0.0):
         heights = np.asarray(heights, dtype=np.float32)
         if heights.shape != (spec.n_rows, spec.n_cols):
             raise ValueError(f"heights have shape {heights.shape}, the grid says "
@@ -204,8 +207,11 @@ class HeightGrid:
         self.spec = spec
         self._heights = heights
         self._errors = None if errors is None else np.asarray(errors, dtype=np.float32)
-        self._pyramids: dict[float, list[np.ndarray]] = {}
+        self.horizontal_error_m = float(horizontal_error_m)
+        self._pyramids: dict = {}
         self._disc: tuple[float, float, float] | None = None
+        self._slopes: np.ndarray | None = None
+        self._slope_bounds: np.ndarray | None = None
 
     @property
     def has_errors(self) -> bool:
@@ -276,6 +282,57 @@ class HeightGrid:
         if key not in self._pyramids:
             self._pyramids[key] = max_pyramid(cell_max(self._heights), missing_as)
         return self._pyramids[key]
+
+    def local_slopes(self) -> np.ndarray:
+        """For every pixel, the steepest rise to any of its 8 neighbours (cached).
+
+        Returns:
+            Array like the heights: metres of height per metre on the sheet,
+            NaN where the pixel or all its neighbours are missing.
+        """
+        if self._slopes is None:
+            h = np.asarray(self._heights, dtype=float)
+            padded = np.pad(h, 1, constant_values=np.nan)
+            steepest = np.full(h.shape, np.nan)
+            rows, cols = h.shape
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    if dr == dc == 0:
+                        continue
+                    neighbour = padded[1 + dr:1 + dr + rows, 1 + dc:1 + dc + cols]
+                    rise = np.abs(neighbour - h) / (self.spec.pixel_m * np.hypot(dr, dc))
+                    steepest = np.fmax(steepest, rise)
+            self._slopes = steepest
+        return self._slopes
+
+    def slope_bound(self, rows, cols) -> np.ndarray:
+        """How steep the surface can be anywhere near a pixel, per metre on the sheet.
+
+        Covers the four cells that share the pixel, so it holds for any
+        point within half a pixel (along each axis) of that pixel's centre
+        and a little beyond. Inside a cell, the slope along the columns is a
+        blend of the two differences between neighbouring columns, so it is
+        no steeper than the larger; the same along the rows; and each such
+        difference is no larger than the steepest rise of one of the cell's
+        corners (:meth:`local_slopes`). So the gradient is at most
+        ``sqrt(2)`` times the steepest rise among the 3 x 3 pixels around.
+
+        Args:
+            rows, cols: pixel indices (inside the grid).
+
+        Returns:
+            Bound per pixel; NaN where no neighbour has data.
+        """
+        if self._slope_bounds is None:
+            s = self.local_slopes()
+            padded = np.pad(s, 1, constant_values=np.nan)
+            rows_n, cols_n = s.shape
+            block = np.full(s.shape, np.nan)
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    block = np.fmax(block, padded[1 + dr:1 + dr + rows_n, 1 + dc:1 + dc + cols_n])
+            self._slope_bounds = np.sqrt(2.0) * block
+        return self._slope_bounds[rows, cols]
 
     def disc(self) -> tuple[float, float, float]:
         """The disc on the sheet inside which this map is trusted (cached).

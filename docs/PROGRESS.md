@@ -12,9 +12,10 @@ Plan approved on 2026-11-14.
 | 2 Web handoff | Merged (PR #5) |
 | 3 Timetable and fixtures | Merged (PRs #6 and #10) |
 | 4 Elevation interface and synthetic terrain | Merged (PR #7) |
-| 5 Skyline core | Built, in review |
-| 6 Error bound and independent check | **Next** |
-| 7 to 11 | Not started |
+| 5 Skyline core | Built, in review (PR #12) |
+| 6 Error bound and independent check | Built, in review |
+| 7 Record writer and live API | **Next** |
+| 8 to 11 | Not started |
 
 The web app (`web/`) is built separately and merged into `main` (PR #9). Engine work is done in a separate git worktree and never changes files under `web/` except the agreed data files, so the two do not conflict.
 
@@ -24,7 +25,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 5): 167 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 6): 180 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
@@ -210,9 +211,22 @@ PR 2 had to turn the spec's prose into exact schemas (`docs/schemas/`). Where th
 11. **Lit, blocked, uncertain (needs your decision).** The spec says lit is when "the whole relevant part of the disc is above skyline + error". `docs/WEB_HANDOFF.md` proposes: compute the visible fraction of the disc against skyline + error (`f_low`) and against skyline - error (`f_high`); **lit** if `f_low > 0` (some of the disc is certainly visible), **blocked** if `f_high == 0`, **uncertain** otherwise, and report the fraction as the range `f_low` to `f_high`. The stricter reading would call a site lit only when the entire disc is certainly clear, and everything partial "uncertain". This decides what the app says during the hours the Sun is half hidden, so it should be your call.
 12. **A curated site's skyline is computed at exactly its `sites.json` coordinates**, with no rounding. Rounding applies only to custom points sent to the API.
 13. **Azimuths in the fixtures are in 0 (included) to 360 (excluded).**
+15. **What `skyline_deg +/- skyline_err_deg` covers.** The spec says each entry is "the true maximum over its whole wedge" and "blocked" is "below skyline - error". A wedge's maximum alone cannot prove "blocked": light can pass through a dip narrower than the wedge (a test shows it). So the interval is made to contain the skyline at every azimuth of the wedge. It still contains the wedge's maximum, as the spec requires, and "lit" and "blocked" both become provable. The reported `skyline_deg` is the middle of that interval, not the maximum itself.
 14. **Limits the schemas enforce beyond the spec's wording**: exactly 10 sites; `t0_ms` exactly 1794787200000 and the last row at or after 1 Jan 2040; `service_region.lat_max` south of the equator; `category` made of lowercase letters, digits, `_` and `-`; `date_utc` in ISO 8601 form; no NaN or Infinity anywhere.
 
 Still to be fixed, with the PR that needs them: the default and accepted `az_step_deg` and the default `mast_m` (PR 7; the mock uses 0.1 degrees and 2 m), the rounding of custom points (PR 7), the category names (PR 9), and the Sun and Earth radii used for disc edges (PR 3).
+
+## Error model for `skyline_err_deg`: needs your decision
+
+PR 6 combines the map's published errors into the bound with three values that are scientific choices, not facts. They decide how often the app says "uncertain".
+
+| Value | Proposed | What it means |
+| --- | --- | --- |
+| `K_SIGMA` | 3 | The published height errors are standard deviations; 3 of them make the bound (about 99.7 % for a normal error) |
+| `SLOPE_ERROR_DEG` | 6° | Nearby ground comes from the same measurements as the site, so its error relative to the eye cannot grow faster than this slope error over distance. Barker et al. 2021 give a median slope uncertainty of 1.5 to 2.5° for the 5 m maps; 6° is about 3 times 2° |
+| near-site zone `r0` | 1 pixel diagonal | Within it, terrain has no error relative to the eye: it is the site's own cell, defined by blending the same pixels |
+
+Measured effect on synthetic terrain: with a 0.5 m map error, the bound averages ±0.15° (largest ±0.38°); with 1 m, ±0.39° (largest ±1.0°). Lower values make more answers definite, but less safely. The horizontal accuracy of the LOLA product will be taken from its paper in PR 8.
 
 ## Proposed spec changes
 

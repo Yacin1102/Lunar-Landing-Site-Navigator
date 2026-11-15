@@ -13,6 +13,8 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/mock_world.py` | An invented landscape given by formulas, with a brute-force skyline, terrain patch and shade grid. Used only for mock data. | Nothing | Nothing |
 | `python/lunar_engine/elevation.py` | Terrain heights behind one interface (`ElevationSource`): the polar projection, a map grid with interpolation between pixel centres, nested maps answered from the finest, and "highest terrain in a block" tables. | Map grids | Nothing |
 | `python/lunar_engine/skyline.py` | The skyline: for every azimuth wedge, a guaranteed interval for the highest elevation angle of any terrain, found by proving which areas cannot matter. | An `ElevationSource` | Nothing (returns a `SkylineResult`) |
+| `python/lunar_engine/uncertainty.py` | The error bound `skyline_err_deg`: runs the skyline on the map raised and lowered by the error allowed at each point, and combines the results. | An `ElevationSource` with its error maps | Nothing (returns `SkylineBounds`) |
+| `python/lunar_engine/lineofsight.py` | The independent check: lines of sight traced through the terrain, and the skyline at single exact azimuths by dense sampling. Shares no code with the skyline search. | An `ElevationSource` | Nothing |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -103,7 +105,8 @@ flowchart TD
     pieces --> upper[ceilings of the pieces left:<br/>upper limit per wedge]
     upper --> edge{"4. Could unmapped terrain,<br/>as high as anything on the Moon,<br/>rise above the lower limit anywhere?"}
     edge -- yes --> error([CoverageError: the search<br/>would leave the data])
-    edge -- no --> result([per wedge: lower and upper limit;<br/>skyline = middle, numerical error = half the gap])
+    edge -- no --> floor["5. Floor: follow arcs of terrain<br/>across each wedge; the lowest point<br/>of an arc bounds every azimuth"]
+    floor --> result([per wedge: floor, lower and upper limit])
 ```
 
 Which map answers where: blocks wholly outside a map's trusted disc, or wholly inside a finer map's disc, are skipped for that map. Samples count for a map only where that map is the one trusted.
@@ -117,6 +120,28 @@ Three ceilings, each a proof; the lowest available is used:
 The four facts that make the block ceilings proofs and not estimates are listed in the docstring of `skyline.py`. In short: ground inside a cell is never above its highest corner; distances on the sphere are never longer than on the sheet, so a block lies inside a known circle on the sphere; elevation angle at a given height first rises and then falls with distance; and the azimuths of a circle seen from the eye are exactly known. Height does not change azimuth, because the eye is on the vertical.
 
 Choices fixed in `skyline.py`: ground within 1 m of the point under the eye is not an obstacle; the target interval half-width is 0.0005°; a cell is cut at most 8 times (to 1/256 of a pixel).
+
+## The error bound
+
+```mermaid
+flowchart LR
+    source[ElevationSource<br/>heights + per-pixel error] --> nominal[skyline of the map as it is]
+    source --> up["map raised by the allowed error<br/>(_ShiftedSource +1)"] --> top[proven ceiling<br/>= top of the interval]
+    source --> down["map lowered by the allowed error<br/>(_ShiftedSource -1)"] --> bottom[proven floor<br/>= bottom of the interval]
+    top --> record["skyline_deg = middle<br/>skyline_err_deg = half the width<br/>+ frame angle"]
+    bottom --> record
+    nominal --> record
+    los[lineofsight.py<br/>independent rays] -. checks in tests .-> record
+```
+
+The interval of a wedge contains the skyline at every single azimuth in it, for any terrain within the error model:
+
+- the top is a ceiling over the whole wedge (the skyline search's upper limit);
+- the bottom is a floor under every azimuth of the wedge (step 5 of the search: arcs of terrain followed across the wedge).
+
+So a direction above the interval is certainly clear, and one below it is certainly blocked.
+
+The allowed error at a point is `min(E(x) + E(site), max(0, D - r0) * tan(6°))`, with `E = 3 * sigma + horizontal error * local slope`, `D` the distance from the site and `r0` one pixel diagonal. The reasons for each part are in the docstring of `uncertainty.py`; the values are proposals awaiting approval (`docs/PROGRESS.md`).
 
 ## Timetable and fixtures
 
