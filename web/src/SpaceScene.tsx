@@ -108,7 +108,7 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
           map: createMoonTexture(three),
           roughness: 1,
         }) as { map?: object; needsUpdate?: boolean };
-        new three.TextureLoader().load("https://threejs.org/examples/textures/planets/moon_1024.jpg", (texture) => {
+        new three.TextureLoader().load("/assets/lroc_color_2k.jpg", (texture) => {
           moonMaterial.map = texture;
           moonMaterial.needsUpdate = true;
         });
@@ -119,22 +119,50 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
         light.position.copy(directionVector(three, sun)).multiplyScalar(20);
         scene.add(light);
 
-        const sunSprite = new three.Sprite(new three.SpriteMaterial({ color: 0xffc857, transparent: true, opacity: 0.92 }));
-        sunSprite.scale.set(1.8, 1.8, 1);
-        sunSprite.position.copy(directionVector(three, sun)).multiplyScalar(9);
-        scene.add(sunSprite);
-
-        const earthGroup = new three.Mesh(new three.SphereGeometry(0.22, 64, 48), new three.MeshStandardMaterial({ color: 0x4185d7, roughness: 0.85 }));
-        earthGroup.position.copy(directionVector(three, earth)).multiplyScalar(6);
-        scene.add(earthGroup);
-        const atmosphere = new three.Mesh(new three.SphereGeometry(0.245, 48, 32), new three.MeshBasicMaterial({
-          color: 0x4c8bff,
+        const sunPosition = directionVector(three, sun).multiplyScalar(9);
+        const sunSphere = new three.Mesh(
+          new three.SphereGeometry(0.42, 64, 48),
+          new three.MeshBasicMaterial({ color: 0xffc857 }),
+        );
+        sunSphere.position.copy(sunPosition);
+        scene.add(sunSphere);
+        const sunGlow = new three.Sprite(new three.SpriteMaterial({
+          map: createGlowTexture(three, "#ffd36a"),
           transparent: true,
-          opacity: 0.18,
-          side: 1,
+          depthWrite: false,
           blending: three.AdditiveBlending,
         }));
-        atmosphere.position.copy(earthGroup.position);
+        sunGlow.scale.set(2.2, 2.2, 1);
+        sunGlow.position.copy(sunPosition);
+        scene.add(sunGlow);
+
+        const earthPosition = directionVector(three, earth).multiplyScalar(6);
+        const earthGroup = new three.Mesh(
+          new three.SphereGeometry(0.22, 64, 48),
+          new three.MeshStandardMaterial({ map: createEarthTexture(three), roughness: 0.8 }),
+        );
+        earthGroup.position.copy(earthPosition);
+        scene.add(earthGroup);
+        const clouds = new three.Mesh(
+          new three.SphereGeometry(0.228, 64, 48),
+          new three.MeshStandardMaterial({
+            map: createCloudTexture(three),
+            transparent: true,
+            opacity: 0.82,
+            depthWrite: false,
+          }),
+        );
+        clouds.position.copy(earthPosition);
+        scene.add(clouds);
+        const atmosphere = new three.Mesh(new three.SphereGeometry(0.252, 48, 32), new three.MeshBasicMaterial({
+          color: 0x4c8bff,
+          transparent: true,
+          opacity: 0.2,
+          side: 1,
+          depthWrite: false,
+          blending: three.AdditiveBlending,
+        }));
+        atmosphere.position.copy(earthPosition);
         scene.add(atmosphere);
         scene.add(createStars(three));
 
@@ -280,6 +308,59 @@ function createMoonTexture(three: ThreeApi): object {
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
     context.fill();
+  }
+  return new three.CanvasTexture(canvas);
+}
+
+/** Create a circular glow texture so the Sun has no opaque square sprite corners. */
+function createGlowTexture(three: ThreeApi, color: string): object {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (!context) return new three.CanvasTexture(canvas);
+  const gradient = context.createRadialGradient(64, 64, 4, 64, 64, 64);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(0.22, "rgba(255,214,124,.95)");
+  gradient.addColorStop(0.62, "rgba(255,180,48,.25)");
+  gradient.addColorStop(1, "rgba(255,180,48,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 128, 128);
+  return new three.CanvasTexture(canvas);
+}
+
+/** Create a small Earth map with ocean, land, and atmospheric color variation. */
+function createEarthTexture(three: ThreeApi): object {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (!context) return new three.CanvasTexture(canvas);
+  context.fillStyle = "#1557a8";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < 18; index += 1) {
+    context.fillStyle = index % 3 === 0 ? "#9dbd65" : "#4c8d58";
+    context.beginPath();
+    context.ellipse((index * 53) % 256, 18 + ((index * 31) % 92), 10 + (index % 8) * 2, 5 + (index % 5) * 2, index, 0, Math.PI * 2);
+    context.fill();
+  }
+  return new three.CanvasTexture(canvas);
+}
+
+/** Create translucent cloud bands for the spherical Earth layer. */
+function createCloudTexture(three: ThreeApi): object {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (!context) return new three.CanvasTexture(canvas);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = "rgba(255,255,255,.62)";
+  context.lineWidth = 3;
+  for (let index = 0; index < 14; index += 1) {
+    context.beginPath();
+    context.ellipse((index * 37) % 256, 10 + ((index * 19) % 108), 22 + (index % 5) * 7, 4 + (index % 3), index * 0.2, 0, Math.PI * 2);
+    context.stroke();
   }
   return new three.CanvasTexture(canvas);
 }
