@@ -375,6 +375,33 @@ class HeightGrid:
                 self._shift_allowances[key] = key * steepest
         return self._shift_allowances[key]
 
+    # ---- for the error model (lunar_engine.uncertainty) ------------------------
+
+    def own_allowance(self, rows, cols, k_sigma: float) -> np.ndarray:
+        """Error allowed at pixels before the distance taper, metres:
+        ``k_sigma`` times the published height error, plus what a sideways
+        shift of the map can change (:meth:`shift_allowance`)."""
+        sigma = self.error_values(rows, cols)
+        sigma = np.zeros(np.shape(rows)) if sigma is None else np.nan_to_num(np.asarray(sigma, dtype=float))
+        return k_sigma * sigma + self.shift_allowance(self.horizontal_error_m)[rows, cols]
+
+    def max_own_allowance(self, k_sigma: float) -> float:
+        """An upper limit for :meth:`own_allowance` anywhere in the map, metres."""
+        key = ("max_allowance", float(k_sigma))
+        if key not in self._pyramids:
+            rows, cols = np.indices(self._heights.shape)
+            self._pyramids[key] = float(np.nanmax(self.own_allowance(rows, cols, k_sigma)))
+        return self._pyramids[key]
+
+    def raised_pyramid(self, k_sigma: float, missing_as: float) -> list:
+        """Highest-terrain tables for the heights raised by :meth:`own_allowance` (cached)."""
+        key = ("raised", float(k_sigma), float(missing_as))
+        if key not in self._pyramids:
+            rows, cols = np.indices(self._heights.shape)
+            raised = np.asarray(self._heights, dtype=float) + self.own_allowance(rows, cols, k_sigma)
+            self._pyramids[key] = max_pyramid(cell_max(raised), missing_as)
+        return self._pyramids[key]
+
     def disc(self) -> tuple[float, float, float]:
         """The disc on the sheet inside which this map is trusted (cached).
 

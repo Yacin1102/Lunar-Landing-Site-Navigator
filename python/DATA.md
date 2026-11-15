@@ -103,7 +103,26 @@ Same source and paper as group 2. Height maps are downloaded before error maps.
 
 Why four nested maps: a peak 8 km high is geometrically visible from about 170 km away at ground level, and from over 300 km when the observer also stands on high ground. A site at 85°S can therefore be shadowed by terrain 450 km from the pole.
 
-Label notes: to be filled in from each file's GeoTIFF header once downloaded.
+Label notes, read from every file by `lunar_engine.lola.read_label`, which refuses any file that differs:
+
+| File | Pixels | Pixel size | Extent from the pole |
+| --- | --- | --- | --- |
+| `LDEM_83S_10MPP_ADJ.TIF` (+ `_ERR`) | 43,280 x 43,280 | 10 m | 216.4 km |
+| `LDEM_80S_20MPP_ADJ.TIF` (+ `_ERR`) | 30,400 x 30,400 | 20 m | 304.0 km |
+| `LDEM_75S_30MPP_ADJ.TIF` (+ `_ERR`) | 30,496 x 30,496 | 30 m | 457.4 km |
+| `LDEM_60S_60MPP_ADJ.TIF` (+ `_ERR`) | 31,040 x 31,040 | 60 m | 931.2 km |
+
+All of them: single band, 32-bit floating point, missing values NaN, south polar stereographic on the 1737.4 km sphere centred on the pole with central meridian 0, square pixels with row 0 at the top, values belonging to pixel areas (`AREA_OR_POINT = Area`). Each error map is on exactly the same grid as its height map.
+
+What the products' paper says (Barker et al. 2023, *Planet. Sci. J.* 4, 183; NTRS preprint 20230014419):
+
+- **Error maps** hold the RMS height uncertainty of each pixel, estimated from ensembles of "clone" maps for 4 representative tiles and converted through each pixel's effective resolution (section 3). They are 1-sigma values, so the engine's bound uses 3 of them.
+- **Horizontal accuracy:** "we consider 1.00/1.00/0.15 m as a conservative estimate of the final track geolocation errors" (along-track, cross-track, radial). The engine uses 1 m (`lola.HORIZONTAL_ERROR_M`).
+- The maps are in the `MOON_ME` frame of DE421, whose coordinates "have an overall uncertainty of a few meters". That moves the site and its terrain together, so it does not change the skyline.
+
+Checked against published features (`python/tests/test_lola.py`): Shackleton crater on the 80 m map is 4104 m deep from its rim to its floor; Zuber et al. 2012 (*Nature* 486, 378) give a diameter of 21 km and depth/diameter 0.195 +/- 0.025, that is 4100 +/- 500 m. The deepest point lies within the 7 km floor round the gazetteer centre (89.67 S, 129.78 E). At the three places where a mirrored or rotated read would put the crater, the same measurement finds 319 m, 1111 m and -136 m.
+
+The decompressed copies and tables take about 50 GB in `python/dem/cache/` (never committed). Prepare them with `python python/scripts/build_dem_cache.py`.
 
 ## Group 4: 5 m site maps (`python/dem/`)
 
