@@ -2,9 +2,9 @@
 
 ## Now (2026-11-15)
 
-**Next:** review and merge PR #22 (cleanup), then PR B (the web engine audit, stacked on it). After that: bring the 3D view from `yacin1102-lunar-web-3d` into `main`.
+**Next:** verify the Three.js satellite view in a browser and confirm the external Three.js runtime loads in the target environment.
 
-**Web UI:** the browser app presents a dashboard view for the skyline and mission timeline plus a separate interactive Moon scene for inspecting curated sites. Coordinates are displayed from the curated `sites.json` records; custom coordinate evaluation remains intentionally removed.
+**Web UI:** the browser app presents a dashboard view for the skyline and mission timeline plus a separate Three.js satellite scene for inspecting curated sites. The scene follows the supplied Moon viewer prototype with orbit controls, Moon lighting, Sun/Earth objects, stars, and clickable site markers. Coordinates are displayed from the curated `sites.json` records; custom coordinate evaluation remains intentionally removed.
 
 **Done in PR B (web engine audit):** 13 findings, each shown with the engine's real output before the fix and asserted by a test after it (`docs/WEB_AUDIT.md`). The most serious:
 - The worker's site height was NaN, so it produced no events or metrics.
