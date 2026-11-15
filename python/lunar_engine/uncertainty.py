@@ -63,7 +63,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .elevation import ElevationSource, HeightGrid, cell_max, max_pyramid, to_xy, xy_to_unit
+from .elevation import ElevationSource, HeightGrid, to_xy, xy_to_unit
 from .geometry import R_MOON_M, enu_frame
 from .skyline import ROUNDING_MARGIN_DEG, SkylineResult, compute_skyline
 
@@ -107,6 +107,16 @@ class SkylineBounds:
     parts: dict = field(default_factory=dict)
 
 
+class _Plus:
+    """A highest-terrain table read with a constant added, without copying it."""
+
+    def __init__(self, level, add: float):
+        self.level, self.add, self.shape = level, add, level.shape
+
+    def __getitem__(self, index):
+        return np.asarray(self.level[index], dtype=float) + self.add
+
+
 class _ShiftedGrid(HeightGrid):
     """A map whose every pixel is moved up (or down) by the error allowed there.
 
@@ -137,10 +147,7 @@ class _ShiftedGrid(HeightGrid):
 
     def _own_allowance(self, rows, cols) -> np.ndarray:
         """``E`` at pixels: K * sigma + what a sideways shift can change, metres."""
-        sigma = self.base.error_values(rows, cols)
-        sigma = np.zeros(np.shape(rows)) if sigma is None else np.nan_to_num(sigma.astype(float))
-        shift = self.base.shift_allowance(self.base.horizontal_error_m)[rows, cols]
-        return self.k_sigma * sigma + shift
+        return self.base.own_allowance(rows, cols, self.k_sigma)
 
     def values(self, rows, cols) -> np.ndarray:
         """Heights moved by the allowed error, metres."""
@@ -165,12 +172,8 @@ class _ShiftedGrid(HeightGrid):
         """
         if self.sign < 0:
             return self.base.pyramid(missing_as)
-        key = ("raised", self.k_sigma, missing_as)
-        if key not in self.base._pyramids:
-            rows, cols = np.indices((self.spec.n_rows, self.spec.n_cols))
-            raised = self.base._heights.astype(float) + self._own_allowance(rows, cols)
-            self.base._pyramids[key] = max_pyramid(cell_max(raised), missing_as)
-        return [level + self.site_allowance_m for level in self.base._pyramids[key]]
+        return [_Plus(level, self.site_allowance_m)
+                for level in self.base.raised_pyramid(self.k_sigma, missing_as)]
 
     def disc(self):
         return self._disc
@@ -178,9 +181,7 @@ class _ShiftedGrid(HeightGrid):
     def max_allowance(self) -> float:
         """The largest error allowed anywhere in this map, metres (cached)."""
         if self._max_allowance is None:
-            rows, cols = np.indices((self.spec.n_rows, self.spec.n_cols))
-            self._max_allowance = float(np.nanmax(self._own_allowance(rows, cols))
-                                        + self.site_allowance_m)
+            self._max_allowance = self.base.max_own_allowance(self.k_sigma) + self.site_allowance_m
         return self._max_allowance
 
     def slope_bound(self, rows, cols) -> np.ndarray:
@@ -211,10 +212,7 @@ class _ShiftedSource(ElevationSource):
                        0, spec.n_rows - 1)
         cols = np.clip(np.array([np.floor(col), np.ceil(col), np.floor(col), np.ceil(col)]).astype(int),
                        0, spec.n_cols - 1)
-        sigma = site_grid.error_values(rows, cols)
-        sigma = 0.0 if sigma is None else float(np.nanmax(sigma))
-        shift = float(np.max(site_grid.shift_allowance(site_grid.horizontal_error_m)[rows, cols]))
-        site_allowance = k_sigma * sigma + shift
+        site_allowance = float(np.max(site_grid.own_allowance(rows, cols, k_sigma)))
         near_m = np.sqrt(2.0) * spec.pixel_m
         super().__init__([_ShiftedGrid(g, sign, site_unit, site_allowance, near_m, k_sigma,
                                        slope_error_deg) for g in source.grids])

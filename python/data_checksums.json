@@ -11,15 +11,35 @@
       "size": 267005175,
       "recorded_utc": "2026-11-14T20:28:05Z"
     },
+    "dem/LDEM_60S_60MPP_ADJ.TIF": {
+      "sha256": "b03b5b3b3bf6a0eb8e871be7a7c04bcfa1f7d9c01c885db10655c9f26afc1f6a",
+      "size": 3089110093,
+      "recorded_utc": "2026-11-14T22:16:49Z"
+    },
+    "dem/LDEM_60S_60MPP_ADJ_ERR.TIF": {
+      "sha256": "0a74522cba22896863e72d57ea0d2bc61224a6e43d05b8f514e4c0108cb086c2",
+      "size": 4218063226,
+      "recorded_utc": "2026-11-15T00:27:14Z"
+    },
     "dem/LDEM_75S_30MPP_ADJ.TIF": {
       "sha256": "56dd4290379a4f94ff1e22fed232a87781158107bf20cd27568955f8bfdaaf9c",
       "size": 2802850273,
       "recorded_utc": "2026-11-14T22:02:44Z"
     },
+    "dem/LDEM_75S_30MPP_ADJ_ERR.TIF": {
+      "sha256": "aeec3d5aca202211c02bd4d41d5dea05b4e5ce94e3263c4229ed9f58f01d7805",
+      "size": 3987742327,
+      "recorded_utc": "2026-11-14T23:44:39Z"
+    },
     "dem/LDEM_80S_20MPP_ADJ.TIF": {
       "sha256": "09b7ca80f9e6a146f970225d18af72fc02787669b3ef51b888e347d2b6845649",
       "size": 2696082051,
       "recorded_utc": "2026-11-14T22:00:35Z"
+    },
+    "dem/LDEM_80S_20MPP_ADJ_ERR.TIF": {
+      "sha256": "d64045b8aa58a24010f009ab5667ae02cc06cffa7796784dd5e2d48b3059d8cf",
+      "size": 3954709201,
+      "recorded_utc": "2026-11-14T23:25:13Z"
     },
     "dem/LDEM_80S_80MPP_ADJ.TIF": {
       "sha256": "82030dcbdd7c4bb0c7d858e9b4b293b9f2cda5a543ba31ec0f42784bd6beee5a",
@@ -30,6 +50,16 @@
       "sha256": "e89306914bb209143f61ba66d341703d75221339424b774c6a1eb3c6c370ffc6",
       "size": 254808965,
       "recorded_utc": "2026-11-14T20:30:02Z"
+    },
+    "dem/LDEM_83S_10MPP_ADJ.TIF": {
+      "sha256": "6c548d47896e238616149cfe336a1174eb9c070e34e8b605425fc40f768bde51",
+      "size": 5116709568,
+      "recorded_utc": "2026-11-14T22:52:33Z"
+    },
+    "dem/LDEM_83S_10MPP_ADJ_ERR.TIF": {
+      "sha256": "fb1dd0883c37e04ddfcab45aec7653399bdf4747597694032bba9a3acc567e9e",
+      "size": 7959582840,
+      "recorded_utc": "2026-11-15T00:55:55Z"
     },
     "kernels/de440.bsp": {
       "sha256": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",

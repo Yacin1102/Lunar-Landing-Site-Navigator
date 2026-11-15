@@ -18,6 +18,8 @@ This page describes the code as it exists today. It grows with each pull request
 | `python/lunar_engine/records.py` | The one place a Contract 3 skyline record is made (rounded so its interval never shrinks, checked against the contract) and written. Shared by the Builder and the live API. | `uncertainty` | `skylines/{id}.json` |
 | `python/lunar_engine/server.py` | The live API (Contract 7): `/api/health` and `/api/skyline`, input checks, rounding, cache, CORS. | An `ElevationSource` | HTTP responses |
 | `python/scripts/serve.py` | Starts the live API on port 8000; `--synthetic` serves an invented landscape. | `server` | Nothing |
+| `python/lunar_engine/lola.py` | The real-data backend: reads the LOLA GeoTIFFs (checking their labels), decompresses each once into a memory-mapped file, and builds the highest-terrain tables strip by strip on disk; slopes and error allowances are computed on demand. | `python/dem/*.TIF` | `python/dem/cache/` |
+| `python/scripts/build_dem_cache.py` | Prepares the caches of the four full-resolution maps up front, with progress. | `lola` | `python/dem/cache/` |
 | `python/lunar_engine/synthetic.py` | The synthetic backend: cones, domes and walls given by formulas, sampled onto grids like a real map. | Nothing | Nothing |
 | `python/lunar_engine/spice_env.py` | Loads the SPICE kernels and converts UTC milliseconds to SPICE time at the edge. | `python/kernels/` | Nothing |
 | `python/lunar_engine/ephemeris.py` | Where the Sun and Earth are: from the Moon's centre (for the timetable) and directly for a surface site (the reference answer). Also the browser's method written in Python, for measuring its error. | SPICE | Nothing |
@@ -82,7 +84,7 @@ flowchart TD
     users["skyline engine, terrain patches,<br/>shade grids, live API<br/>(coming)"] --> source[ElevationSource<br/>height, height error, pixel size,<br/>finest map covering a point]
     source --> grid[HeightGrid<br/>one map on the projected sheet,<br/>bilinear between pixel centres]
     grid --> synth[SyntheticElevation<br/>cones, domes, walls from formulas,<br/>is_real = False]
-    grid -.-> lola["LOLA map reader<br/>(coming, PR 8)<br/>is_real = True"]
+    grid --> lola["LolaGrid (lola.py)<br/>GeoTIFF decompressed once to disk,<br/>read memory-mapped; is_real = True"]
     proj["projection: to_xy, to_lat_lon, xy_to_unit<br/>south polar stereographic, exact on the sphere"] --> grid
 ```
 
