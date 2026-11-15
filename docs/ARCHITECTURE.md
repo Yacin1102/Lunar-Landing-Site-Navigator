@@ -170,7 +170,7 @@ sequenceDiagram
     API-->>Web: record (same as skylines/{id}.json would be)
 ```
 
-The Builder writes `skylines/{id}.json` with the same `records.skyline_record`, so a live answer and a file for the same point and settings are identical (a test compares them byte for byte).
+The Builder will write `skylines/{id}.json` with the same `records.skyline_record` (it comes with the real products), so a live answer and a file for the same point and settings are identical; a test writes a file with it and compares it with the live answer byte for byte.
 
 ## Timetable and fixtures
 

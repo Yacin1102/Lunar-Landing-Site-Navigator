@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 from lunar_engine import contracts, records
 from lunar_engine.elevation import CoverageError
+from lunar_engine.records import RecordContractError
 from lunar_engine.geometry import R_MOON_M, enu_frame, lat_lon_radius
 from lunar_engine.server import ALLOWED_AZ_STEPS_DEG, POLE_NUDGE_LAT, create_app, parse_skyline_request
 from lunar_engine.synthetic import Cone, SyntheticElevation
@@ -102,6 +103,8 @@ def test_live_answer_is_identical_to_the_prebuilt_file(client, world, tmp_path):
     assert contracts.skyline_problems(live) == []
     path = records.write_skyline(tmp_path, "test_site", records.skyline_record(world, -89.98, 45.5, 2.0, 0.1))
     assert json.loads(path.read_text(encoding="utf-8")) == live
+    # Byte for byte: the file is the response plus a final line ending.
+    assert path.read_bytes() == response.content + b"\n"
     assert live["dem"] == ["SYNTHETIC_40MPP"] and live["resolution_m"] == 40.0
     assert len(live["skyline_deg"]) == 3600
 
@@ -144,6 +147,7 @@ def test_a_point_whose_skyline_needs_terrain_beyond_the_maps_is_refused(client, 
     ({"lat": "-91", "lon": "0"}, 400, "invalid_value", "lat"),
     ({"lat": "-89.9", "lon": "200"}, 400, "invalid_value", "lon"),
     ({"lat": "-89.9", "lon": "160", "note": "x"}, 400, "invalid_value", "note"),
+    ([("lat", "-85"), ("lat", "-89"), ("lon", "0")], 400, "invalid_value", "lat"),
     ({"lat": "-89.9", "lon": "0", "mast_m": "-1"}, 400, "invalid_value", "mast_m"),
     ({"lat": "-89.9", "lon": "0", "mast_m": "500"}, 400, "invalid_value", "mast_m"),
     ({"lat": "-89.9", "lon": "0", "az_step_deg": "0.3"}, 400, "invalid_value", "az_step_deg"),
@@ -163,6 +167,9 @@ def test_the_pole_is_nudged_and_the_far_side_meridian_has_one_name(region):
     assert parse_skyline_request({"lat": "-89.9", "lon": "-180"}, region)[1] == -180.0
     assert parse_skyline_request({"lat": "-89.9", "lon": "0", "mast_m": "0"}, region)[2] == 0.0, \
         "an eye at ground level is accepted"
+    point = parse_skyline_request({"lat": "-89.9", "lon": "-0", "mast_m": "-0"}, region)
+    assert math.copysign(1.0, point[1]) == 1.0 and math.copysign(1.0, point[2]) == 1.0, "no -0.0"
+    assert point == parse_skyline_request({"lat": "-89.9", "lon": "0", "mast_m": "0"}, region)
 
 
 def test_every_allowed_step_divides_360():
@@ -180,12 +187,23 @@ def test_engine_failures_become_schema_valid_errors(world, region):
     def crash(*args):
         raise RuntimeError("boom")
 
+    def broken_record(*args):
+        raise RecordContractError("skyline record breaks its contract: x")
+
     query = {"lat": "-89.95", "lon": "10"}
     for compute, status, code in ((coverage, 422, "out_of_region"), (bad_value, 400, "invalid_value"),
-                                  (crash, 500, "internal")):
+                                  (crash, 500, "internal"), (broken_record, 500, "internal")):
         client = TestClient(create_app(world, service_region=region, compute=compute),
                             raise_server_exceptions=False)
-        _assert_refused(client.get("/api/skyline", params=query), status, code)
+        response = client.get("/api/skyline", params=query, headers={"Origin": WEB_ORIGIN})
+        _assert_refused(response, status, code)
+        assert response.headers.get("access-control-allow-origin") == WEB_ORIGIN, \
+            "the browser must be able to read every error"
+
+
+def test_unknown_paths_and_methods_answer_in_the_error_shape(fake_client):
+    _assert_refused(fake_client.get("/api/nothing"), 404, "not_found")
+    _assert_refused(fake_client.post("/api/skyline"), 405, "invalid_value")
 
 
 def test_only_the_web_apps_origin_is_allowed(fake_client):
@@ -203,7 +221,7 @@ def test_rounding_never_shrinks_the_interval():
     half = rng.uniform(0, 0.5, 20_000)
     c, h = records._round_interval(centre, half)
     c, h = np.array(c), np.array(h)
-    assert np.all(c - h <= centre - half + 1e-15) and np.all(c + h >= centre + half - 1e-15)
+    assert np.all(c - h <= centre - half) and np.all(c + h >= centre + half)
     assert np.all(np.abs(c - centre) <= 0.5e-6 + 1e-15)
     assert np.all(h - half <= 1.6e-6)
     assert all(float(f"{v:.6f}") == v for v in c[:100]), "6 decimals"

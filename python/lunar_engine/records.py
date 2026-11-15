@@ -32,6 +32,10 @@ from .uncertainty import SkylineBounds, skyline_with_error
 ANGLE_DECIMALS = 6
 
 
+class RecordContractError(Exception):
+    """A record the engine made breaks its contract. Always a bug, never the input's fault."""
+
+
 def _round_interval(centre: np.ndarray, half_width: np.ndarray) -> tuple[list, list]:
     """Round an interval so that the rounded one still contains the original.
 
@@ -51,8 +55,8 @@ def record_from_bounds(bounds: SkylineBounds) -> dict:
     """Turn a computed skyline with its error bound into a Contract 3 record.
 
     Raises:
-        ValueError: if the record would break its contract (this would be a
-            bug, never a matter of the input).
+        RecordContractError: if the record would break its contract (a bug,
+            never a matter of the input).
     """
     skyline, err = _round_interval(bounds.skyline_deg, bounds.skyline_err_deg)
     record = {
@@ -70,7 +74,7 @@ def record_from_bounds(bounds: SkylineBounds) -> dict:
     }
     problems = contracts.skyline_problems(record)
     if problems:
-        raise ValueError("skyline record breaks its contract: " + "; ".join(problems))
+        raise RecordContractError("skyline record breaks its contract: " + "; ".join(problems))
     return record
 
 

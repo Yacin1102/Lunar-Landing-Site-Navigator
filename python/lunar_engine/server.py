@@ -41,9 +41,10 @@ from typing import Callable
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .elevation import CoverageError, ElevationSource
-from .records import skyline_record
+from .records import RecordContractError, skyline_record
 
 DEFAULT_AZ_STEP_DEG = 0.1
 #: Accepted wedge widths, degrees. All divide 360.
@@ -78,7 +79,14 @@ def error_body(code: str, message: str, param: str | None = None) -> dict:
 
 
 def _number(query, name: str, default: float | None = None) -> float:
-    """Read one numeric query parameter, refusing anything that is not a finite number."""
+    """Read one numeric query parameter, refusing anything that is not a finite number.
+
+    A parameter given twice is refused rather than guessed. The result is
+    never ``-0.0`` (``+ 0.0`` turns it into ``0.0``), so the same point always
+    gives the same record.
+    """
+    if hasattr(query, "getlist") and len(query.getlist(name)) > 1:
+        raise RequestError(400, "invalid_value", f"'{name}' is given more than once", name)
     raw = query.get(name)
     if raw is None:
         if default is None:
@@ -90,7 +98,7 @@ def _number(query, name: str, default: float | None = None) -> float:
         raise RequestError(400, "invalid_value", f"'{name}' must be a number, got {raw!r}", name)
     if not math.isfinite(value):
         raise RequestError(400, "invalid_value", f"'{name}' must be a finite number, got {raw!r}", name)
-    return value
+    return value + 0.0
 
 
 def parse_skyline_request(query, service_region: dict) -> tuple[float, float, float, float]:
@@ -130,8 +138,8 @@ def parse_skyline_request(query, service_region: dict) -> tuple[float, float, fl
     if not service_region["lat_min"] <= lat <= service_region["lat_max"]:
         raise RequestError(422, "out_of_region", f"latitude {lat} is outside the service region "
                            f"({service_region['lat_min']:g} to {service_region['lat_max']:g})", "lat")
-    lat = round(lat, COORD_DECIMALS)
-    lon = round(lon, COORD_DECIMALS)
+    lat = round(lat, COORD_DECIMALS) + 0.0
+    lon = round(lon, COORD_DECIMALS) + 0.0
     if lon >= 180.0:
         lon = -180.0                                  # one meridian, one name
     if lat < POLE_NUDGE_LAT:
@@ -164,8 +172,18 @@ def create_app(source: ElevationSource, service_region: dict | None = None,
     def refused(request: Request, error: RequestError):
         return JSONResponse(error_body(error.code, error.message, error.param), status_code=error.status)
 
+    @app.exception_handler(StarletteHTTPException)
+    def http_error(request: Request, error: StarletteHTTPException):
+        # FastAPI's own replies (unknown path, wrong method) in the api_error shape.
+        code = "not_found" if error.status_code == 404 else "invalid_value"
+        return JSONResponse(error_body(code, f"{error.detail}: {request.method} {request.url.path}"),
+                            status_code=error.status_code)
+
     @app.exception_handler(Exception)
     def failed(request: Request, error: Exception):
+        # Last resort. Route errors are turned into RequestError inside the
+        # route instead, so that their replies pass through CORS and the
+        # browser can read them.
         return JSONResponse(error_body("internal", f"internal error: {type(error).__name__}"),
                             status_code=500)
 
@@ -187,8 +205,12 @@ def create_app(source: ElevationSource, service_region: dict | None = None,
             record = compute(source, *key)
         except CoverageError as error:
             raise RequestError(422, "out_of_region", f"no skyline can be proven here: {error}")
+        except RecordContractError as error:
+            raise RequestError(500, "internal", f"internal error: {error}")
         except ValueError as error:
             raise RequestError(400, "invalid_value", str(error))
+        except Exception as error:      # noqa: BLE001 - reported to the caller, never hidden
+            raise RequestError(500, "internal", f"internal error: {type(error).__name__}")
         with lock:
             cache[key] = record
             app.state.computed += 1

@@ -28,7 +28,7 @@ Python environment: `python -m venv .venv`, then `.venv\Scripts\python -m pip in
 
 Test command: `.venv\Scripts\python -m pytest python/tests -v -rs`.
 
-Last result (PR 7): 210 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
+Last result (PR 7): 212 passed, 8 skipped, 0 failed. Skipped, all waiting for data:
 
 - `test_full_resolution_map_opens` (8 cases, one per full-resolution map): waiting for group `full`.
 
