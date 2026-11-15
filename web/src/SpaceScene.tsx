@@ -76,13 +76,21 @@ interface SpaceSceneProps {
 /** Render the space-view experience from the supplied Moon viewer prototype. */
 export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const sunRef = useRef(sun);
+  const earthRef = useRef(earth);
+  const onSelectSiteRef = useRef(onSelectSite);
   const [status, setStatus] = useState("Loading 3D space view…");
+
+  sunRef.current = sun;
+  earthRef.current = earth;
+  onSelectSiteRef.current = onSelectSite;
 
   useEffect(() => {
     let disposed = false;
     let renderer: RendererLike | undefined;
     let controls: ControlsLike | undefined;
     let animation = 0;
+    let sceneCleanup: (() => void) | undefined;
 
     loadThree()
       .then((three) => {
@@ -119,7 +127,7 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
         light.position.copy(directionVector(three, sun)).multiplyScalar(20);
         scene.add(light);
 
-        const sunPosition = directionVector(three, sun).multiplyScalar(9);
+        const sunPosition = directionVector(three, sunRef.current).multiplyScalar(9);
         const sunSphere = new three.Mesh(
           new three.SphereGeometry(0.42, 64, 48),
           new three.MeshBasicMaterial({ color: 0xffc857 }),
@@ -136,7 +144,7 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
         sunGlow.position.copy(sunPosition);
         scene.add(sunGlow);
 
-        const earthPosition = directionVector(three, earth).multiplyScalar(6);
+        const earthPosition = directionVector(three, earthRef.current).multiplyScalar(6);
         const earthGroup = new three.Mesh(
           new three.SphereGeometry(0.22, 64, 48),
           new three.MeshStandardMaterial({ map: createEarthTexture(three), roughness: 0.8 }),
@@ -189,7 +197,7 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
           raycaster.setFromCamera(pointer, camera);
           const hit = raycaster.intersectObjects(markerMeshes)[0];
           const index = hit ? markerMeshes.indexOf(hit.object) : -1;
-          if (index >= 0) onSelectSite(sites[index].id);
+          if (index >= 0) onSelectSiteRef.current(sites[index].id);
           pointerDown = undefined;
         };
         renderer.domElement.addEventListener("pointerdown", onPointerDown);
@@ -208,12 +216,20 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
         const loop = () => {
           if (disposed || !renderer || !controls) return;
           animation = window.requestAnimationFrame(loop);
+          light.position.copy(directionVector(three, sunRef.current)).multiplyScalar(20);
+          const currentSunPosition = directionVector(three, sunRef.current).multiplyScalar(9);
+          sunSphere.position.copy(currentSunPosition);
+          sunGlow.position.copy(currentSunPosition);
+          const currentEarthPosition = directionVector(three, earthRef.current).multiplyScalar(6);
+          earthGroup.position.copy(currentEarthPosition);
+          clouds.position.copy(currentEarthPosition);
+          atmosphere.position.copy(currentEarthPosition);
           controls.update();
           renderer.render(scene, camera);
         };
         loop();
 
-        return () => {
+        sceneCleanup = () => {
           window.removeEventListener("resize", resize);
           renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
           renderer?.domElement.removeEventListener("pointerup", onPointerUp);
@@ -224,11 +240,12 @@ export function SpaceScene({ site, sites, sun, earth, onSelectSite }: SpaceScene
     return () => {
       disposed = true;
       window.cancelAnimationFrame(animation);
+      sceneCleanup?.();
       controls?.dispose();
       renderer?.dispose();
       hostRef.current?.replaceChildren();
     };
-  }, [earth, onSelectSite, site, sites, sun]);
+  }, [site.id, sites]);
 
   return <div className="space-scene" ref={hostRef} role="img" aria-label={`3D lunar satellite view centered on ${site.name}`}>
     <div className="space-scene-status">{status}</div>

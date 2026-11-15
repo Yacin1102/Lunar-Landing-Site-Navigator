@@ -46,6 +46,7 @@ export default function App() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [spanDays, setSpanDays] = useState(1);
   const [playing, setPlaying] = useState(false);
+  const [playWindow, setPlayWindow] = useState<{ startMs: number; endMs: number; stepMs: number }>();
   const [workerResult, setWorkerResult] = useState<WorkerResult>();
   const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
 
@@ -64,18 +65,23 @@ export default function App() {
   const activeScenario = scenarios[activeIndex] ?? scenarios[0];
   const activeSite = allSites.find((site) => site.id === activeScenario?.siteId);
   const activeSkyline = activeScenario ? bundle?.skylines.get(activeScenario.siteId) : undefined;
+  const timelineCenterMs = playing && playWindow
+    ? (playWindow.startMs + playWindow.endMs) / 2
+    : activeScenario?.dateMs;
   const activeSummary = useMemo(
-    () => bundle && activeSite && activeScenario
-      ? buildTimeline(bundle, activeSite, activeSkyline, activeScenario.dateMs, spanDays)
+    () => bundle && activeSite && activeScenario && timelineCenterMs !== undefined
+      ? buildTimeline(bundle, activeSite, activeSkyline, timelineCenterMs, spanDays)
       : undefined,
-    [activeScenario, activeSite, activeSkyline, bundle, spanDays],
+    [activeScenario, activeSite, activeSkyline, bundle, spanDays, timelineCenterMs],
   );
   // Memoised on the instant and span: a fresh object on every render would re-run the worker effect
   // below after each result, an endless loop of worker evaluations.
   const activeDateMs = activeScenario?.dateMs;
   const bounds = useMemo(
-    () => activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
-    [activeDateMs, spanDays],
+    () => playing && playWindow
+      ? playWindow
+      : activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
+    [activeDateMs, playWindow, playing, spanDays],
   );
   const currentPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
 
@@ -109,11 +115,20 @@ export default function App() {
   }, [activeIndex, activeScenario, bounds, playing]);
 
   useEffect(() => {
+    if (playing && bounds && activeScenario && activeScenario.dateMs >= bounds.endMs) {
+      setPlaying(false);
+      setPlayWindow(undefined);
+    }
+  }, [activeScenario, bounds, playing]);
+
+  useEffect(() => {
     if (mode === "expert") setDetailsOpen(true);
   }, [mode]);
 
   /** Select a site, reusing an existing scenario when it is already open. */
   function selectSite(siteId: string): void {
+    setPlaying(false);
+    setPlayWindow(undefined);
     const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
     if (existingIndex >= 0) {
       setActiveIndex(existingIndex);
@@ -128,7 +143,20 @@ export default function App() {
   /** Change the selected UTC instant without changing the active site. */
   function updateActiveDate(dateMs: number): void {
     if (!activeScenario || !Number.isFinite(dateMs)) return;
+    setPlaying(false);
+    setPlayWindow(undefined);
     setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs } : scenario));
+  }
+
+  /** Start playback inside one fixed UTC window, or pause the current playback. */
+  function togglePlaying(): void {
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    if (activeDateMs === undefined) return;
+    setPlayWindow(timelineBounds(activeDateMs, spanDays));
+    setPlaying(true);
   }
 
   /** Remove a scenario from the comparison page's saved set. */
@@ -210,7 +238,7 @@ export default function App() {
         </aside>
       </div>
 
-      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={() => setPlaying((current) => !current)} onChange={updateActiveDate} bounds={bounds} />
+      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={togglePlaying} onChange={updateActiveDate} bounds={bounds} />
 
       {detailsOpen && <DetailsDrawer
         summary={activeSummary}
