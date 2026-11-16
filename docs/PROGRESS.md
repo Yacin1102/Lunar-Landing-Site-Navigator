@@ -4,7 +4,15 @@
 
 **The web UI is being rebuilt from scratch in nine parts, one pull request each.** The plan, and the five places where the brief and the repository disagreed, are in `docs/UI_PLAN.md`.
 
-**Next (exact step): part 2, assets.** After the part 1 PR is merged: branch `ui/02-assets` from `main`; write `web/scripts/fetch-assets.mjs` (downloads to `web/assets-raw/`, already ignored by git); produce the Moon colour and elevation maps, the south pole hillshade with its georeference sidecar, the Sun disc and the 12 Blue Marble months in `web/public/assets/`; write `assets.json` (URL, date, SHA-256) and `CREDITS.md`. New dev dependencies: `sharp`, `geotiff`.
+**Next (exact step): part 3, globe.** After the part 2 PR is merged: branch `ui/03-globe` from `main`; `npm install three fast-png` (and `@types/three`); build `web/src/scenes/globe/`: a three.js sphere with `assets/moon/lroc_color_4096.jpg`, relief from `assets/moon/ldem_4096_uint16.png` decoded in the browser with the formula in `assets.json` (`count * 0.5 - 10000` m), the camera opening on the south pole, damped orbit and zoom, and markers from `sites.json`; clicking a marker opens `#/site/{id}`. Replace the globe placeholder in `web/src/ui/Stage.tsx`. Any vertical exaggeration must be labelled on screen.
+
+**Done in part 2 (assets), branch `ui/02-assets`:**
+
+- `web/scripts/fetch-assets.mjs` (`npm run fetch-assets`): downloads each NASA source once to `web/assets-raw/` (ignored by git, 194 MB), converts it and writes `web/public/assets/` (committed, 39 MB, 16 pictures) with `assets.json` (source URL, server date, download date, sizes, SHA-256 of raw and processed files). Running it again changes nothing.
+- Moon colour 4096 x 2048 JPEG and Moon elevation 4096 x 2048 16-bit PNG (CGI Moon Kit); south pole hillshade 3800 x 3800 PNG at 160 m per pixel with a georeference sidecar read from the GeoTIFF's own tags; the Sun's disc from SDO/HMI, cropped to the disc and transparent outside; 12 Blue Marble months at 4096 x 2048.
+- `web/public/assets/CREDITS.md` with the credit wording each source asks for.
+- `web/scripts/assets.test.ts`: 42 tests on the committed files (see `docs/WEB_ARCHITECTURE.md`).
+- Found while doing it: the Blue Marble files are no longer served from `eoimages.gsfc.nasa.gov` (no connection); the script uses the address the Visible Earth page links to now, `assets.science.nasa.gov`. The Sun image is greyscale, not white: that is how NASA publishes the plain HMII product; the app will show it at full brightness (part 6). The Sun file is 1891 pixels across (the disc cropped from the 2048 image), although its name says 2048 as the brief asked.
 
 **Done in part 1 (cleanup and shell), branch `ui/01-shell`:**
 
@@ -22,7 +30,7 @@
 - Terrain size is read from the labels (241 x 241 at 20 m, 4.8 km), not the 257 x 257 over 20 km of the brief.
 - `url-state.ts` (up to four comparison scenarios in the query string) was removed with the comparison page; the plan had listed it as kept. The route module replaces it.
 
-**Web test commands:** `cd web; npm test` and `cd web; npm run e2e`. Last result (part 1, 2026-11-16): 76 unit tests passed; 12 browser tests passed (6 in each viewport); `npm run build` OK. Python: 235 passed, 20 skipped (real-data tests waiting for the full maps), 0 failed.
+**Web test commands:** `cd web; npm test` and `cd web; npm run e2e`. Last result (part 2, 2026-11-16): 118 unit tests passed (76 before, plus 42 asset tests); 12 browser tests passed (6 in each viewport); `npm run build` OK. Python not re-run: nothing it reads was touched (last run in part 1: 235 passed, 20 skipped waiting for the full maps).
 
 ## Earlier (2026-11-15)
 

@@ -9,7 +9,8 @@
     "test": "vitest run --environment jsdom",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "fetch-assets": "node scripts/fetch-assets.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
@@ -28,6 +29,8 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "ajv": "^8.20.0",
-    "jsdom": "^29.1.1"
+    "geotiff": "^3.0.5",
+    "jsdom": "^29.1.1",
+    "sharp": "^0.35.5"
   }
 }

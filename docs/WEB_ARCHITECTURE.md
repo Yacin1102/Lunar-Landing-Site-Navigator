@@ -19,6 +19,8 @@ The web application is a static site. It reads prepared products from one folder
 | `web/src/App.tsx` | The shell: top bar, stage, one side panel; loading, error and mock-data states | Route, `DataState` | React view |
 | `web/src/ui/` | `TopBar` (Globe/Map toggle), `Stage` (scene slot), `SiteList`, `SiteSummary`, `PointSummary`, `Facts` | Route, `DataBundle` | React view |
 | `web/vite.config.ts` | Default data folder `/data`; remove `data-mock` from `dist/` after the build | `public/` | `dist/` |
+| `web/scripts/fetch-assets.mjs` | Download the NASA imagery once, convert it to web sizes, record every file. Not part of the app: run by hand (`npm run fetch-assets`) | NASA servers, `web/assets-raw/` | `web/public/assets/`, `assets.json` |
+| `web/scripts/assets.test.ts` | Check the committed pictures against `assets.json` and against what the app will assume about them | `web/public/assets/` | Test results |
 | `web/e2e/`, `web/playwright.config.ts` | Browser tests and screenshots at 1440×900 and 390×844 against the production build | `dist/` | `docs/screenshots/` |
 
 The interface is being rebuilt in nine parts (`docs/UI_PLAN.md`). The scenes (globe, polar map, site terrain, sky view, geometry) do not exist yet; this file gains a row for each as it is built.
@@ -58,6 +60,30 @@ flowchart TD
   W --> B[battery between 0 and capacity]
 ```
 
+## Imagery
+
+```mermaid
+flowchart LR
+  SVS["NASA SVS CGI Moon Kit<br/>colour 8k TIFF, elevation 16-bit TIFF"] --> Script
+  PGDA["PGDA LOLA product 90<br/>80 m hillshade GeoTIFF"] --> Script
+  SDO["SDO/HMI<br/>latest 2048 continuum JPEG"] --> Script
+  BMNG["Blue Marble Next Generation<br/>12 monthly JPEGs"] --> Script
+  Script[fetch-assets.mjs<br/>run once, by hand] --> Raw["web/assets-raw/<br/>(ignored by git)"]
+  Script --> Out["web/public/assets/<br/>(committed)"]
+  Script --> Manifest[assets.json<br/>URL, dates, SHA-256]
+  Out --> App[scenes, from part 3 on]
+```
+
+| File | Size | What the app must know |
+| --- | --- | --- |
+| `moon/lroc_color_4096.jpg` | 4096 x 2048 | Latitude/longitude grid, 0 degrees longitude in the middle, north at the top |
+| `moon/ldem_4096_uint16.png` | 4096 x 2048, 16-bit | Same grid. Height above the 1737.4 km sphere in metres = `count * 0.5 - 10000`. A browser flattens a PNG to 8 bits when it is used as a texture, so the app must decode this file itself |
+| `hillshade/south_pole_hillshade.png` + `.json` | 3800 x 3800 | South polar stereographic, pole at the centre, 160 m per pixel, to 80 degrees south. The sidecar gives the corner coordinates in metres and the pixel-to-map formula |
+| `sun/sun_hmi_2048.png` | 1891 x 1891, grey + alpha | Cropped to the disc: the picture's width is the Sun's diameter. Greyscale with real limb darkening |
+| `earth/bmng_01.jpg` to `bmng_12.jpg` | 4096 x 2048 | Latitude/longitude grid, 0 degrees longitude in the middle. Use the month of the selected UTC date |
+
+The hillshade's projection values are not typed in: the script reads them from the GeoTIFF's tags and writes them to the sidecar. The Sun's disc is found in the image itself (the longest run of bright rows and columns), not assumed.
+
 ## Component structure
 
 ```mermaid
@@ -76,5 +102,5 @@ At most one side panel is open. Which one depends only on the route.
 
 ## Tests
 
-- `cd web; npm test`: unit tests (vitest). The audit tests in `web/engine/tests/audit/` compare the engine with SPICE, JPL Horizons, the Python engine and closed forms, and validate every data file against `docs/schemas/` (`docs/WEB_AUDIT.md`). The UI adds tests for the route and the site helpers, the latter against the real `sites.json`.
+- `cd web; npm test`: unit tests (vitest). The audit tests in `web/engine/tests/audit/` compare the engine with SPICE, JPL Horizons, the Python engine and closed forms, and validate every data file against `docs/schemas/` (`docs/WEB_AUDIT.md`). The UI adds tests for the route and the site helpers, the latter against the real `sites.json`. `web/scripts/assets.test.ts` checks every committed picture: present, same size and SHA-256 as `assets.json`, global maps 4096 x 2048, the elevation map really 16-bit with lunar heights in the right places (and within 400 m of the engine's own ground height on three crater floors), the Sun transparent outside its disc and darker at the limb, the hillshade sidecar consistent and reaching 80 degrees south, every credit present, raw downloads ignored by git.
 - `cd web; npm run e2e`: builds the app, serves the build and runs the browser tests (Playwright, Chromium) in both viewports. They assert zero console errors and failed requests, that every site of `sites.json` is listed, that a failed data load shows an error and no result, and that `dist/` holds the real data and no mock data. First use on a machine: `npx playwright install chromium`.
