@@ -1,18 +1,30 @@
 # Progress
 
-## Now (2026-11-15)
+## Now (2026-11-16)
 
-**Next:** the UI work (kept for later, at your request): the UI test `web/src/App.test.tsx:106` fails on `main` since the satellite view PRs (#28, #29), because it looks for "-89.000° latitude", which the view no longer shows. Also: verify the Three.js satellite view in a browser, confirm the external Three.js runtime loads in the target environment, and decide whether the old 3D view on `yacin1102-lunar-web-3d` is still wanted now that #28 added a new one.
+**The web UI is being rebuilt from scratch in nine parts, one pull request each.** The plan, and the five places where the brief and the repository disagreed, are in `docs/UI_PLAN.md`.
 
-**Done in the audit follow-up (2026-11-16):** the leftovers of the web engine audit.
-- **Python suite re-run** with the kernels and the coarse maps re-downloaded and verified: 235 passed, 20 skipped, 0 failed. The 20 need the full-resolution maps (about 32 GB, not downloaded).
-- **Contract review** of PRs #22 to #24: no blockers. It raised two precision faults, both confirmed on real data and fixed (findings 14 and 15 in `docs/WEB_AUDIT.md`):
-  - The event search missed crossings on the real skylines: in a year, 51 of 61 sunrises and sunsets at the Malapert massif. It now follows a continuous margin with a proven rate bound and skips none.
-  - The flat disc model put the Earth's disc edges up to 0.0028° too high, where the docs claimed below 0.00001°. Proven margins now widen the lit and blocked tests.
-  - Also fixed: the timetable label is checked, a test claiming "rows north to south" now really checks it, the lit rule is marked approved in `docs/WEB_HANDOFF.md`, and the leftover API references are marked as removed.
-- **`npm run build`** passes on `main` (both before and after this work). If it fails on your machine, run `git pull`, then `npm install` in `web/`.
+**Next (exact step): part 2, assets.** After the part 1 PR is merged: branch `ui/02-assets` from `main`; write `web/scripts/fetch-assets.mjs` (downloads to `web/assets-raw/`, already ignored by git); produce the Moon colour and elevation maps, the south pole hillshade with its georeference sidecar, the Sun disc and the 12 Blue Marble months in `web/public/assets/`; write `assets.json` (URL, date, SHA-256) and `CREDITS.md`. New dev dependencies: `sharp`, `geotiff`.
 
-**Web UI:** the browser app presents a dashboard view for the skyline and mission timeline plus a separate Three.js satellite scene for inspecting curated sites. The scene follows the supplied Moon viewer prototype with orbit controls, Moon lighting, Sun/Earth objects, stars, and clickable site markers. Playback uses one fixed UTC window so the cursor advances instead of moving the window underneath it, and the 3D scene keeps its camera while time changes. Coordinates are displayed from the curated `sites.json` records; custom coordinate evaluation remains intentionally removed.
+**Done in part 1 (cleanup and shell), branch `ui/01-shell`:**
+
+- Old interface deleted: `App.tsx`, `App.test.tsx`, `SpaceScene.tsx` (three.js from a CDN), `styles.css`, `visual-model.ts`, `url-state.ts` and the 2k Moon texture of unrecorded origin. The engine (`web/engine/`) is untouched.
+- New shell: top bar with the Globe/Map toggle, a stage for the scenes, one side panel (site list, site summary, custom point). Addresses are in the URL hash (`web/src/state/route.ts`). `docs/WEB_UI.md` describes it.
+- The app now reads the real data by default, and the production build contains no mock data (a Vite plugin removes `data-mock` from `dist/`; a browser test asserts it). The mock folder stays in the repository because the Python engine writes and tests it.
+- Browser tests (Playwright) at 1440×900 and 390×844, with screenshots in `docs/screenshots/`.
+- `docs/ENGINE_REQUESTS.md`: skyline for custom points, a wider terrain patch, the sub-Moon point on the Earth.
+- Your uncommitted work on `ui/ops-dashboard` is saved as a local commit on that branch (not pushed). Its `polar.ts` and `shade.ts` will be reviewed for reuse in parts 4 and 5.
+
+**Decisions taken for the rebuild (2026-11-16):**
+
+- A custom point shows Sun and Earth directions only; no verdict, fraction, countdown or battery, because it has no terrain skyline (your choice).
+- The drawn Earth uses the engine's audited radius (6356.7519 km), not the brief's 6371 km, so the picture and the visibility math agree.
+- Terrain size is read from the labels (241 x 241 at 20 m, 4.8 km), not the 257 x 257 over 20 km of the brief.
+- `url-state.ts` (up to four comparison scenarios in the query string) was removed with the comparison page; the plan had listed it as kept. The route module replaces it.
+
+**Web test commands:** `cd web; npm test` and `cd web; npm run e2e`. Last result (part 1, 2026-11-16): 76 unit tests passed; 12 browser tests passed (6 in each viewport); `npm run build` OK. Python: 235 passed, 20 skipped (real-data tests waiting for the full maps), 0 failed.
+
+## Earlier (2026-11-15)
 
 **Done in PR B (web engine audit):** 13 findings, each shown with the engine's real output before the fix and asserted by a test after it (`docs/WEB_AUDIT.md`). The most serious:
 - The worker's site height was NaN, so it produced no events or metrics.

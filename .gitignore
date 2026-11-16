@@ -18,3 +18,8 @@ web/dist/
 
 # Local environment
 .env
+
+# Web UI: raw asset downloads and browser test output
+web/assets-raw/
+web/test-results/
+web/playwright-report/

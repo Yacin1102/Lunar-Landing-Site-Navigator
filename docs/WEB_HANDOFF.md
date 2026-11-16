@@ -12,7 +12,7 @@ Everything the web app (`web/`) needs from the Python engine, and how to use it.
 | Timetable `ephem.bin` + `ephem.json` | `web/public/data-mock/` and later `web/public/data/` | Ready, and **real**: built from the NASA kernels, 16 Nov 2026 to 1 Jan 2040, hourly. Only the terrain in the mock folder is invented |
 | Test fixtures `altaz.json`, `events.json` | `web/engine/tests/fixtures/` | Ready, and real: 61 direction cases and 8 event windows |
 | Live API | none | Removed on 2026-11-15 by decision: the app covers the 10 curated sites only, with no custom coordinates |
-| Real data, complete | `web/public/data/` | Ready: the 10 real sites (sources in `python/sites_sources.md`; categories `high_illumination`, `landing_site`, `psr`), their skylines with error bounds, terrain patches, shade grids (17 x 17 cells, 300 m apart, 1° wedges), the timetable and the manifest (`data_kind: "real"`). To use it, set `VITE_DATA_FOLDER=/data` (the default is still `/data-mock`) |
+| Real data, complete | `web/public/data/` | Ready: the 10 real sites (sources in `python/sites_sources.md`; categories `high_illumination`, `landing_site`, `psr`), their skylines with error bounds, terrain patches, shade grids (17 x 17 cells, 300 m apart, 1° wedges), the timetable and the manifest (`data_kind: "real"`). The app reads it by default; set `VITE_DATA_FOLDER=/data-mock` to run on the mock folder instead |
 
 To start in a separate working copy:
 
