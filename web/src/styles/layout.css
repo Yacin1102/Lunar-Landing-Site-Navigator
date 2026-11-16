@@ -293,3 +293,408 @@ button {
     padding: var(--gap-3);
   }
 }
+
+/* Stage: the scene fills it, the time controls sit under it. */
+.stage {
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-scene {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scene-note {
+  position: absolute;
+  left: var(--gap-3);
+  right: var(--gap-3);
+  bottom: var(--gap-2);
+  max-width: 78ch;
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+  line-height: 1.4;
+  pointer-events: none;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+}
+
+.scene-note strong {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.scene-sky .scene-note {
+  bottom: calc(var(--gap-4) + var(--gap-2));
+}
+
+.stage-tabs {
+  position: absolute;
+  top: var(--gap-3);
+  left: var(--gap-3);
+  background: var(--surface);
+}
+
+.scene-tools,
+.map-zoom {
+  position: absolute;
+  top: var(--gap-3);
+  right: var(--gap-3);
+  display: flex;
+  gap: var(--gap-1);
+}
+
+.map-zoom {
+  flex-direction: column;
+}
+
+.scene-tools button,
+.map-zoom button,
+.button,
+.timebar-play {
+  padding: var(--gap-1) var(--gap-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.map-zoom button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.scene-tools button:hover,
+.map-zoom button:hover,
+.button:hover,
+.timebar-play:hover {
+  border-color: var(--text-quiet);
+}
+
+.scene-tools button[aria-pressed="true"],
+.button[aria-pressed="true"],
+.timebar-play[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button-quiet {
+  background: transparent;
+  color: var(--text-quiet);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+}
+
+/* Site markers, shared by the globe and the map. The dot is the position. */
+.markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-1);
+  margin: -5px 0 0 -5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--size-small);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+
+.marker-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.marker:hover,
+.marker:focus-visible {
+  color: var(--accent);
+  z-index: 1;
+}
+
+.marker:hover .marker-dot {
+  background: var(--accent);
+}
+
+.scene-map {
+  cursor: grab;
+}
+
+.map-image {
+  position: absolute;
+  max-width: none;
+  image-rendering: auto;
+}
+
+.map-legend {
+  position: absolute;
+  left: var(--gap-3);
+  bottom: calc(var(--gap-5) + var(--gap-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-1);
+  font-size: var(--size-small);
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+
+.scale-bar {
+  height: 6px;
+  border: 1px solid var(--text);
+  border-top: 0;
+}
+
+.map-cursor {
+  color: var(--accent);
+}
+
+/* Geometry */
+.scene-geometry svg {
+  width: 100%;
+  height: 100%;
+}
+
+.geo-ring {
+  fill: none;
+  stroke: var(--line);
+}
+
+.geo-line {
+  stroke: var(--text-quiet);
+  stroke-dasharray: 3 5;
+}
+
+.geo-arc {
+  fill: none;
+  stroke: var(--accent);
+}
+
+.geo-moon {
+  fill: #9a9891;
+}
+
+.geo-tick,
+.geo-value {
+  fill: var(--text-quiet);
+  font-size: 12px;
+}
+
+.geo-label {
+  fill: var(--text);
+  font-size: 14px;
+}
+
+.geo-value {
+  fill: var(--accent);
+}
+
+/* Time controls */
+.timebar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-2) var(--gap-3);
+  padding: var(--gap-2) var(--gap-3);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--size-small);
+}
+
+.timebar-play {
+  min-width: 4.25rem;
+}
+
+.timebar-slider {
+  flex: 1 1 12rem;
+  accent-color: var(--accent);
+}
+
+.timebar-now {
+  min-width: 12.5rem;
+  color: var(--text);
+}
+
+.timebar-date {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  color: var(--text-quiet);
+}
+
+.timebar select,
+.timebar input[type="datetime-local"],
+.field input {
+  padding: var(--gap-1) var(--gap-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--space);
+  color: var(--text);
+  font: inherit;
+  color-scheme: dark;
+}
+
+/* Forms in the panel */
+.fields,
+.coords {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
+}
+
+.coords-row {
+  display: flex;
+  gap: var(--gap-3);
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 1fr 6rem 2.5rem;
+  align-items: center;
+  gap: var(--gap-2);
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+}
+
+.coords-row .field {
+  grid-template-columns: auto 1fr auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--alert);
+}
+
+.coords .button {
+  align-self: flex-start;
+}
+
+.error {
+  color: var(--alert);
+}
+
+.back-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 760px) {
+  .stage {
+    flex: 0 0 58%;
+  }
+
+  .scene-note {
+    display: none;
+  }
+
+  .timebar-now {
+    min-width: 0;
+  }
+
+  .timebar-date span {
+    display: none;
+  }
+
+  .marker-name {
+    display: none;
+  }
+
+  .coords-row {
+    flex-direction: column;
+    gap: var(--gap-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
+
+/* Marker names appear when a marker is pointed at or focused, so close sites do not overprint. */
+.marker-name {
+  display: none;
+  padding: 0 var(--gap-1);
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: var(--radius);
+}
+
+.marker:hover .marker-name,
+.marker:focus-visible .marker-name {
+  display: inline;
+}
+
+@media (max-width: 760px) {
+  .scene-tools {
+    top: auto;
+    bottom: var(--gap-5);
+    left: var(--gap-2);
+    right: var(--gap-2);
+    flex-wrap: wrap;
+    font-size: var(--size-small);
+  }
+}
+
+/* On the bright map, notes and the legend get a dark backing so they stay readable. */
+.scene-map .scene-note,
+.map-legend {
+  padding: var(--gap-1) var(--gap-2);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.72);
+  text-shadow: none;
+}
+
+.scene-map .scene-note {
+  right: auto;
+}

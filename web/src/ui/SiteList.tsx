@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Site } from "../../engine/types";
 import { categoryHeading, formatLatLon, groupByCategory } from "../lib/sites";
 
@@ -5,7 +6,7 @@ import { categoryHeading, formatLatLon, groupByCategory } from "../lib/sites";
  * The curated sites from `sites.json`, grouped by category. Choosing one opens its site view.
  * Names, coordinates and groups all come from the file; nothing here is typed in.
  */
-export function SiteList({ sites, onOpen }: { sites: Site[]; onOpen: (siteId: string) => void }) {
+export function SiteList({ sites, onOpen, children }: { sites: Site[]; onOpen: (siteId: string) => void; children?: ReactNode }) {
   return (
     <div className="panel-body">
       <h1 className="panel-title">Sites</h1>
@@ -25,6 +26,7 @@ export function SiteList({ sites, onOpen }: { sites: Site[]; onOpen: (siteId: st
           </ul>
         </section>
       ))}
+      {children}
     </div>
   );
 }

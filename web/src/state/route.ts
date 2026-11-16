@@ -5,7 +5,7 @@
  * shareable link and the browser's back button works.
  *
  * How it works: the hash is `#/globe`, `#/map`, `#/site/{id}` or `#/point/{lat},{lon}`, followed
- * by an optional `?t={ms}`. Anything that does not parse falls back to the globe.
+ * by an optional `?t={ms}` (and `&probe=sun|earth` for the browser tests). Anything that does not parse falls back to the globe.
  *
  * Units: latitude and longitude in degrees (longitude east-positive); time in UTC milliseconds
  * since 1970.
@@ -14,17 +14,22 @@
 /** The two overview scenes the top-bar toggle switches between. */
 export type Overview = "globe" | "map";
 
+/** Probe mode centres the sky view on one body and removes labels, so tests can count its pixels. */
+export type Probe = "sun" | "earth";
+
 export type Route =
-  | { view: Overview; timeMs?: number }
-  | { view: "site"; siteId: string; timeMs?: number }
-  | { view: "point"; lat: number; lon: number; timeMs?: number };
+  | { view: Overview; timeMs?: number; probe?: Probe }
+  | { view: "site"; siteId: string; timeMs?: number; probe?: Probe }
+  | { view: "point"; lat: number; lon: number; timeMs?: number; probe?: Probe };
 
 /** Read a route from a location hash such as `#/site/shackleton_rim?t=1794787200000`. */
 export function parseRoute(hash: string): Route {
   const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
   const rawTime = new URLSearchParams(query).get("t");
   const parsedTime = rawTime === null || rawTime === "" ? NaN : Number(rawTime);
-  const time = Number.isFinite(parsedTime) ? { timeMs: parsedTime } : {};
+  const rawProbe = new URLSearchParams(query).get("probe");
+  const probe = rawProbe === "sun" || rawProbe === "earth" ? { probe: rawProbe as Probe } : {};
+  const time = { ...(Number.isFinite(parsedTime) ? { timeMs: parsedTime } : {}), ...probe };
   const [head, rest] = path.split("/");
 
   if (head === "map") return { view: "map", ...time };
@@ -42,7 +47,8 @@ export function parseRoute(hash: string): Route {
 
 /** Write a route as a location hash. The inverse of `parseRoute`. */
 export function formatRoute(route: Route): string {
-  const time = route.timeMs === undefined ? "" : `?t=${Math.round(route.timeMs)}`;
+  const parts = [route.timeMs === undefined ? "" : `t=${Math.round(route.timeMs)}`, route.probe ? `probe=${route.probe}` : ""].filter(Boolean);
+  const time = parts.length ? `?${parts.join("&")}` : "";
   if (route.view === "site") return `#/site/${encodeURIComponent(route.siteId)}${time}`;
   if (route.view === "point") return `#/point/${route.lat},${route.lon}${time}`;
   return `#/${route.view}${time}`;

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "source": "JPL Horizons API, https://ssd.jpl.nasa.gov/api/horizons.api, queried 2026-11-16",
+  "query": "format=text COMMAND='399' OBJ_DATA='NO' MAKE_EPHEM='YES' EPHEM_TYPE='OBSERVER' CENTER='500@301' TLIST=<the times below> QUANTITIES='10,24'",
+  "meaning": "Target Earth (399) seen from the Moon's centre (500@301). illuminated_percent is Horizons quantity 10 (Illu%), phase_angle_deg is quantity 24 (S-T-O, Sun-Target-Observer angle).",
+  "cases": [
+    { "utc": "2027-01-10T00:00:00Z", "illuminated_percent": 95.93365, "phase_angle_deg": 23.2723 },
+    { "utc": "2027-01-17T12:00:00Z", "illuminated_percent": 32.38281, "phase_angle_deg": 110.6285 },
+    { "utc": "2027-01-25T06:00:00Z", "illuminated_percent": 10.5447, "phase_angle_deg": 142.1068 },
+    { "utc": "2030-06-03T18:00:00Z", "illuminated_percent": 94.45978, "phase_angle_deg": 27.2324 },
+    { "utc": "2035-09-20T09:00:00Z", "illuminated_percent": 8.98203, "phase_angle_deg": 145.1256 }
+  ]
+}

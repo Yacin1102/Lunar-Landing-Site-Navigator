@@ -2,6 +2,7 @@ import type { DataBundle } from "../../engine/runtime-types";
 import { formatRoute } from "../state/route";
 import { formatLatLon } from "../lib/sites";
 import { Facts } from "./Facts";
+import { PointReadouts } from "./Readouts";
 
 /**
  * Side panel for a custom point (coordinates the user typed, not a curated site).
@@ -10,7 +11,7 @@ import { Facts } from "./Facts";
  * but must not say whether the point is lit. The panel states that limit in one line. A point
  * outside the service region of the manifest is refused with the region's real bounds.
  */
-export function PointSummary({ lat, lon, bundle, timeMs }: { lat: number; lon: number; bundle: DataBundle; timeMs?: number }) {
+export function PointSummary({ lat, lon, bundle, timeMs }: { lat: number; lon: number; bundle: DataBundle; timeMs: number }) {
   const back = formatRoute({ view: "globe", timeMs });
   const region = bundle.manifest.service_region;
   const inRegion = lat >= region.lat_min && lat <= region.lat_max && lon >= -180 && lon <= 180;
@@ -37,6 +38,7 @@ export function PointSummary({ lat, lon, bundle, timeMs }: { lat: number; lon: n
         answers exist only for the curated sites.
       </p>
       <Facts facts={[{ label: "Position", value: formatLatLon(lat, lon) }]} />
+      <PointReadouts bundle={bundle} lat={lat} lon={lon} timeMs={timeMs} />
     </div>
   );
 }
