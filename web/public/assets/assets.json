@@ -1,0 +1,455 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "path": "moon/lroc_color_4096.jpg",
+      "bytes": 1303049,
+      "sha256": "efecd2f63c074ebb80cf496c31109817b8bfbb76c5d03703193bde68fedf0d96",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Moon colour map (LROC WAC mosaic with polar fill), NASA SVS CGI Moon Kit",
+      "credit": "NASA's Scientific Visualization Studio",
+      "frame": "MOON_ME",
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_8k.tif",
+        "raw_bytes": 50641970,
+        "raw_sha256": "4af8b0cd4d50c30851359d98e7e72040240dd8d03256b58b345b5b76e9edb4ef",
+        "last_modified_utc": "2019-06-05T20:21:15.000Z",
+        "downloaded_utc": "2026-11-16T00:53:17.076Z"
+      }
+    },
+    {
+      "path": "moon/ldem_4096_uint16.png",
+      "bytes": 14929605,
+      "sha256": "7878f7a0f20bd517b06bf13f6f278d00df5e7c779c529125f9282e5a927a8b8b",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 16,
+      "channels": 1,
+      "what": "Moon elevation map (LOLA gridded heights), NASA SVS CGI Moon Kit",
+      "credit": "NASA's Scientific Visualization Studio; LRO/LOLA",
+      "frame": "MOON_ME",
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "encoding": {
+        "metres_per_count": 0.5,
+        "offset_m": -10000,
+        "reference_radius_m": 1737400,
+        "formula": "height_m above the 1737.4 km sphere = count * 0.5 - 10000",
+        "stated_by": "https://svs.gsfc.nasa.gov/4720/"
+      },
+      "source": {
+        "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_16_uint.tif",
+        "raw_bytes": 33201026,
+        "raw_sha256": "45a2b32d56e81ed30db07fead8abc842b249b6511219d9ca2c53f81bc2dc5d62",
+        "last_modified_utc": "2019-06-05T20:21:01.000Z",
+        "downloaded_utc": "2026-11-16T00:53:29.212Z"
+      }
+    },
+    {
+      "path": "hillshade/south_pole_hillshade.png",
+      "bytes": 10522416,
+      "sha256": "acbf470d027f327cb53c6e1c14dab524bb1f12388957931cf381d4867e36642d",
+      "width": 3800,
+      "height": 3800,
+      "bits_per_channel": 8,
+      "channels": 1,
+      "what": "South polar hillshade to 80 degrees south, LOLA (PGDA product 90, Barker et al. 2023)",
+      "credit": "NASA/GSFC LRO/LOLA, Planetary Geodesy Data Archive (PGDA)",
+      "sidecar": "hillshade/south_pole_hillshade.json",
+      "source": {
+        "url": "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_80S_80MPP_ADJ_HILL.TIF",
+        "raw_bytes": 88474342,
+        "raw_sha256": "f669073ea6bf05ae97bce897e5e3c08f2ee9097a663c8cd3a758db296f373ae2",
+        "last_modified_utc": "2023-06-07T22:45:11.000Z",
+        "downloaded_utc": "2026-11-16T00:55:18.017Z"
+      }
+    },
+    {
+      "path": "sun/sun_hmi_2048.png",
+      "bytes": 2349877,
+      "sha256": "bc0e86ebb75773c2b485529e2a4cee2faeddeb157350a389e476937e14c21fe8",
+      "width": 1891,
+      "height": 1891,
+      "bits_per_channel": 8,
+      "channels": 2,
+      "what": "The Sun's visible disc: SDO/HMI intensitygram (continuum), plain HMII product",
+      "credit": "Courtesy of NASA/SDO and the AIA, EVE, and HMI science teams.",
+      "image_time": "2026.11.16_00:23:15_TAI",
+      "image_time_note": "The source URL is the 'latest' image. image_time is the caption printed in the downloaded picture, read by eye and keyed to the raw file's SHA-256; last_modified_utc is the server's time for that file.",
+      "disc": {
+        "note": "The picture is cropped to the disc: its width is the Sun's diameter and its centre is the Sun's centre.",
+        "diameter_px": 1891,
+        "source_centre_px": [
+          1024.5,
+          1023.5
+        ],
+        "source_size_px": [
+          2048,
+          2048
+        ]
+      },
+      "source": {
+        "url": "https://sdo.gsfc.nasa.gov/assets/img/latest/latest_2048_HMII.jpg",
+        "raw_bytes": 625710,
+        "raw_sha256": "eb4c42dad26921f8e3547c17b3b15f6e9ce12a4697b78498107c4e6c27fc56b2",
+        "last_modified_utc": "2026-11-16T00:50:06.000Z",
+        "downloaded_utc": "2026-11-16T00:55:20.362Z"
+      }
+    },
+    {
+      "path": "earth/bmng_01.jpg",
+      "bytes": 969204,
+      "sha256": "7814e9ffd5061087953f6a24c71468e7d4ad47721abb03e6727069b3be55fa84",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, january: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 1,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/january/world.topo.bathy.200401.3x5400x2700.jpg",
+        "raw_bytes": 2571926,
+        "raw_sha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d",
+        "last_modified_utc": "2025-12-16T17:48:00.000Z",
+        "downloaded_utc": "2026-11-16T00:56:07.077Z"
+      }
+    },
+    {
+      "path": "earth/bmng_02.jpg",
+      "bytes": 962148,
+      "sha256": "8cd4720550fa49fee3b3cf773cc830a5d2d24d071e292e60ed4e82fbd21de08b",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, february: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 2,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/february/world.topo.bathy.200402.3x5400x2700.jpg",
+        "raw_bytes": 2553992,
+        "raw_sha256": "9ec9b87ea351c354f18997e252497f1f207041dee4ab90b24839b63ab90afb24",
+        "last_modified_utc": "2025-12-16T17:48:05.000Z",
+        "downloaded_utc": "2026-11-16T00:56:08.934Z"
+      }
+    },
+    {
+      "path": "earth/bmng_03.jpg",
+      "bytes": 949528,
+      "sha256": "8b423097862934661e753f2cb5ab36d94170efa9842813e35e0428e4d507e70b",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, march: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 3,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/march/world.topo.bathy.200403.3x5400x2700.jpg",
+        "raw_bytes": 2522112,
+        "raw_sha256": "1df1a3ff1067a5ccf99031280f77acc3fff4dab202b18b6b2c7f913a9a78a0a4",
+        "last_modified_utc": "2025-12-16T17:48:11.000Z",
+        "downloaded_utc": "2026-11-16T00:56:11.764Z"
+      }
+    },
+    {
+      "path": "earth/bmng_04.jpg",
+      "bytes": 928435,
+      "sha256": "90fbb6ff1b2f2807462dd25c1c9f669e4cf7ed2a7f7278fe2536c2a04f7bf8aa",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, april: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 4,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/april/world.topo.bathy.200404.3x5400x2700.jpg",
+        "raw_bytes": 2467601,
+        "raw_sha256": "859a6aa3055f97bd28b4190a0cf3f0e9377111cc971985fb087d6a4211d94ce3",
+        "last_modified_utc": "2025-12-16T17:48:16.000Z",
+        "downloaded_utc": "2026-11-16T00:56:13.954Z"
+      }
+    },
+    {
+      "path": "earth/bmng_05.jpg",
+      "bytes": 913302,
+      "sha256": "fe74fcd3c6ecbd5cd076a11d2c2bc411cf538b93d3e1bf9dd189f2bd4af569ad",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, may: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 5,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/may/world.topo.bathy.200405.3x5400x2700.jpg",
+        "raw_bytes": 2430267,
+        "raw_sha256": "04310dba908ab5e24bf73fbd3ef0be01bb1b820c76ae05ad7489b81a714c69a1",
+        "last_modified_utc": "2025-12-16T17:48:20.000Z",
+        "downloaded_utc": "2026-11-16T00:56:15.910Z"
+      }
+    },
+    {
+      "path": "earth/bmng_06.jpg",
+      "bytes": 892158,
+      "sha256": "4722986e35be90a5b1c4bf669252abf5dd7e9244547f61d157f407ea103f2ee1",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, june: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 6,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/june/world.topo.bathy.200406.3x5400x2700.jpg",
+        "raw_bytes": 2383580,
+        "raw_sha256": "d37ab2654ce7181cf869455bb7cb8dbad9edc2075a0751d030544f90c55b4d37",
+        "last_modified_utc": "2025-12-16T17:48:25.000Z",
+        "downloaded_utc": "2026-11-16T00:56:18.113Z"
+      }
+    },
+    {
+      "path": "earth/bmng_07.jpg",
+      "bytes": 859734,
+      "sha256": "437b39cbb5f0280c9829285beb04b2ac1ca41847eb1a9f85024db8ce403b99eb",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, july: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 7,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x5400x2700.jpg",
+        "raw_bytes": 2308798,
+        "raw_sha256": "4f4240673a3a1b173d61b92ca4b07bac5fd17059ea5f725ba6da5a9c5386b7ba",
+        "last_modified_utc": "2025-12-16T17:48:28.000Z",
+        "downloaded_utc": "2026-11-16T00:56:20.305Z"
+      }
+    },
+    {
+      "path": "earth/bmng_08.jpg",
+      "bytes": 859132,
+      "sha256": "5397ad9c7e0620af9caf0c037a2c67c1211a03af4a0349ff3770db6948436653",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, august: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 8,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x5400x2700.jpg",
+        "raw_bytes": 2308163,
+        "raw_sha256": "f76d7b94445e8975a755c849ddaa93ed07b7e01118fb0b7e6bc5546a68c18d5c",
+        "last_modified_utc": "2025-12-16T17:48:31.000Z",
+        "downloaded_utc": "2026-11-16T00:56:22.048Z"
+      }
+    },
+    {
+      "path": "earth/bmng_09.jpg",
+      "bytes": 899419,
+      "sha256": "b7cb60596b9f29c57615a17fc80d32d5634a8b22a3f6123f84679945bf7ed42f",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, september: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 9,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/september/world.topo.bathy.200409.3x5400x2700.jpg",
+        "raw_bytes": 2402871,
+        "raw_sha256": "4c6723e79dc7c1bdb8c193cdf8f946b10b9407bc9fd1164cdf5e75d0aa79ad3b",
+        "last_modified_utc": "2025-12-16T17:48:35.000Z",
+        "downloaded_utc": "2026-11-16T00:56:23.911Z"
+      }
+    },
+    {
+      "path": "earth/bmng_10.jpg",
+      "bytes": 922533,
+      "sha256": "f73c5d1e000015e0c8b4fe3c587213ce442ce30661254a7db2ff3b9da2314607",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, october: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 10,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/october/world.topo.bathy.200410.3x5400x2700.jpg",
+        "raw_bytes": 2459484,
+        "raw_sha256": "f9ad745c780281dbfdda9769f10b161aacb0a03c83888ab24d4be16575aa4a7c",
+        "last_modified_utc": "2025-12-16T17:48:39.000Z",
+        "downloaded_utc": "2026-11-16T00:56:26.152Z"
+      }
+    },
+    {
+      "path": "earth/bmng_11.jpg",
+      "bytes": 955341,
+      "sha256": "1b209d5d038c4c5c70ca54738270d9a49b613df01b0a14ae6962821f60ca72a7",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, november: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 11,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/november/world.topo.bathy.200411.3x5400x2700.jpg",
+        "raw_bytes": 2540426,
+        "raw_sha256": "388422e3bfc62517af2a9d538989a2f859fc193e6f6cde72c3d230ef29c2e69f",
+        "last_modified_utc": "2025-12-16T17:48:43.000Z",
+        "downloaded_utc": "2026-11-16T00:56:27.988Z"
+      }
+    },
+    {
+      "path": "earth/bmng_12.jpg",
+      "bytes": 965849,
+      "sha256": "ec7a1d44ccea8dd7e5141f69141d298af32a52c9c8db67b81c6636ed875ffc4a",
+      "width": 4096,
+      "height": 2048,
+      "bits_per_channel": 8,
+      "channels": 3,
+      "what": "Earth, december: Blue Marble Next Generation with topography and bathymetry (2004)",
+      "credit": "NASA Earth Observatory (Blue Marble: Next Generation, Reto Stöckli)",
+      "month": 12,
+      "layout": {
+        "projection": "equirectangular",
+        "lon_west_deg": -180,
+        "lon_east_deg": 180,
+        "lat_north_deg": 90,
+        "lat_south_deg": -90,
+        "rows": "north to south",
+        "columns": "west to east"
+      },
+      "source": {
+        "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/december/world.topo.bathy.200412.3x5400x2700.jpg",
+        "raw_bytes": 2566770,
+        "raw_sha256": "a9f0088972dee0254610af851c4d6838ca3f2cf79176987e0a5713e2c15ec042",
+        "last_modified_utc": "2025-12-16T17:48:47.000Z",
+        "downloaded_utc": "2026-11-16T00:56:30.212Z"
+      }
+    }
+  ]
+}
