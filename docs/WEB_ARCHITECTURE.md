@@ -16,32 +16,61 @@ The web application is a static site. It reads prepared products from one folder
 | `web/src/state/route.ts`, `useRoute.ts` | The address: scene, site or point, and time, as the URL hash | `location.hash` | `Route` |
 | `web/src/state/useData.ts` | Load the data once; report loading, error or ready | `loadDataBundle` | `DataState` |
 | `web/src/lib/sites.ts` | Group sites by category, write headings and positions | `Site[]` | Display strings |
-| `web/src/App.tsx` | The shell: top bar, stage, one side panel; loading, error and mock-data states | Route, `DataState` | React view |
-| `web/src/ui/` | `TopBar` (Globe/Map toggle), `Stage` (scene slot), `SiteList`, `SiteSummary`, `PointSummary`, `Facts` | Route, `DataBundle` | React view |
+| `web/src/lib/geometry.ts` | Display math: angular size, Earth phase and lit fraction, coordinate validation, polar projection both ways, log scale, axis conversions | Vectors, angles | Numbers |
+| `web/src/lib/shade.ts` | Share of the Sun above each shade-grid cell's skyline; cell light; bilinear reading | `ShadeGrid`, Sun direction | Float32 grids |
+| `web/src/App.tsx` | Shell and state: selected time, 30-day window, playback, tab, power assumptions | Route, `DataState` | React view |
+| `web/src/ui/Stage.tsx` | Pick the scene for the route and tab | Route, `DataBundle`, time | Scene |
+| `web/src/scenes/Globe.tsx` | three.js Moon with colour, true-scale relief, true Sun direction, HTML markers | `assets/moon/*`, timetable, sites | WebGL canvas |
+| `web/src/scenes/PolarMap.tsx` | Hillshade positioned by its sidecar; markers, scale bar, cursor position | `assets/hillshade/*`, sites | DOM |
+| `web/src/scenes/Terrain.tsx` | three.js mesh of the terrain patch, vertex brightness from slopes and the shade grid | `TerrainPatch`, `ShadeGrid`, Sun direction | WebGL canvas |
+| `web/src/scenes/Sky.tsx` | 2D canvas: Sun and Earth, then the skyline in front; Earth rendered by a small three.js scene | `Skyline`, timetable, `assets/sun`, `assets/earth` | Canvas |
+| `web/src/scenes/GeometryView.tsx` | SVG of Moon, Earth, Sun: true angle, log distances | Timetable | SVG |
+| `web/src/ui/Readouts.tsx` | Verdicts, fractions, countdowns, battery for a site; directions for a custom point | Engine functions, worker client | React view |
+| `web/src/ui/TimeBar.tsx`, `CoordinateInput.tsx`, `About.tsx`, `TopBar.tsx`, `SiteList.tsx`, `SiteSummary.tsx`, `PointSummary.tsx`, `Facts.tsx` | Controls and panels | State, `assets.json` | React view |
 | `web/vite.config.ts` | Default data folder `/data`; remove `data-mock` from `dist/` after the build | `public/` | `dist/` |
 | `web/scripts/fetch-assets.mjs` | Download the NASA imagery once, convert it to web sizes, record every file. Not part of the app: run by hand (`npm run fetch-assets`) | NASA servers, `web/assets-raw/` | `web/public/assets/`, `assets.json` |
 | `web/scripts/assets.test.ts` | Check the committed pictures against `assets.json` and against what the app will assume about them | `web/public/assets/` | Test results |
 | `web/e2e/`, `web/playwright.config.ts` | Browser tests and screenshots at 1440×900 and 390×844 against the production build | `dist/` | `docs/screenshots/` |
 
-The interface is being rebuilt in nine parts (`docs/UI_PLAN.md`). The scenes (globe, polar map, site terrain, sky view, geometry) do not exist yet; this file gains a row for each as it is built.
-
 ## Main data flow
 
 ```mermaid
 flowchart LR
-  Files["web/public/data/<br/>(written once by the Python engine)"] --> Loader[loadDataBundle<br/>checks versions and sizes]
-  Loader --> Data[useData<br/>loading / error / ready]
+  Files["web/public/data/"] --> Loader[loadDataBundle] --> Data[useData]
   Hash[URL hash] --> Route[useRoute]
-  Route --> App
-  Data --> App[App shell]
-  App --> TopBar
-  App --> Stage[Stage: scene slot]
+  Data --> App
+  Route --> App[App: time, window, playback]
+  App --> Stage
+  App --> TimeBar
   App --> Panel[Side panel]
-  TopBar -- navigate --> Hash
-  Panel -- navigate --> Hash
+  Stage --> Globe
+  Stage --> PolarMap
+  Stage --> Terrain
+  Stage --> Sky
+  Stage --> GeometryView
+  Panel --> Readouts
+  Readouts -- "events, once per window" --> Worker[Web Worker: evaluateSite]
+  Readouts -- "directions, verdicts, every step" --> Engine[astro.ts, visibility.ts]
+  Sky --> Engine
+  Assets["web/public/assets/"] --> Globe
+  Assets --> PolarMap
+  Assets --> Sky
 ```
 
-The worker client (`evaluateInWorker`) is not called by the shell yet. It is wired in with the time controls and readouts (part 7).
+## How the sky view stays honest
+
+```mermaid
+flowchart TD
+  T[timetable at the selected time] --> D[directionsAt: azimuth, elevation, distance]
+  D --> R["disc radius = asin(radius / distance), every draw"]
+  R --> B[draw Sun picture and Earth sphere at true position and size]
+  B --> S[draw terrain: opaque shape from the step-function skyline down]
+  S --> L[labels last]
+  T --> P["Earth light direction = Earth-to-Sun, in the observer's view axes"]
+  P --> B
+```
+
+The terrain is drawn after the bodies, so it hides exactly what lies below the skyline. Nothing computes a "clipped disc" separately; the readout's fraction comes from the engine and the picture from the drawing order, and a browser test checks that the two agree on real pixels.
 
 ## Inside one evaluation
 
@@ -84,23 +113,11 @@ flowchart LR
 
 The hillshade's projection values are not typed in: the script reads them from the GeoTIFF's tags and writes them to the sidecar. The Sun's disc is found in the image itself (the longest run of bright rows and columns), not assumed.
 
-## Component structure
-
-```mermaid
-flowchart TB
-  App --> TopBar
-  App --> Stage
-  App --> Panel
-  Panel --> SiteList
-  Panel --> SiteSummary
-  Panel --> PointSummary
-  SiteSummary --> Facts
-  PointSummary --> Facts
-```
-
-At most one side panel is open. Which one depends only on the route.
-
 ## Tests
 
-- `cd web; npm test`: unit tests (vitest). The audit tests in `web/engine/tests/audit/` compare the engine with SPICE, JPL Horizons, the Python engine and closed forms, and validate every data file against `docs/schemas/` (`docs/WEB_AUDIT.md`). The UI adds tests for the route and the site helpers, the latter against the real `sites.json`. `web/scripts/assets.test.ts` checks every committed picture: present, same size and SHA-256 as `assets.json`, global maps 4096 x 2048, the elevation map really 16-bit with lunar heights in the right places (and within 400 m of the engine's own ground height on three crater floors), the Sun transparent outside its disc and darker at the limb, the hillshade sidecar consistent and reaching 80 degrees south, every credit present, raw downloads ignored by git.
-- `cd web; npm run e2e`: builds the app, serves the build and runs the browser tests (Playwright, Chromium) in both viewports. They assert zero console errors and failed requests, that every site of `sites.json` is listed, that a failed data load shows an error and no result, and that `dist/` holds the real data and no mock data. First use on a machine: `npx playwright install chromium`.
+- `cd web; npm test`: unit tests (vitest).
+  - `web/engine/tests/audit/`: the engine against SPICE, JPL Horizons, the Python engine and closed forms (`docs/WEB_AUDIT.md`).
+  - `web/src/lib/geometry.audit.test.ts`: angular sizes (formula, and range over the whole timetable); Earth lit fraction `(1 + cos phase) / 2` against five JPL Horizons values saved with their query in `web/src/lib/fixtures/earth_phase_horizons.json`; every `altaz.json` case within 0.01 degrees; coordinate validation; the polar projection round trip for every site and against the hillshade's sidecar; shade-grid lighting on a real grid.
+  - `web/scripts/assets.test.ts`: the committed pictures against `assets.json`.
+  - The 60-second event check against `events.json` is the engine's own audit test and is unchanged.
+- `cd web; npm run e2e`: builds the app and runs `web/e2e/app.spec.ts` in Chromium at 1440x900 and 390x844: every scene with a screenshot and zero console errors, coordinate refusals, time controls, About, a failed data load, no mock data in `dist/`. On the desktop viewport three more tests use a probe mode (`&probe=sun` or `&probe=earth`: no labels, no glow, the disc 150 pixels in radius) to count screen pixels: the visible share of a half-set Sun against the engine (5 %), the Earth's lit share against the formula with Magnify off and on (2 %), and a frame-rate report. First use on a machine: `npx playwright install chromium`.

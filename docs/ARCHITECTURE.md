@@ -125,7 +125,7 @@ flowchart LR
 
 Coordinates shown in the interface are read-only metadata from `sites.json`. The removed custom-coordinate workflow is intentionally not exposed by the UI.
 
-The interface is being rebuilt from scratch (`docs/UI_PLAN.md`). The earlier Three.js scene (`SpaceScene.tsx`, loaded from a CDN) was removed in part 1; the new scenes bundle three.js with the app and are described in `docs/WEB_ARCHITECTURE.md` as they are built.
+The interface was rebuilt from scratch in November 2026 (`docs/UI_PLAN.md`). Its scenes (globe, polar map, site terrain, sky view, geometry) bundle three.js with the app and are described in `docs/WEB_ARCHITECTURE.md` and `docs/WEB_UI.md`.
 
 Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Moon's centre, "north" is along the meridian toward the north pole (away from the south pole at these sites), "east" completes the right-handed set, and azimuth runs from north through east.
 

@@ -19,5 +19,5 @@
     "types": ["vite/client"]
   },
   "include": ["src", "engine"],
-  "exclude": ["engine/tests/audit"]
+  "exclude": ["engine/tests/audit", "src/**/*.audit.test.ts"]
 }

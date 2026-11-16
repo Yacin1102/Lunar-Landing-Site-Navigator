@@ -4,7 +4,35 @@
 
 **The web UI is being rebuilt from scratch in nine parts, one pull request each.** The plan, and the five places where the brief and the repository disagreed, are in `docs/UI_PLAN.md`.
 
-**Next (exact step): part 3, globe.** After the part 2 PR is merged: branch `ui/03-globe` from `main`; `npm install three fast-png` (and `@types/three`); build `web/src/scenes/globe/`: a three.js sphere with `assets/moon/lroc_color_4096.jpg`, relief from `assets/moon/ldem_4096_uint16.png` decoded in the browser with the formula in `assets.json` (`count * 0.5 - 10000` m), the camera opening on the south pole, damped orbit and zoom, and markers from `sites.json`; clicking a marker opens `#/site/{id}`. Replace the globe placeholder in `web/src/ui/Stage.tsx`. Any vertical exaggeration must be labelled on screen.
+**The rebuild is complete.** Parts 3 to 9 were done together in one pull request (branch `ui/03-scenes`) at your request on 2026-11-16, instead of one each.
+
+**Next (exact step):** review and merge that pull request, then open the app on a real laptop and phone (`cd web; npm run dev`) and check the frame rate and the feel of the controls, which the automated tests cannot judge. Open follow-ups are listed under "Left for later" below.
+
+**Done in parts 3 to 9 (scenes, controls, About), branch `ui/03-scenes`:**
+
+- **Globe** (`web/src/scenes/Globe.tsx`): three.js sphere, LROC colour, LOLA relief at true scale decoded from the 16-bit PNG, opening on the south pole, lit from the Sun's true direction at the selected time plus a labelled fill light. Site markers open the site.
+- **Polar map** (`PolarMap.tsx`): the hillshade in its own projection, markers, scale bar, position under the cursor, zoom and pan. One toggle switches Globe and Map.
+- **Coordinate input** (`ui/CoordinateInput.tsx`): validated against the manifest's service region, with a sentence saying what is wrong.
+- **Site terrain** (`Terrain.tsx`): the real patch, no vertical exaggeration, shaded by the Sun's direction against the patch's own slopes, shadowed by the shade grid, dimmed by the site's visible Sun fraction.
+- **Sky view** (`Sky.tsx`): azimuth-elevation view with the step-function skyline drawn in front of the Sun and the Earth, so the terrain hides exactly what is below it. Disc sizes from the engine's distances on every draw. Earth is a lit sphere with the month's Blue Marble; phase exact, rotation labelled approximate. Magnify x10 changes size only and is labelled.
+- **Time controls and readouts** (`ui/TimeBar.tsx`, `ui/Readouts.tsx`): UTC date field, 30-day slider, play/pause, speed; Sun and Earth elevation, azimuth, disc size, visible fraction as a proven range with the lit / blocked / uncertain verdict, sunlight in W/m2, time to sunset and Earthset, battery charge from the user's own assumptions.
+- **Geometry** (`GeometryView.tsx`): Moon, Earth and Sun at the true angle, distances on a labelled logarithmic scale, real pictures as icons.
+- **About** (`ui/About.tsx`): sources and credits read from `assets.json`.
+- A custom point gets the sky view and geometry only, with directions and no verdict.
+
+**Measured (2026-11-16):**
+
+- Sun partly behind the skyline at Shackleton rim, 2027-02-01 11:40 UTC: engine 0.6293 of the disc visible, counted on screen pixels 0.6290 (limit 5 %).
+- Earth's sunlit share at 2026-11-18 01:00 UTC: formula 0.4462, on screen 0.4483, with Magnify on 0.4483 (limit 2 %). The formula agrees with JPL Horizons within 0.02 % at five dates.
+- Frame rate of the terrain scene while playing: 19.7 per second in headless Chromium on this machine (software-style rendering). **Not measured on a real laptop GPU**; the 60 per second target is unverified.
+
+**Left for later:**
+
+- Frame rate on real hardware (above).
+- The terrain's shadow edge is blocky because the shade grid is 17 x 17 cells, 300 m apart. A finer grid is an engine request.
+- Safari does not apply the canvas brightness filter, so the Sun would look grey there. Not tested.
+- The main script is 0.8 MB (three.js is in it because the sky view draws the Earth with it).
+- The three items of `docs/ENGINE_REQUESTS.md`.
 
 **Done in part 2 (assets), branch `ui/02-assets`:**
 
@@ -30,7 +58,7 @@
 - Terrain size is read from the labels (241 x 241 at 20 m, 4.8 km), not the 257 x 257 over 20 km of the brief.
 - `url-state.ts` (up to four comparison scenarios in the query string) was removed with the comparison page; the plan had listed it as kept. The route module replaces it.
 
-**Web test commands:** `cd web; npm test` and `cd web; npm run e2e`. Last result (part 2, 2026-11-16): 118 unit tests passed (76 before, plus 42 asset tests); 12 browser tests passed (6 in each viewport); `npm run build` OK. Python not re-run: nothing it reads was touched (last run in part 1: 235 passed, 20 skipped waiting for the full maps).
+**Web test commands:** `cd web; npm test` and `cd web; npm run e2e`. Last result (parts 3 to 9, 2026-11-16): 143 unit tests passed; 17 browser tests passed and 3 skipped (the three pixel-measuring tests run on the desktop viewport only); `npm run build` OK. Python not re-run: nothing it reads was touched.
 
 ## Earlier (2026-11-15)
 

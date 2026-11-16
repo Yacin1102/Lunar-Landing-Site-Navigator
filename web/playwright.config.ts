@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
   reporter: [["list"]],
+  workers: 4,
+  timeout: 90_000,
+  expect: { timeout: 20_000 },
   use: { baseURL: "http://localhost:4173" },
   webServer: {
     command: "npm run build && npm run preview -- --port 4173 --strictPort",
