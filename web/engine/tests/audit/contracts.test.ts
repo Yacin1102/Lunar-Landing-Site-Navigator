@@ -67,7 +67,7 @@ describe.each([["real", "web/public/data"], ["mock", "web/public/data-mock"]])("
     console.log(`${folder}: ${files.length} JSON files pass their schemas`);
   });
 
-  it("is read by the app's loader: versions, sizes from labels, manifest bytes, rows north to south", async () => {
+  it("is read by the app's loader: versions, sizes from labels, manifest bytes", async () => {
     serveFolder("/x", root);
     const bundle = await loadDataBundle("/x");
     expect(bundle.manifest.data_kind).toBe(kind);
@@ -105,6 +105,72 @@ describe.each([["real", "web/public/data"], ["mock", "web/public/data-mock"]])("
       return new Response(path === "ephem.bin" ? bytes.subarray(0, bytes.length - 24) : bytes, { status: 200 });
     });
     await expect(loadDataBundle("/x")).rejects.toThrow(/ephem\.bin/);
+  });
+});
+
+describe("grid orientation: rows north to south, columns west to east", () => {
+  /** Pearson correlation of two equal-length lists. */
+  function correlation(a: number[], b: number[]): number {
+    const mean = (v: number[]) => v.reduce((s, x) => s + x, 0) / v.length;
+    const [ma, mb] = [mean(a), mean(b)];
+    let [sab, saa, sbb] = [0, 0, 0];
+    for (let i = 0; i < a.length; i += 1) {
+      sab += (a[i] - ma) * (b[i] - mb);
+      saa += (a[i] - ma) ** 2;
+      sbb += (b[i] - mb) ** 2;
+    }
+    return sab / Math.sqrt(saa * sbb);
+  }
+
+  it("terrain slopes, read rows-north-first, point the same way as the shade grid's normals", async () => {
+    // The shade grid's normals are (east, north, up) vectors: their direction does not depend on
+    // how the rows are stored. The terrain's slope does: read with row 0 as north, its downhill
+    // direction must match the normals; read the other way round, its north part is reversed.
+    // The patch (241 x 241, 20 m) and the grid (17 x 17, 300 m) cover the same 4.8 km square.
+    serveFolder("/x", resolve(REPO, "web/public/data"));
+    const bundle = await loadDataBundle("/x");
+    const fromTerrain = { east: [] as number[], north: [] as number[], northFlipped: [] as number[], eastFlipped: [] as number[] };
+    const fromNormals = { east: [] as number[], north: [] as number[] };
+    let sitesChecked = 0;
+    for (const site of bundle.sites) {
+      const terrain = bundle.terrain.get(site.id);
+      const shade = bundle.shade.get(site.id);
+      if (!terrain || !shade) continue;
+      expect(terrain.label.size_m).toBe(shade.label.size_m);
+      sitesChecked += 1;
+      const n = terrain.label.n;
+      const ratio = shade.label.spacing_m / terrain.label.spacing_m;
+      const h = (row: number, col: number) => terrain.values[row * n + col];
+      const d = 3; // slope over +-3 samples (+-60 m)
+      for (let i = 1; i < shade.label.n - 1; i += 1) {
+        for (let j = 1; j < shade.label.n - 1; j += 1) {
+          const [row, col] = [i * ratio, j * ratio];
+          const base = 2 * d * terrain.label.spacing_m;
+          const riseEast = (h(row, col + d) - h(row, col - d)) / base;
+          const riseNorth = (h(row - d, col) - h(row + d, col)) / base; // row - d is north of row
+          const cell = i * shade.label.n + j;
+          const [e, nn, u] = [shade.normal[3 * cell], shade.normal[3 * cell + 1], shade.normal[3 * cell + 2]];
+          fromTerrain.east.push(-riseEast);
+          fromTerrain.north.push(-riseNorth);
+          fromTerrain.northFlipped.push(riseNorth); // what a south-first reading would give
+          fromTerrain.eastFlipped.push(riseEast); // what an east-first reading would give
+          fromNormals.east.push(e / u);
+          fromNormals.north.push(nn / u);
+        }
+      }
+    }
+    const r = {
+      east: correlation(fromTerrain.east, fromNormals.east),
+      north: correlation(fromTerrain.north, fromNormals.north),
+      northFlipped: correlation(fromTerrain.northFlipped, fromNormals.north),
+      eastFlipped: correlation(fromTerrain.eastFlipped, fromNormals.east),
+    };
+    console.log(`${sitesChecked} sites, ${fromTerrain.east.length} cells: slope against normal, correlation east ${r.east.toFixed(3)}, north ${r.north.toFixed(3)}; rows flipped ${r.northFlipped.toFixed(3)}, columns flipped ${r.eastFlipped.toFixed(3)}`);
+    expect(sitesChecked).toBeGreaterThan(0);
+    expect(r.east).toBeGreaterThan(0.8);
+    expect(r.north).toBeGreaterThan(0.8);
+    expect(r.northFlipped).toBeLessThan(-0.8);
+    expect(r.eastFlipped).toBeLessThan(-0.8);
   });
 });
 

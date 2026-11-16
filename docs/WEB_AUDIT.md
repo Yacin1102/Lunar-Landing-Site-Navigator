@@ -13,13 +13,19 @@ Scientific and mathematical audit of `web/engine/` and its Web Worker, and of ho
 | 4 | Skyline read | `astro.ts` | Entries [0, 10, 0, …] at 1°, azimuth 0.6 | 6° (interpolated) | 10° (step function: wedge maximum) | Fixed. A Sun at 8° there was called clear; now it is blocked |
 | 5 | Verdict rule | `visibility.ts` | Sun centre 0.1° above a flat skyline, error 0.03° | "uncertain" (strict whole-disc rule at the centre azimuth) | "visible" (approved rule: lit iff `f_low > 0`) | Fixed. `fraction_low`, `fraction` and `fraction_high` are reported. `verdict.ts` removed |
 | 6 | Disc fraction | `visibility.ts` | Flat skyline, offset d = 0.3 radii | 0.688407 (64 strips over an interpolated skyline) | 0.688081 (circle segment) | Exact closed form per wedge: equal to 1e-9 at every offset, and within 2e-3 of a brute-force count across north |
-| 7 | Events | `events.ts` | A graze 0.001° high for 6 minutes between two 10-minute samples | Missed (the scan compared signs of samples only) | Rise and set at peak ± 3 min | Port of the Python reference search (turning points, first and last interval, bisection): found to 1 s |
+| 7 | Events | `events.ts` | A graze 0.001° high for 6 minutes between two 10-minute samples | Missed (the scan compared signs of samples only) | Rise and set at peak ± 3 min | Port of the Python reference search (turning points, first and last interval, bisection): found to 1 s. Superseded by finding 14: still found to 1 s |
 | 8 | Metrics | `metrics.ts` | A window dark throughout | `longest_night_ms` = 0 | The window's length | Fixed. Exact intervals from crossings against skyline ± error. Countdowns run from the chosen time |
 | 9 | Panel tilt | `power.ts` | Tilt 0 (lying flat), Sun at 1° | Incidence 0.9998 | sin 1° = 0.0175 | Fixed. Tilt from horizontal, normal elevation 90 − tilt |
 | 10 | Battery | `power.ts` | 50 Wh, 100 W load, no Sun, hourly samples | Runs out at 3,600,000 ms | 1,800,000 ms | Fixed by interpolating within the step. No samples with initial 500 Wh and capacity 100: was 500, now 100. Impossible settings are refused |
 | 11 | Loader | `data.ts` | A file longer than its label | Accepted | Refused | Exact sizes, `version`, manifest `bytes`, and a little-endian check |
 | 12 | Worker loop | `web/src/App.tsx` | Any site | The timeline window was a new object every render and an effect dependency, so each worker result started another worker | One evaluation per change | Fixed in PR #22 |
 | 13 | UI model | `web/src/visual-model.ts` | Chosen time after a sunset that is still inside the window | Countdown to that past sunset (negative) | Next sunset after the chosen time | Fixed: uses the engine's metrics |
+| 14 | Event search | `events.ts` | The 10 real skylines, 365 days from 16 Dec 2026, against a dense 20 s scan | Crossings missed in 15 of 60 site, body and skyline runs: Malapert massif nominal Sun 51 of 61, de Gerlache rim certain Sun 40 of 58. The clearance jumps when a disc edge crosses a wedge boundary, so the turning-point search between 10-minute samples was not valid | Every crossing | Fixed. The search follows a continuous margin (disc radius minus the distance from its centre to the visible sky) with a proven rate bound, and steps by margin / rate, never sampling blind. 61 of 61 and 60 of 60 (the second with the margins of finding 15) against a 30 s scan |
+| 15 | Disc on a sphere | `visibility.ts` | Earth at 17°, nearest, notch at the side of the disc | Flat disc model: side edges 0.0028° too high, azimuths up to 0.003° off. Lit could be claimed through a notch the real disc does not reach; the docs said below 0.00001° | Real sphere | Fixed. Proven bounds (`flatDiscErrorDeg`) widen skyline ± error for lit and blocked. 400 adversarial notches checked on the sphere: flat model alone wrong 4 times, widened test never |
+| 16 | Timetable label | `data.ts` | `columns` in another order, other `units`, `frame` or `origin` | Accepted (the reader used only the number of columns) | Refused | Fixed: `checkEphemerisLabel` |
+| 17 | Test claim | `contracts.test.ts` | Terrain rows read south first | The test named "rows north to south" checked only the centre sample, which a flip does not move | A test that fails on a flip | Terrain slopes against the shade grid's normals: correlation 0.987 east and 0.972 north; flipped, −0.987 and −0.972 |
+
+Findings 14 to 17 were raised by the contract review of 2026-11-16 and confirmed with the outputs above before they were fixed.
 
 ## Checked and correct
 
@@ -43,5 +49,6 @@ On the real sky a rising disc also spreads in azimuth (offset = arc / cos elevat
 
 - **Float32 timetable:** within 0.0000017° for the Sun and 0.0000005° for the Earth (`docs/ACCURACY.md`).
 - **The browser chain against SPICE:** worst 2.6e-5° on the 61 `altaz.json` cases, and 2.6e-5° against the 60 Horizons rows.
-- **Disc fraction:** exact for the step skyline, apart from the flat-tangent-plane approximation across the disc (about ρ² tan(el) / 2, below 0.00001° here).
+- **Disc fraction:** exact for the step skyline in the flat tangent plane. The plane misplaces points of the disc by at most 0.0029° in elevation and 0.0067° in azimuth (Earth at 17°, nearest), 0.00013° and 0.00028° for the Sun; lit and blocked include these bounds (finding 15, `docs/ACCURACY.md`).
+- **Event search:** every crossing is found except a stretch above or below the threshold shorter than 1 s, provided the rate bound holds. It is checked against the whole timetable and against the margin on all 10 sites (finding 14).
 - **No NaN or Infinity found in 3,000 random sites, times, heights and masts.** That covers latitudes 80°S to the pole, heights −5 to 8 km and masts 0 to 100 m.

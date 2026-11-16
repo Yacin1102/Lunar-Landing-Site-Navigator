@@ -1,5 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadDataBundle } from "./data";
+import { checkEphemerisLabel, loadDataBundle } from "./data";
+import type { EphemerisLabel } from "./runtime-types";
+
+describe("timetable label", () => {
+  const good = {
+    version: 1, t0_ms: 0, step_s: 3600, count: 4,
+    columns: ["sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z"],
+    units: "km", frame: "MOON_ME", origin: "MOON", aberration: "LT+S",
+  } as unknown as EphemerisLabel;
+
+  it("accepts the contract's columns, units, frame and origin", () => {
+    expect(() => checkEphemerisLabel(good)).not.toThrow();
+  });
+
+  it("refuses columns in another order, other units, another frame or another origin", () => {
+    const swapped = { ...good, columns: ["earth_x", "earth_y", "earth_z", "sun_x", "sun_y", "sun_z"] } as unknown as EphemerisLabel;
+    expect(() => checkEphemerisLabel(swapped)).toThrow(/in that order/);
+    expect(() => checkEphemerisLabel({ ...good, units: "m" } as unknown as EphemerisLabel)).toThrow(/units/);
+    expect(() => checkEphemerisLabel({ ...good, frame: "J2000" } as unknown as EphemerisLabel)).toThrow(/frame/);
+    expect(() => checkEphemerisLabel({ ...good, origin: "EARTH" } as unknown as EphemerisLabel)).toThrow(/origin/);
+  });
+});
 
 describe("prepared data loading", () => {
   it("uses labels to decode every prepared product", async () => {

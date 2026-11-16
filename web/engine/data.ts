@@ -53,6 +53,24 @@ export function decodeInt16(buffer: ArrayBuffer, count: number, url = "binary fi
   return Int16Array.from({ length: count }, (_, i) => view.getInt16(2 * i, true));
 }
 
+/** The timetable columns in the order `astro.ts` reads them: the Sun at offset 0, the Earth at 3. */
+export const EPHEMERIS_COLUMNS = ["sun_x", "sun_y", "sun_z", "earth_x", "earth_y", "earth_z"] as const;
+
+/**
+ * Refuse a timetable label the engine would misread (Contract 1). The engine reads each row by
+ * position, so the columns must be exactly `EPHEMERIS_COLUMNS` in that order, in km, in the
+ * `MOON_ME` frame, from the Moon's centre. Anything else is an error, not a guess.
+ */
+export function checkEphemerisLabel(label: EphemerisLabel, url = "ephem.json"): void {
+  const columns = label.columns as readonly string[];
+  if (columns.length !== EPHEMERIS_COLUMNS.length || columns.some((c, i) => c !== EPHEMERIS_COLUMNS[i])) {
+    throw new Error(`${url}: columns must be ${EPHEMERIS_COLUMNS.join(", ")} in that order, not ${columns.join(", ")}`);
+  }
+  if (label.units !== "km") throw new Error(`${url}: units must be km, not ${String(label.units)}`);
+  if (label.frame !== "MOON_ME") throw new Error(`${url}: frame must be MOON_ME, not ${String(label.frame)}`);
+  if (label.origin !== "MOON") throw new Error(`${url}: origin must be MOON, not ${String(label.origin)}`);
+}
+
 /** Refuse a skyline whose arrays do not have one entry per wedge of 360 / az_step_deg. */
 function checkSkyline(skyline: Skyline, url: string): void {
   const entries = Math.round(360 / skyline.az_step_deg);
@@ -84,6 +102,7 @@ export async function loadDataBundle(folder = getDataFolder()): Promise<DataBund
   const siteList = await fetchJson<SiteList>(`${base}/sites.json`);
   const sites = siteList.sites;
   const ephemerisLabel = await fetchJson<EphemerisLabel>(`${base}/ephem.json`);
+  checkEphemerisLabel(ephemerisLabel, `${base}/ephem.json`);
   const fetchListed = listedFetcher(base, manifest);
   const ephemerisBinary = await fetchListed("ephem.bin");
   const skylines = new Map<string, Skyline>();

@@ -1,10 +1,10 @@
 """Skyline records: the one place a Contract 3 skyline is made and written.
 
 Role
-    The Builder (``skylines/{id}.json``)
-    must give identical answers for the same point and parameters (spec
-    section 11). Both call :func:`skyline_record`, so there is only one way a
-    skyline record can be produced.
+    The Builder (``scripts/build_products.py``) calls :func:`skyline_record`
+    for every ``skylines/{id}.json``, so there is only one way a skyline
+    record can be produced. (A live API once shared it; it was removed on
+    2026-11-15, see ``docs/PROGRESS.md``.)
 
 Rounding, in plain words
     Numbers are written with 6 decimals (a millionth of a degree), which keeps
