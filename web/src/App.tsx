@@ -1,368 +1,76 @@
-import { useEffect, useMemo, useState } from "react";
-import { evaluateInWorker } from "../engine/client";
-import { loadDataBundle } from "../engine/data";
-import { panelPowerW } from "../engine/power";
 import type { DataBundle } from "../engine/runtime-types";
-import type { Site } from "../engine/types";
-import { formatDegrees, formatDuration, formatLocalTime, formatPercent, formatPower, fromDateTimeInputValue, toDateTimeInputValue } from "./formatting";
-import {
-  buildTimeline,
-  elevationRange,
-  skyBodySize,
-  skyPoint,
-  timelineBounds,
-  type ScenarioSummary,
-  type TimelinePoint,
-} from "./visual-model";
-import { readSavedScenarios, saveScenariosToUrl, type SavedScenario } from "./url-state";
-import { SpaceScene } from "./SpaceScene";
+import { useData } from "./state/useData";
+import { useRoute } from "./state/useRoute";
+import type { Route } from "./state/route";
+import { TopBar } from "./ui/TopBar";
+import { SiteList } from "./ui/SiteList";
+import { SiteSummary } from "./ui/SiteSummary";
+import { PointSummary } from "./ui/PointSummary";
+import { Stage } from "./ui/Stage";
 
-type ViewMode = "sky" | "terrain" | "map";
-type ExperienceMode = "beginner" | "expert";
-type Page = "dashboard" | "compare";
-
-interface WorkerEvents {
-  sunrise: number[];
-  sunset: number[];
-  earthrise: number[];
-  earthset: number[];
-}
-
-interface WorkerResult {
-  events?: WorkerEvents;
-}
-
-const PANEL = { type: "tracking" as const, area_m2: 4, efficiency: 0.25 };
-
-/** Render the focused mission dashboard without changing the existing astronomy engine. */
+/**
+ * The application shell.
+ *
+ * Role: load the engine's prepared data once, read the route from the URL, and lay out the three
+ * fixed regions: a quiet top bar, the stage (where the imagery goes) and one side panel.
+ *
+ * How it works: `useData` reports loading, error or ready. Until the data is ready nothing but a
+ * status line is shown, so no number can appear that did not come from a checked file. When the
+ * manifest says the folder holds mock data, a banner says so on every screen (handoff rule 3).
+ */
 export default function App() {
-  const [bundle, setBundle] = useState<DataBundle>();
-  const [loadError, setLoadError] = useState<string>();
-  const [scenarios, setScenarios] = useState<SavedScenario[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [view, setView] = useState<ViewMode>("sky");
-  const [mode, setMode] = useState<ExperienceMode>("beginner");
-  const [page, setPage] = useState<Page>("dashboard");
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [spanDays, setSpanDays] = useState(1);
-  const [playing, setPlaying] = useState(false);
-  const [playWindow, setPlayWindow] = useState<{ startMs: number; endMs: number; stepMs: number }>();
-  const [workerResult, setWorkerResult] = useState<WorkerResult>();
-  const [introOpen, setIntroOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("lunar-intro-dismissed") !== "1");
+  const data = useData();
+  const [route, navigate] = useRoute();
 
-  useEffect(() => {
-    loadDataBundle()
-      .then((loaded) => {
-        setBundle(loaded);
-        const saved = readSavedScenarios().filter((scenario) => loaded.sites.some((site) => site.id === scenario.siteId));
-        const initialDate = loaded.ephemeris.label.t0_ms + 12 * 3600000;
-        setScenarios((saved.length ? saved : [{ siteId: loaded.sites[0]?.id ?? "", dateMs: initialDate }]).slice(0, 4));
-      })
-      .catch((reason: unknown) => setLoadError(reason instanceof Error ? reason.message : "Prepared data could not be loaded."));
-  }, []);
-
-  const allSites = bundle?.sites ?? [];
-  const activeScenario = scenarios[activeIndex] ?? scenarios[0];
-  const activeSite = allSites.find((site) => site.id === activeScenario?.siteId);
-  const activeSkyline = activeScenario ? bundle?.skylines.get(activeScenario.siteId) : undefined;
-  const timelineCenterMs = playing && playWindow
-    ? (playWindow.startMs + playWindow.endMs) / 2
-    : activeScenario?.dateMs;
-  const activeSummary = useMemo(
-    () => bundle && activeSite && activeScenario && timelineCenterMs !== undefined
-      ? buildTimeline(bundle, activeSite, activeSkyline, timelineCenterMs, spanDays)
-      : undefined,
-    [activeScenario, activeSite, activeSkyline, bundle, spanDays, timelineCenterMs],
-  );
-  // Memoised on the instant and span: a fresh object on every render would re-run the worker effect
-  // below after each result, an endless loop of worker evaluations.
-  const activeDateMs = activeScenario?.dateMs;
-  const bounds = useMemo(
-    () => playing && playWindow
-      ? playWindow
-      : activeDateMs === undefined ? undefined : timelineBounds(activeDateMs, spanDays),
-    [activeDateMs, playWindow, playing, spanDays],
-  );
-  const currentPoint = activeSummary ? nearestPoint(activeSummary.points, activeScenario?.dateMs ?? 0) : undefined;
-
-  useEffect(() => {
-    if (scenarios.length) saveScenariosToUrl(scenarios);
-  }, [scenarios]);
-
-  useEffect(() => {
-    if (playing || !bundle || !activeScenario || !activeSkyline || !bounds) return;
-    let cancelled = false;
-    evaluateInWorker(bundle, activeScenario.siteId, activeScenario.dateMs, bounds.startMs, bounds.endMs)
-      .then((result) => {
-        if (!cancelled) setWorkerResult(result as WorkerResult);
-      })
-      .catch(() => {
-        if (!cancelled) setWorkerResult(undefined);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeScenario, activeSkyline, bounds, bundle, playing]);
-
-  useEffect(() => {
-    if (!playing || !activeScenario || !bounds) return;
-    const timer = window.setInterval(() => {
-      setScenarios((current) => current.map((scenario, index) => index === activeIndex
-        ? { ...scenario, dateMs: Math.min(bounds.endMs, scenario.dateMs + bounds.stepMs) }
-        : scenario));
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, [activeIndex, activeScenario, bounds, playing]);
-
-  useEffect(() => {
-    if (playing && bounds && activeScenario && activeScenario.dateMs >= bounds.endMs) {
-      setPlaying(false);
-      setPlayWindow(undefined);
-    }
-  }, [activeScenario, bounds, playing]);
-
-  useEffect(() => {
-    if (mode === "expert") setDetailsOpen(true);
-  }, [mode]);
-
-  /** Select a site, reusing an existing scenario when it is already open. */
-  function selectSite(siteId: string): void {
-    setPlaying(false);
-    setPlayWindow(undefined);
-    const existingIndex = scenarios.findIndex((scenario) => scenario.siteId === siteId);
-    if (existingIndex >= 0) {
-      setActiveIndex(existingIndex);
-      return;
-    }
-    if (!siteId) return;
-    const dateMs = activeScenario?.dateMs ?? bundle?.ephemeris.label.t0_ms ?? Date.now();
-    setScenarios((current) => [...current, { siteId, dateMs }].slice(-4));
-    setActiveIndex(Math.min(scenarios.length, 3));
+  if (data.status === "loading") {
+    return (
+      <div className="app">
+        <TopBar route={route} onNavigate={navigate} />
+        <p className="status" role="status">Loading the prepared lunar data…</p>
+      </div>
+    );
   }
 
-  /** Change the selected UTC instant without changing the active site. */
-  function updateActiveDate(dateMs: number): void {
-    if (!activeScenario || !Number.isFinite(dateMs)) return;
-    setPlaying(false);
-    setPlayWindow(undefined);
-    setScenarios((current) => current.map((scenario, index) => index === activeIndex ? { ...scenario, dateMs } : scenario));
-  }
-
-  /** Start playback inside one fixed UTC window, or pause the current playback. */
-  function togglePlaying(): void {
-    if (playing) {
-      setPlaying(false);
-      return;
-    }
-    if (activeDateMs === undefined) return;
-    setPlayWindow(timelineBounds(activeDateMs, spanDays));
-    setPlaying(true);
-  }
-
-  /** Remove a scenario from the comparison page's saved set. */
-  function removeScenario(index: number): void {
-    setScenarios((current) => current.filter((_, candidateIndex) => candidateIndex !== index));
-    setActiveIndex((current) => Math.max(0, Math.min(current, scenarios.length - 2)));
-  }
-
-  /** Store the first-visit explanation dismissal so returning visitors see the focused dashboard. */
-  function dismissIntro(): void {
-    window.localStorage.setItem("lunar-intro-dismissed", "1");
-    setIntroOpen(false);
-  }
-
-  if (loadError) return <main className="app-shell"><aside className="error-panel" role="alert">{loadError}</aside></main>;
-  if (!bundle || !activeScenario || !activeSite || !activeSummary || !currentPoint) return <main className="app-shell"><p className="loading">Loading mission data…</p></main>;
-
-  if (page === "compare") {
-    return <ComparePage
-      scenarios={scenarios}
-      summaries={buildComparisonSummaries(bundle, scenarios, allSites, spanDays)}
-      activeIndex={activeIndex}
-      onBack={() => setPage("dashboard")}
-      onSelect={setActiveIndex}
-    />;
-  }
-
-  const nextSunset = workerResult?.events?.sunset.find((time) => time >= activeScenario.dateMs)
-    ?? (activeSummary.timeToSunsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToSunsetMs);
-  const nextSunrise = workerResult?.events?.sunrise.find((time) => time >= activeScenario.dateMs);
-  const nextEarthset = workerResult?.events?.earthset.find((time) => time >= activeScenario.dateMs)
-    ?? (activeSummary.timeToEarthsetMs === undefined ? undefined : activeScenario.dateMs + activeSummary.timeToEarthsetMs);
-  const nextEarthrise = workerResult?.events?.earthrise.find((time) => time >= activeScenario.dateMs);
-
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <button className="brand" type="button" onClick={() => setPage("dashboard")}>Lunar Landing Site Navigator</button>
-        <label className="top-control">Site
-          <select value={activeSite.id} onChange={(event) => selectSite(event.target.value)} aria-label="Select site">
-            {allSites.map((site) => <option value={site.id} key={site.id}>{site.name}</option>)}
-          </select>
-        </label>
-        <label className="top-control">UTC
-          <input type="datetime-local" value={toDateTimeInputValue(activeScenario.dateMs)} onChange={(event) => updateActiveDate(fromDateTimeInputValue(event.target.value))} aria-label="Select UTC date and time" />
-          <small className="local-time">{formatLocalTime(activeScenario.dateMs)} local</small>
-        </label>
-        <div className="top-actions">
-          <button type="button" onClick={() => setPage("compare")}>Compare</button>
-          <button type="button" className={mode === "expert" ? "mode-toggle active" : "mode-toggle"} onClick={() => setMode(mode === "beginner" ? "expert" : "beginner")}>
-            {mode === "beginner" ? "Beginner" : "Expert"}
-          </button>
-          <button type="button" onClick={() => setDetailsOpen(true)}>Details</button>
+  if (data.status === "error") {
+    return (
+      <div className="app">
+        <TopBar route={route} onNavigate={navigate} />
+        <div className="status" role="alert">
+          <h1>The prepared data could not be loaded</h1>
+          <p>{data.message}</p>
+          <p>Nothing is shown, because every number in this app must come from a checked file. Reload the page to try again.</p>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      {bundle.manifest.data_kind === "mock" && <div className="mock-strip">Mock terrain data — not a mission verdict.</div>}
-      {introOpen && <IntroPanel onDismiss={dismissIntro} />}
-
+  const { bundle } = data;
+  return (
+    <div className="app">
+      <TopBar route={route} onNavigate={navigate} />
+      {bundle.manifest.data_kind === "mock" && (
+        <p className="mock-banner" role="alert">Mock data: invented terrain. Nothing on this screen is a real verdict.</p>
+      )}
       <div className="workspace">
-        <section className="main-column" aria-label="Main mission view">
-          <div className="view-tabs" role="tablist" aria-label="Mission views">
-            {(["sky", "terrain", "map"] as ViewMode[]).map((tab) => (
-              <button type="button" role="tab" aria-selected={view === tab} className={view === tab ? "view-tab active" : "view-tab"} onClick={() => setView(tab)} key={tab}>
-                {tab === "sky" ? "Dashboard" : tab === "terrain" ? "Site view" : "Site map"}
-              </button>
-            ))}
-          </div>
-          {view === "sky" && <SkyView summary={activeSummary} currentPoint={currentPoint} />}
-          {view === "terrain" && <SiteView site={activeSite} sites={allSites} currentPoint={currentPoint} onSelect={selectSite} />}
-          {view === "map" && <MapView site={activeSite} sites={allSites} onSelect={selectSite} />}
-        </section>
-
-        <aside className="status-column" aria-label="Mission status">
-          <StatusCard tone="sun" label="Sun" help="The visible fraction is how much of the Sun's disc clears the terrain skyline." status={sunStatusLabel(currentPoint.sunStatus)} value={formatPercent(currentPoint.sunFraction)} exact={mode === "expert" ? `${formatDegrees(currentPoint.sun.el_deg)} elevation · ${formatDegrees(currentPoint.sun.az_deg)} azimuth` : undefined} />
-          <StatusCard label={currentPoint.sunStatus === "visible" ? "Time until sunset" : "Time until sunrise"} help="The next time the Sun changes between visible and hidden, based on the current terrain skyline." value={formatDuration(durationUntil(currentPoint.sunStatus === "visible" ? nextSunset : nextSunrise, activeScenario.dateMs))} />
-          <StatusCard tone="earth" label="Earth" help="Earth is in view when some of its disc clears the local terrain skyline." status={earthStatusLabel(currentPoint.earthStatus)} value={formatDuration(durationUntil(currentPoint.earthStatus === "visible" ? nextEarthset : nextEarthrise, activeScenario.dateMs))} exact={mode === "expert" ? `${formatDegrees(currentPoint.earth.el_deg)} elevation · ${formatDegrees(currentPoint.earth.az_deg)} azimuth` : undefined} />
-          <StatusCard label="Power now" help="Estimated electrical output from the default 4 m² Sun-tracking array at 25% efficiency." value={formatPower(panelPowerW(currentPoint.sun, currentPoint.sunFraction, PANEL))} exact={mode === "expert" ? `${Math.round(currentPoint.batteryWh)} Wh battery · 120 W load` : `Battery ${formatPercent(currentPoint.batteryWh / 2400)}`} />
+        <Stage route={route} />
+        <aside className="panel" aria-label={panelLabel(route)}>
+          <Panel route={route} bundle={bundle} onNavigate={navigate} />
         </aside>
       </div>
-
-      <Timeline summary={activeSummary} selectedMs={activeScenario.dateMs} playing={playing} onPlay={togglePlaying} onChange={updateActiveDate} bounds={bounds} />
-
-      {detailsOpen && <DetailsDrawer
-        summary={activeSummary}
-        mode={mode}
-        onClose={() => setDetailsOpen(false)}
-      />}
-    </main>
+    </div>
   );
 }
 
-/** Find the timeline sample closest to a selected UTC instant. */
-function nearestPoint(points: TimelinePoint[], timeMs: number): TimelinePoint | undefined {
-  return points.reduce<TimelinePoint | undefined>((best, point) => !best || Math.abs(point.timeMs - timeMs) < Math.abs(best.timeMs - timeMs) ? point : best, undefined);
+/** Name the side panel for screen readers according to what it holds. */
+function panelLabel(route: Route): string {
+  if (route.view === "site") return "Site";
+  if (route.view === "point") return "Custom point";
+  return "Sites";
 }
 
-/** Convert an event timestamp into a non-negative countdown. */
-function durationUntil(timeMs: number | undefined, nowMs: number): number | undefined {
-  return timeMs === undefined ? undefined : Math.max(0, timeMs - nowMs);
-}
-
-/** Describe the three-state Sun result in words for a first-time visitor. */
-function sunStatusLabel(status: TimelinePoint["sunStatus"]): string {
-  return status === "visible" ? "Visible" : status === "blocked" ? "Hidden" : "Uncertain";
-}
-
-/** Describe the three-state Earth result in words for a first-time visitor. */
-function earthStatusLabel(status: TimelinePoint["earthStatus"]): string {
-  return status === "visible" ? "In view" : status === "blocked" ? "Out of view" : "Uncertain";
-}
-
-/** Explain the south-pole planning problem once, then let the visitor focus on the answer. */
-function IntroPanel({ onDismiss }: { onDismiss: () => void }) {
-  return <section className="intro-panel"><div><p className="eyebrow">First visit</p><h2>Why the lunar south pole is difficult</h2><p>The Sun and Earth skim the horizon, so small terrain changes can decide whether a landing site has power and contact.</p></div><button type="button" onClick={onDismiss}>Got it</button></section>;
-}
-
-/** Render one compact status card with optional exact values for expert mode. */
-function StatusCard({ tone, label, status, value, exact, help }: { tone?: "sun" | "earth"; label: string; status?: string; value: string; exact?: string; help: string }) {
-  return <article className={`status-card ${tone ?? ""}`}><div className="status-card-heading"><span>{label}</span><Tooltip text={help} /></div>{status && <strong className="status-word">{status}</strong>}<strong className="status-value">{value}</strong>{exact && <small>{exact}</small>}</article>;
-}
-
-/** Render the primary sky view with terrain, body paths, and current body positions. */
-function SkyView({ summary, currentPoint }: { summary: ScenarioSummary; currentPoint: TimelinePoint }) {
-  const width = 720;
-  const height = 420;
-  const range = elevationRange(summary);
-  const skyline = summary.skyline;
-  if (!skyline) return <section className="view-panel unavailable">Terrain not included; verdict unavailable.</section>;
-  const skylinePoints = skyline.skyline_deg.map((elevation, index) => skyPoint(index * skyline.az_step_deg, elevation, width, height, range.min, range.max));
-  const bodyPath = (body: "sun" | "earth") => summary.points.map((point) => {
-    const screen = skyPoint(point[body].az_deg, point[body].el_deg, width, height, range.min, range.max);
-    return `${screen.x.toFixed(1)},${screen.y.toFixed(1)}`;
-  }).join(" ");
-  const sunScreen = skyPoint(currentPoint.sun.az_deg, currentPoint.sun.el_deg, width, height, range.min, range.max);
-  const earthScreen = skyPoint(currentPoint.earth.az_deg, currentPoint.earth.el_deg, width, height, range.min, range.max);
-  return <section className="view-panel sky-panel">
-    <div className="view-title"><div><p className="eyebrow">Current sky · curated site</p><h1>{summary.site.name}</h1><p className="coordinate-line">{summary.site.lat.toFixed(3)}° latitude <span>·</span> {summary.site.lon.toFixed(3)}° longitude</p></div><Tooltip text="The terrain line is the highest local obstacle. A body above it can be seen." /></div>
-    <svg className="sky-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Skyline with Sun and Earth paths">
-      <line x1="0" y1={height - ((0 - range.min) / (range.max - range.min)) * height} x2={width} y2={height - ((0 - range.min) / (range.max - range.min)) * height} className="horizon" />
-      <polyline points={skylinePoints.map((point) => `${point.x},${point.y}`).join(" ")} className="skyline-line" />
-      <polyline points={bodyPath("sun")} className="sun-path" />
-      <polyline points={bodyPath("earth")} className="earth-path" />
-      <circle cx={sunScreen.x} cy={sunScreen.y} r={skyBodySize(currentPoint.sun, "sun", height, range.min, range.max)} className="sun-dot" />
-      <circle cx={earthScreen.x} cy={earthScreen.y} r={skyBodySize(currentPoint.earth, "earth", height, range.min, range.max)} className="earth-dot" />
-    </svg>
-    <div className="view-legend"><span className="sun-key">Sun</span><span className="earth-key">Earth</span><span>Terrain skyline</span></div>
-  </section>;
-}
-
-/** Render the interactive Moon scene that lets a visitor inspect the selected curated site. */
-function SiteView({ site, sites, currentPoint, onSelect }: { site: Site; sites: Site[]; currentPoint: TimelinePoint; onSelect: (siteId: string) => void }) {
-  return <section className="view-panel site-panel">
-    <div className="view-title">
-      <div><p className="eyebrow">Satellite view · Three.js scene</p><h1>{site.name}</h1><p className="coordinate-line">{site.lat.toFixed(3)}° latitude <span>·</span> {site.lon.toFixed(3)}° longitude</p></div>
-      <Tooltip text="This is the immersive view from the prototype: orbit around the Moon, zoom toward the surface, and click a curated site marker." />
-    </div>
-    <SpaceScene site={site} sites={sites} sun={currentPoint.sun} earth={currentPoint.earth} onSelectSite={onSelect} />
-    <div className="site-view-labels"><span>South pole region</span><span>Red marker: selected site</span><span>Gold markers: curated sites</span></div>
-  </section>;
-}
-
-/** Render the data-driven south-polar map for selecting one of the curated sites. */
-function MapView({ site, sites, onSelect }: { site: Site; sites: Site[]; onSelect: (siteId: string) => void }) {
-  const x = 50 + (site.lon / 180) * 36;
-  const y = 50 + ((site.lat + 90) / 10) * 36;
-  return <section className="view-panel map-panel"><div className="view-title"><div><p className="eyebrow">South polar region</p><h1>Map</h1></div><Tooltip text="Select a curated site marker to evaluate it." /></div><div className="polar-map"><div className="polar-grid" />{sites.map((candidate) => <button type="button" className={candidate.id === site.id ? "site-marker selected" : "site-marker"} style={{ left: `${50 + (candidate.lon / 180) * 36}%`, top: `${50 + ((candidate.lat + 90) / 10) * 36}%` }} onClick={(event) => { event.stopPropagation(); onSelect(candidate.id); }} title={candidate.name} aria-label={`Select ${candidate.name}`} key={candidate.id} />)}<span className="site-marker custom-marker" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden="true" /></div><p className="view-caption">{site.lat.toFixed(3)}° latitude · {site.lon.toFixed(3)}° longitude</p></section>;
-}
-
-/** Render the single compact timeline and its draggable UTC cursor. */
-function Timeline({ summary, selectedMs, playing, onPlay, onChange, bounds }: { summary: ScenarioSummary; selectedMs: number; playing: boolean; onPlay: () => void; onChange: (timeMs: number) => void; bounds: { startMs: number; endMs: number; stepMs: number } | undefined }) {
-  const width = 1000;
-  const height = 160;
-  const values = summary.points.flatMap((point) => [point.sun.el_deg, point.earth.el_deg, 0]);
-  const min = Math.min(...values, -2);
-  const max = Math.max(...values, 2);
-  const x = (index: number) => summary.points.length <= 1 ? 0 : (index / (summary.points.length - 1)) * width;
-  const y = (value: number) => height - ((value - min) / (max - min)) * height;
-  const line = (body: "sun" | "earth") => summary.points.map((point, index) => `${x(index).toFixed(1)},${y(point[body].el_deg).toFixed(1)}`).join(" ");
-  const ratio = bounds ? Math.max(0, Math.min(1, (selectedMs - bounds.startMs) / (bounds.endMs - bounds.startMs))) : 0;
-  return <section className="timeline-panel"><div className="timeline-heading"><div><p className="eyebrow">Mission timeline</p><h2>Sunlight and Earth contact</h2></div><Tooltip text="Drag the cursor or press play to move through the selected UTC window." /></div><div className="timeline-plot"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Sun and Earth elevation over time"><line x1="0" y1={y(0)} x2={width} y2={y(0)} className="horizon" /><polyline points={line("sun")} className="sun-path" /><polyline points={line("earth")} className="earth-path" /><line x1={ratio * width} y1="0" x2={ratio * width} y2={height} className="time-cursor" /></svg><div className="timeline-controls"><button type="button" onClick={onPlay}>{playing ? "Pause" : "Play"}</button><input type="range" min="0" max="1000" value={Math.round(ratio * 1000)} onChange={(event) => onChange((bounds?.startMs ?? selectedMs) + (Number(event.target.value) / 1000) * (bounds ? bounds.endMs - bounds.startMs : 0))} aria-label="Timeline cursor" /><time>{new Date(selectedMs).toISOString().replace(".000Z", "Z")}</time></div></div></section>;
-}
-
-/** Render a right-side drawer with precision and metric details. */
-function DetailsDrawer({ summary, mode, onClose }: { summary: ScenarioSummary; mode: ExperienceMode; onClose: () => void }) {
-  return <aside className="details-drawer" aria-label="Mission details"><div className="drawer-heading"><div><p className="eyebrow">Mission details</p><h2>{mode === "expert" ? "Expert readout" : "Additional information"}</h2></div><button type="button" onClick={onClose} aria-label="Close details">×</button></div><dl className="detail-list"><div><dt>Sunlight in selected window</dt><dd>{summary.sunlightHours.toFixed(1)} h</dd></div><div><dt>Lowest battery</dt><dd>{summary.lowestBatteryWh.toFixed(0)} Wh</dd></div><div><dt>Skyline DEM</dt><dd>{summary.skyline?.dem.join(", ") ?? "Unavailable"}</dd></div><div><dt>Resolution</dt><dd>{summary.skyline?.resolution_m.toFixed(0) ?? "—"} m</dd></div><div><dt>Skyline uncertainty</dt><dd>{summary.skyline ? `${Math.max(...summary.skyline.skyline_err_deg).toFixed(2)}° max` : "—"}</dd></div></dl></aside>;
-}
-
-/** Render the separate scenario comparison page without crowding the dashboard. */
-function ComparePage({ scenarios, summaries, activeIndex, onBack, onSelect }: { scenarios: SavedScenario[]; summaries: ScenarioSummary[]; activeIndex: number; onBack: () => void; onSelect: (index: number) => void }) {
-  const sunlight = summaries.map((summary) => summary.sunlightHours);
-  const battery = summaries.map((summary) => summary.lowestBatteryWh);
-  return <main className="app-shell compare-page"><header className="compare-header"><button type="button" onClick={onBack}>← Dashboard</button><div><p className="eyebrow">Scenario comparison</p><h1>Compare mission options</h1></div></header><section className="comparison-card"><table><thead><tr><th>Metric</th>{summaries.map((summary, index) => <th className={index === activeIndex ? "active-column" : ""} key={summary.site.id}>{summary.site.name}</th>)}</tr></thead><tbody><tr><th>Sunlight</th>{summaries.map((summary, index) => <td className={summary.sunlightHours === Math.max(...sunlight) ? "best" : summary.sunlightHours === Math.min(...sunlight) ? "worst" : ""} key={summary.site.id}>{summary.sunlightHours.toFixed(1)} h</td>)}</tr><tr><th>Lowest battery</th>{summaries.map((summary, index) => <td className={summary.lowestBatteryWh === Math.max(...battery) ? "best" : summary.lowestBatteryWh === Math.min(...battery) ? "worst" : ""} key={summary.site.id}>{summary.lowestBatteryWh.toFixed(0)} Wh</td>)}</tr><tr><th>Open scenario</th>{scenarios.map((scenario, index) => <td key={scenario.siteId}><button type="button" onClick={() => { onSelect(index); onBack(); }}>Open</button></td>)}</tr></tbody></table></section></main>;
-}
-
-/** Build summaries for the separate comparison page from the same browser engine calls. */
-function buildComparisonSummaries(bundle: DataBundle | undefined, scenarios: SavedScenario[], sites: Site[], spanDays: number): ScenarioSummary[] {
-  if (!bundle) return [];
-  return scenarios.flatMap((scenario) => {
-    const site = sites.find((candidate) => candidate.id === scenario.siteId);
-    if (!site) return [];
-    return [buildTimeline(bundle, site, bundle.skylines.get(site.id), scenario.dateMs, spanDays)];
-  });
-}
-
-/** Render a small question-mark tooltip trigger for unfamiliar terms. */
-function Tooltip({ text }: { text: string }) {
-  return <button className="tooltip-button" type="button" title={text} aria-label={text}>?</button>;
+/** The one side panel: the site list on the overview scenes, a summary on the site scenes. */
+function Panel({ route, bundle, onNavigate }: { route: Route; bundle: DataBundle; onNavigate: (route: Route) => void }) {
+  if (route.view === "site") return <SiteSummary siteId={route.siteId} bundle={bundle} timeMs={route.timeMs} />;
+  if (route.view === "point") return <PointSummary lat={route.lat} lon={route.lon} bundle={bundle} timeMs={route.timeMs} />;
+  return <SiteList sites={bundle.sites} onOpen={(siteId) => onNavigate({ view: "site", siteId, timeMs: route.timeMs })} />;
 }

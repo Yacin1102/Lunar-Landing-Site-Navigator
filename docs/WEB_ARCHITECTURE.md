@@ -1,6 +1,6 @@
 # Web application architecture
 
-The web application is a static site. It reads prepared products from one folder (`VITE_DATA_FOLDER`: `/data-mock` by default, `/data` for the real sites) and does every calculation that depends on the chosen time or settings in the browser. It never opens NASA files and needs no server.
+The web application is a static site. It reads prepared products from one folder (`VITE_DATA_FOLDER`; `web/vite.config.ts` sets it to `/data`, the real sites, unless it is already set) and does every calculation that depends on the chosen time or settings in the browser. It never opens NASA files and needs no server.
 
 | Module | Job | Reads | Writes |
 | --- | --- | --- | --- |
@@ -12,26 +12,34 @@ The web application is a static site. It reads prepared products from one folder
 | `web/engine/power.ts` | Irradiance, panel factors (flat, tracking, fixed with tilt from horizontal), battery integration with exact run-out time | Sun direction, visible fraction, settings | Power, charge history |
 | `web/engine/evaluate.ts` | One site, time and window: directions, verdicts, events, metrics. Eye height from the skyline record | All of the above | `Evaluation` |
 | `web/engine/worker.ts`, `client.ts` | Run `evaluateSite` in one long-lived Web Worker; the timetable is sent once | `DataBundle` | `Evaluation` |
-| `web/src/visual-model.ts` | Sample directions and verdicts for the chart; take sunlight hours and countdowns from the engine | `DataBundle`, site, window | `ScenarioSummary` |
-| `web/src/formatting.ts` | Format every user-facing number and time | Numeric values, UTC milliseconds | Display strings |
-| `web/src/App.tsx` | Compose dashboard, tabs, cards, drawer, map and compare page | Loader, visual model, worker client, URL state | React view state |
-| `web/src/url-state.ts` | Preserve up to four scenarios in the page URL | Query string, scenarios | Query string |
+| `web/src/formatting.ts` | Format durations, powers, angles and UTC times | Numeric values, UTC milliseconds | Display strings |
+| `web/src/state/route.ts`, `useRoute.ts` | The address: scene, site or point, and time, as the URL hash | `location.hash` | `Route` |
+| `web/src/state/useData.ts` | Load the data once; report loading, error or ready | `loadDataBundle` | `DataState` |
+| `web/src/lib/sites.ts` | Group sites by category, write headings and positions | `Site[]` | Display strings |
+| `web/src/App.tsx` | The shell: top bar, stage, one side panel; loading, error and mock-data states | Route, `DataState` | React view |
+| `web/src/ui/` | `TopBar` (Globe/Map toggle), `Stage` (scene slot), `SiteList`, `SiteSummary`, `PointSummary`, `Facts` | Route, `DataBundle` | React view |
+| `web/vite.config.ts` | Default data folder `/data`; remove `data-mock` from `dist/` after the build | `public/` | `dist/` |
+| `web/e2e/`, `web/playwright.config.ts` | Browser tests and screenshots at 1440×900 and 390×844 against the production build | `dist/` | `docs/screenshots/` |
+
+The interface is being rebuilt in nine parts (`docs/UI_PLAN.md`). The scenes (globe, polar map, site terrain, sky view, geometry) do not exist yet; this file gains a row for each as it is built.
 
 ## Main data flow
 
 ```mermaid
 flowchart LR
   Files["web/public/data/<br/>(written once by the Python engine)"] --> Loader[loadDataBundle<br/>checks versions and sizes]
-  Loader --> Model[buildTimeline]
-  Loader --> Client[worker client]
-  Client --> Worker[Web Worker: evaluateSite]
-  Worker --> Cards[Sun, transition, Earth, power cards]
-  Model --> Cards
-  Model --> Views[Sky, terrain, map views]
-  Model --> Timeline[Timeline cursor and chart]
-  URL[scenarios query parameter] --> App[React App]
-  App --> URL
+  Loader --> Data[useData<br/>loading / error / ready]
+  Hash[URL hash] --> Route[useRoute]
+  Route --> App
+  Data --> App[App shell]
+  App --> TopBar
+  App --> Stage[Stage: scene slot]
+  App --> Panel[Side panel]
+  TopBar -- navigate --> Hash
+  Panel -- navigate --> Hash
 ```
+
+The worker client (`evaluateInWorker`) is not called by the shell yet. It is wired in with the time controls and readouts (part 7).
 
 ## Inside one evaluation
 
@@ -55,21 +63,18 @@ flowchart TD
 ```mermaid
 flowchart TB
   App --> TopBar
-  App --> MainArea
-  App --> StatusColumn
-  App --> Timeline
-  App --> DetailsDrawer
-  App --> ComparePage
-  MainArea --> SkyView
-  MainArea --> TerrainView
-  MainArea --> MapView
-  StatusColumn --> StatusCard
+  App --> Stage
+  App --> Panel
+  Panel --> SiteList
+  Panel --> SiteSummary
+  Panel --> PointSummary
+  SiteSummary --> Facts
+  PointSummary --> Facts
 ```
 
-The beginner screen intentionally exposes only the site/time controls, one main view, four status cards and the timeline. Expert mode adds exact values and opens the Details drawer. Comparison is a separate page so it cannot compete with the first answer.
+At most one side panel is open. Which one depends only on the route.
 
 ## Tests
 
-`cd web; npm test`. The audit tests in `web/engine/tests/audit/` compare the engine with SPICE, JPL Horizons, the Python engine and closed forms. They also validate every data file against `docs/schemas/`. See `docs/WEB_AUDIT.md`.
-
-The 3D view is not on `main` yet: its code is on the `yacin1102-lunar-web-3d` branch.
+- `cd web; npm test`: unit tests (vitest). The audit tests in `web/engine/tests/audit/` compare the engine with SPICE, JPL Horizons, the Python engine and closed forms, and validate every data file against `docs/schemas/` (`docs/WEB_AUDIT.md`). The UI adds tests for the route and the site helpers, the latter against the real `sites.json`.
+- `cd web; npm run e2e`: builds the app, serves the build and runs the browser tests (Playwright, Chromium) in both viewports. They assert zero console errors and failed requests, that every site of `sites.json` is listed, that a failed data load shows an error and no result, and that `dist/` holds the real data and no mock data. First use on a machine: `npx playwright install chromium`.

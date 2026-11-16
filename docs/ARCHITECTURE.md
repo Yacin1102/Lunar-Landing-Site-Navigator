@@ -6,8 +6,8 @@ This page describes the code as it exists today. It grows with each pull request
 
 | Module | Job | Reads | Writes |
 | --- | --- | --- | --- |
-| `web/src/App.tsx` | Renders the mission dashboard, interactive Moon site view, curated-site map, timeline, comparison page and precision drawer. | `DataBundle`, browser engine results, URL state | React UI state |
-| `web/src/visual-model.ts` | Samples browser engine results into chart-ready points and converts sky directions into SVG coordinates. | `DataBundle`, site skylines, selected time | `ScenarioSummary` and visual coordinates |
+| `web/src/App.tsx`, `web/src/ui/` | The shell of the rebuilt interface: top bar, stage and one side panel (`docs/WEB_ARCHITECTURE.md`). | `DataBundle`, URL hash | React UI state |
+| `web/src/state/` | The route (scene, site or point, time) kept in the URL hash, and the one-time data load. | URL hash, `loadDataBundle` | `Route`, `DataState` |
 | `web/src/styles.css` | Provides the dark, glass-panel visual system and responsive layout for the dashboard and site view. | React class names | Browser styles |
 | `web/engine/data.ts` | Loads the data folder: checks every `version`, the timetable label (columns, units, frame, origin), exact binary sizes from labels and the manifest's `bytes`. | `web/public/data/` | `DataBundle` |
 | `web/engine/astro.ts` | The timetable cubic (4-point Lagrange), Sun and Earth azimuth, elevation and distance from a site, disc radii, the step skyline read. | The timetable | Directions |
@@ -125,7 +125,7 @@ flowchart LR
 
 Coordinates shown in the interface are read-only metadata from `sites.json`. The removed custom-coordinate workflow is intentionally not exposed by the UI.
 
-The Site view keeps the supplied `Moon_Site_Viewer` experience as a separate browser scene. `web/src/SpaceScene.tsx` loads the prototype's Three.js 0.128 runtime and OrbitControls, creates the Moon, lighting, Sun, Earth, atmosphere, stars, and site markers, then disposes them when the React view changes. Site coordinates and the current Sun/Earth directions still come from the normal TypeScript data bundle; the scene does not open NASA files or run a second astronomy engine.
+The interface is being rebuilt from scratch (`docs/UI_PLAN.md`). The earlier Three.js scene (`SpaceScene.tsx`, loaded from a CDN) was removed in part 1; the new scenes bundle three.js with the app and are described in `docs/WEB_ARCHITECTURE.md` as they are built.
 
 Conventions fixed in `geometry.py` and used everywhere: "up" is away from the Moon's centre, "north" is along the meridian toward the north pole (away from the south pole at these sites), "east" completes the right-handed set, and azimuth runs from north through east.
 

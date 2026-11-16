@@ -1,0 +1,295 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--space);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--size-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p,
+ul,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Shell: top bar above, stage and one panel below. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-3);
+  height: var(--bar-height);
+  padding: 0 var(--gap-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.topbar-name {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.toggle-option {
+  min-width: 4.5rem;
+  padding: var(--gap-1) var(--gap-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-quiet);
+  cursor: pointer;
+}
+
+.toggle-option + .toggle-option {
+  border-left: 1px solid var(--line);
+}
+
+.toggle-option:hover {
+  color: var(--text);
+}
+
+.toggle-option[aria-pressed="true"] {
+  background: var(--surface-raised);
+  color: var(--accent);
+}
+
+.toggle-option:focus-visible {
+  outline-offset: -2px;
+}
+
+.mock-banner {
+  flex: none;
+  padding: var(--gap-2) var(--gap-4);
+  background: var(--alert);
+  color: #000;
+  font-weight: 500;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.stage {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: var(--space);
+}
+
+.stage-pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-2);
+  padding: var(--gap-4);
+  color: var(--text-quiet);
+  text-align: center;
+}
+
+.stage-pending h2 {
+  color: var(--text);
+  font-size: var(--size-title);
+  font-weight: 500;
+}
+
+.stage-pending p {
+  max-width: 34ch;
+}
+
+.panel {
+  flex: none;
+  width: var(--panel-width);
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-3);
+  padding: var(--gap-4);
+}
+
+.panel-title {
+  font-size: var(--size-title);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.panel-lead {
+  color: var(--text-quiet);
+}
+
+.group-title {
+  margin-top: var(--gap-3);
+  padding-bottom: var(--gap-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+  font-weight: 500;
+}
+
+.site-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.site-list {
+  list-style: none;
+}
+
+.site-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: var(--gap-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.site-row:hover .site-name,
+.site-row:focus-visible .site-name {
+  color: var(--accent);
+}
+
+.site-coords {
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+}
+
+.back {
+  align-self: flex-start;
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+  text-decoration: none;
+}
+
+.back::before {
+  content: "‹ ";
+}
+
+.back:hover {
+  color: var(--accent);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+}
+
+.fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-3);
+  padding: var(--gap-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.fact dt {
+  flex: none;
+  color: var(--text-quiet);
+  font-size: var(--size-small);
+  line-height: 1.75;
+}
+
+.fact dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  max-width: 60ch;
+  margin: var(--gap-5) auto;
+  padding: 0 var(--gap-4);
+  color: var(--text-quiet);
+}
+
+.status h1 {
+  margin-bottom: var(--gap-2);
+  color: var(--alert);
+  font-size: var(--size-title);
+  font-weight: 500;
+}
+
+.status p + p {
+  margin-top: var(--gap-2);
+}
+
+/* Phone: the panel becomes a sheet under the stage. */
+@media (max-width: 760px) {
+  .topbar {
+    padding: 0 var(--gap-3);
+  }
+
+  .workspace {
+    flex-direction: column;
+  }
+
+  .stage {
+    flex: 0 0 42%;
+  }
+
+  .panel {
+    flex: 1;
+    width: auto;
+    min-height: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .panel-body {
+    padding: var(--gap-3);
+  }
+}
